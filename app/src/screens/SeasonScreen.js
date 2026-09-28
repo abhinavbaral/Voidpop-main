@@ -8,6 +8,8 @@ import { useAuth } from "@voidation/shared/backend/AuthContext";
 import { getLibrary, setStatus, statusesFor } from "@voidation/shared/backend/store";
 import { seasonOf, shiftSeason, seasonTitle, FORMAT_GROUPS, groupOf, fetchSeason } from "@voidation/shared/season";
 import Chips from "../components/Chips.js";
+import FilterChips from "../components/FilterChips.js";
+import { applyFilters } from "@voidation/shared/filters";
 import Card from "../components/Card.js";
 import { useTheme } from "../context/ThemeContext.js";
 import { useGridColumns } from "../lib/layout";
@@ -24,6 +26,7 @@ export default function SeasonScreen({ navigation }) {
   const [error, setError] = useState(false);
   const [group, setGroup] = useState("all");
   const [lib, setLib] = useState({});
+  const [filters, setFilters] = useState({ genre: "", studio: "" });
 
   useFocusEffect(useCallback(() => { getLibrary(user).then(setLib).catch(() => {}); }, [user]));
 
@@ -48,7 +51,7 @@ export default function SeasonScreen({ navigation }) {
     { key: "all", label: `All ${items ? items.length : ""}` },
     ...FORMAT_GROUPS.filter((g) => counts[g.key]).map((g) => ({ key: g.key, label: `${g.label} ${counts[g.key]}` })),
   ];
-  const shown = (items || []).filter((it) => group === "all" || groupOf(it) === group);
+  const shown = applyFilters((items || []).filter((it) => group === "all" || groupOf(it) === group), filters);
   const label = (key) => statusesFor("anime").find((s) => s.key === key)?.label;
 
   // adds to Plan to Watch, or undoes that; never removes a title you're
@@ -78,6 +81,7 @@ export default function SeasonScreen({ navigation }) {
       </View>
       <View style={{ paddingHorizontal: 14 }}>
         <Chips options={groups} value={group} onChange={setGroup} />
+        <FilterChips items={items} value={filters} onChange={setFilters} style={{ marginTop: 6 }} />
       </View>
       {items === null ? (
         <View style={{ padding: 40, alignItems: "center" }}>
@@ -90,7 +94,7 @@ export default function SeasonScreen({ navigation }) {
           numColumns={cols}
           keyExtractor={(it) => String(it.id)}
           contentContainerStyle={{ padding: 6, paddingBottom: 30 }}
-          ListEmptyComponent={<Text style={styles.empty}>{loading ? "Loading…" : "Nothing announced for this season yet."}</Text>}
+          ListEmptyComponent={<Text style={styles.empty}>{loading ? "Loading…" : filters.genre || filters.studio ? "Nothing matches these filters." : "Nothing announced for this season yet."}</Text>}
           ListFooterComponent={loading ? <Text style={[styles.empty, { marginTop: 10 }]}>Loading the rest of the season…</Text> : null}
           renderItem={({ item: it }) => {
             const tracked = lib[`anime:${it.id}`];

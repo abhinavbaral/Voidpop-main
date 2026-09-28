@@ -11,7 +11,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Sidebar from "../components/Sidebar.js";
 import Card from "../components/Card.js";
 import {
-  fetchAniList, SORTS, SEASONS, ANIME_ORIGINS, MANGA_ORIGINS,
+  fetchAniList, SORTS, SEASONS, GENRES, ANIME_ORIGINS, MANGA_ORIGINS,
 } from "@voidation/shared/api/anilist";
 import { useTheme } from "../context/ThemeContext.js";
 import { useGridColumns } from "../lib/layout";
@@ -47,6 +47,7 @@ export default function BrowseScreen({ navigation }) {
   const [season, setSeason] = useState("");
   const [year, setYear] = useState(String(THIS_YEAR));
   const [sort, setSort] = useState("popular");
+  const [genre, setGenre] = useState("");
 
   const [items, setItems] = useState([]);
   const [page, setPage] = useState(1);
@@ -62,7 +63,7 @@ export default function BrowseScreen({ navigation }) {
       setLoading(true);
       setError(null);
       try {
-        const opts = { page: pageToLoad, sort, origin };
+        const opts = { page: pageToLoad, sort, origin, genre };
         const result = await fetchAniList(segment, {
           ...opts,
           season: segment === "anime" ? season : "",
@@ -83,7 +84,7 @@ export default function BrowseScreen({ navigation }) {
         loadingRef.current = false;
       }
     },
-    [segment, sort, origin, season, year]
+    [segment, sort, origin, season, year, genre]
   );
 
   useEffect(() => {
@@ -109,6 +110,12 @@ export default function BrowseScreen({ navigation }) {
       options: ORIGIN_MAP[segment],
       onSelect: setOrigin,
     },
+    {
+      label: "Genre",
+      value: genre,
+      options: [{ key: "", label: "All genres" }, ...GENRES.map((g) => ({ key: g, label: g }))],
+      onSelect: setGenre,
+    },
     ...(segment === "anime"
       ? [
           { label: "Season", value: season, options: SEASON_OPTIONS, onSelect: setSeason },
@@ -126,6 +133,7 @@ export default function BrowseScreen({ navigation }) {
   const summary = [
     SEGMENTS.find((s) => s.key === segment)?.label,
     ORIGIN_MAP[segment].find((o) => o.key === origin && o.key !== "")?.label,
+    genre || null,
     segment === "anime" && season
       ? `${season[0].toUpperCase() + season.slice(1)} ${year}`
       : null,

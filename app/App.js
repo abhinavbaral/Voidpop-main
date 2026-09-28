@@ -53,7 +53,10 @@ function useBackgroundChores() {
     const backup = require("./src/lib/backup");
     const alerts = require("./src/lib/episodeAlerts");
     const widget = require("./src/widget");
+    require("./src/lib/backgroundWork").registerBackgroundWork();
+    const sync = require("@voidation/shared/sync/anilist");
     const chores = () => {
+      sync.syncNow({ reason: "open" });
       if (Platform.OS === "android") backup.maybeAutoBackup();
       alerts.rescheduleEpisodeAlerts();
       widget.updateWidget();

@@ -6,7 +6,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@voidation/shared/backend/AuthContext";
 import {
   statusesFor, getStatus, setStatus, addReview, getMyReview, getExcited, toggleExcited,
-  getEntry, setProgress, noteAiring,
+  getEntry, setProgress, noteAiring, getCategories, setEntryCategories,
 } from "@voidation/shared/backend/store";
 import ProgressStepper from "../components/Progress.jsx";
 import { googleCalendarUrl, icsFor } from "@voidation/shared/calendar";
@@ -78,9 +78,13 @@ function TitleBody({ item }) {
   const [watch, setWatch] = useState([]);
   const [progress, setProgressState] = useState(0);
   const [delay, setDelay] = useState(null);
+  const [cats, setCats] = useState([]);
+  const [myCats, setMyCats] = useState([]);
   const refresh = useCallback(async () => {
     const entry = await getEntry(item.segment, item.id);
     setProgressState(entry?.progress || 0);
+    setMyCats(entry?.cats || []);
+    setCats(await getCategories());
     setDelay(entry?.delay?.episode === (entry?.item.nextEpisode?.episode) ? entry.delay : null);
     setStatusState(await getStatus(user, item.segment, item.id));
     setMyReview(await getMyReview(user, item.segment, item.id));
@@ -181,6 +185,24 @@ function TitleBody({ item }) {
                 <button className="status-btn" onClick={() => setVerdictOpen(true)}>{myReview ? "Edit review" : "Review it"}</button>
               )}
             </div>
+
+            {status && cats.length > 0 && (
+              <div className="chips cat-chips" role="group" aria-label="Categories">
+                {cats.map((c) => {
+                  const on = myCats.includes(c.id);
+                  return (
+                    <button key={c.id} className={`chip small${on ? " on" : ""}`} aria-pressed={on}
+                      onClick={async () => {
+                        const next = on ? myCats.filter((x) => x !== c.id) : [...myCats, c.id];
+                        setMyCats(next);
+                        await setEntryCategories(item.segment, item.id, next);
+                      }}>
+                      {on ? "✓ " : "+ "}{c.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             {!!item.overview && <p className="overview">{item.overview}</p>}
             {item.url && <a className="source-link" href={item.url} target="_blank" rel="noreferrer">Source page ↗</a>}

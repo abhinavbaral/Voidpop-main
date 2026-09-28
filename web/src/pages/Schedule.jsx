@@ -13,6 +13,8 @@ import { useSettings } from "@voidation/shared/backend/SettingsContext";
 import { titlePath, cacheTitle } from "../lib/titles.js";
 import { useDocumentTitle } from "../lib/useDocumentTitle.js";
 import PendingPanel from "../components/PendingPanel.jsx";
+import FilterBar from "../components/FilterBar.jsx";
+import { applyFilters } from "@voidation/shared/filters";
 
 // statuses that mean "I still care when the next episode comes out"
 const FOLLOWING = new Set(["watching", "plan", "onhold"]);
@@ -27,6 +29,7 @@ export default function Schedule() {
   const [upcoming, setUpcoming] = useState([]);
   const [excited, setExcited] = useState({});
   const [onlyMine, setOnlyMine] = useState(false);
+  const [filters, setFilters] = useState({ genre: "", studio: "" });
   const [error, setError] = useState(false);
   const [tracked, setTracked] = useState(new Set());
   const [fetched, setFetched] = useState(0); // bumps after fresh air times are saved
@@ -72,6 +75,7 @@ export default function Schedule() {
     (week || [])
       .filter((s) => secondsUntil(s.airingAt, now) > -3600)
       .filter((s) => !onlyMine || tracked.has(s.item.id))
+      .filter((s) => applyFilters([s.item], filters).length)
       .forEach((s) => {
         const label = dayLabel(s.airingAt, now);
         const last = groups[groups.length - 1];
@@ -80,7 +84,7 @@ export default function Schedule() {
       });
     return groups;
     // the day labels only change at midnight, so re-group once a minute at most
-  }, [week, onlyMine, tracked, Math.floor(now / 60000)]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [week, onlyMine, tracked, filters, Math.floor(now / 60000)]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const excite = async (item) => {
     await toggleExcited(user, item);
@@ -141,10 +145,11 @@ export default function Schedule() {
             <button className={`chip${onlyMine ? " on" : ""}`} aria-pressed={onlyMine} onClick={() => setOnlyMine(true)}>Only mine</button>
           </div>
         </div>
+        <FilterBar items={(week || []).map((s) => s.item)} value={filters} onChange={setFilters} />
         {week === null ? (
           <p className="muted">Loading…</p>
         ) : !days.length ? (
-          <p className="empty">{onlyMine ? "None of your shows air this week." : "No episodes found for this week."}</p>
+          <p className="empty">{filters.genre || filters.studio ? "Nothing this week matches these filters." : onlyMine ? "None of your shows air this week." : "No episodes found for this week."}</p>
         ) : (
           days.map((g) => (
             <section key={g.label} className="panel day-group">

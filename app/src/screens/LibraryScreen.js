@@ -5,14 +5,16 @@
 // Search, sort, progress on every card, and +1 on what you're watching.
 
 import { useCallback, useMemo, useState } from "react";
-import { View, Text, TextInput, FlatList, StyleSheet, TouchableOpacity } from "react-native";
+import { View, Text, TextInput, FlatList, StyleSheet, TouchableOpacity, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import { useAuth } from "@voidation/shared/backend/AuthContext";
 import {
   getLibrary, statusesFor, LIBRARY_LISTS as LISTS, inLibraryList as inList,
   setProgress, setStatus, addReview, noteAiring, LIBRARY_SORTS, sortEntries,
+  getCategories, bulkSetStatus, bulkCategory, bulkRemove,
 } from "@voidation/shared/backend/store";
+import OptionsSheet from "../components/OptionsSheet.js";
 import VerdictModal from "../components/VerdictModal.js";
 import { fetchNextEpisodes } from "@voidation/shared/api/anilist";
 import Chips from "../components/Chips.js";
@@ -33,9 +35,14 @@ export default function LibraryScreen({ navigation }) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("updated");
   const [finishing, setFinishing] = useState(null); // item whose last episode you just marked
+  const [cats, setCats] = useState([]);
+  const [cat, setCat] = useState(""); // "" = every category
+  const [selected, setSelected] = useState(null); // null = not selecting; Set of keys while selecting
+  const [sheet, setSheet] = useState(null); // "status" | "category"
 
   const reload = useCallback(async () => {
     setEntries(Object.values(await getLibrary(user).catch(() => ({}))));
+    setCats(await getCategories());
   }, [user]);
 
   useFocusEffect(
@@ -53,6 +60,15 @@ export default function LibraryScreen({ navigation }) {
     }, [user, reload])
   );
 
+  const keyOf = (e) => `${e.item.segment}:${e.item.id}`;
+  const selecting = selected !== null;
+  const toggle = (e) => setSelected((prev) => {
+    const next = new Set(prev || []);
+    if (next.has(keyOf(e))) next.delete(keyOf(e)); else next.add(keyOf(e));
+    return next;
+  });
+  const bulk = async (fn) => { const keys = [...(selected || [])]; setSheet(null); setSelected(null); await fn(keys); reload(); };
+
   const plus = async (e) => {
     const r = await setProgress(user, e.item, (e.progress || 0) + 1);
     if (r.reachedEnd) setFinishing(e.item);
@@ -69,8 +85,10 @@ export default function LibraryScreen({ navigation }) {
   const q = query.trim().toLowerCase();
   // search narrows every status, so the chip counts show where the matches are
   const listEntries = useMemo(
-    () => entries.filter((e) => inList(e, list) && (!q || e.item.title.toLowerCase().includes(q))),
-    [entries, list, q]
+    () => entries.filter((e) => inList(e, list)
+      && (!q || e.item.title.toLowerCase().includes(q))
+      && (!cat || (e.cats || []).includes(cat))),
+    [entries, list, q, cat]
   );
   const sorts = LIBRARY_SORTS.filter((s) => !s.anime || current.segment === "anime");
 
@@ -96,7 +114,7 @@ export default function LibraryScreen({ navigation }) {
           return (
             <TouchableOpacity
               key={l.key}
-              onPress={() => { setList(l.key); if (sort === "airing" || sort === "behind") setSort("updated"); }}
+              onPress={() => { setList(l.key); setSelected(null); if (sort === "airing" || sort === "behind") setSort("updated"); }}
               style={[styles.switchBtn, active && styles.switchActive]}
             >
               <Text style={[styles.switchLabel, active && { color: "#fff" }]}>
@@ -120,7 +138,30 @@ export default function LibraryScreen({ navigation }) {
       <View style={{ paddingHorizontal: 14 }}>
         <Chips options={tabs} value={tab} onChange={setTab} />
         <Chips options={sorts} value={sort} onChange={setSort} style={{ marginTop: 6 }} />
+        {cats.length > 0 && (
+          <Chips
+            options={[{ key: "", label: "All categories" }, ...cats.map((c) => ({ key: c.id, label: c.name }))]}
+            value={cat} onChange={setCat} style={{ marginTop: 6 }}
+          />
+        )}
       </View>
+
+      {selecting && (
+        <View style={styles.bulkBar}>
+          <Text style={styles.bulkCount}>{selected.size} selected</Text>
+          <Text style={styles.bulkBtn} onPress={() => setSelected(new Set(filtered.map(keyOf)))}>All</Text>
+          <Text style={[styles.bulkBtn, !selected.size && styles.bulkOff]} onPress={selected.size ? () => setSheet("status") : undefined}>Move</Text>
+          {cats.length > 0 && (
+            <Text style={[styles.bulkBtn, !selected.size && styles.bulkOff]} onPress={selected.size ? () => setSheet("category") : undefined}>Category</Text>
+          )}
+          <Text style={[styles.bulkBtn, { color: C.rose }, !selected.size && styles.bulkOff]}
+            onPress={selected.size ? () => Alert.alert(`Remove ${selected.size} from your library?`, "Their progress and categories are lost.", [
+              { text: "Cancel", style: "cancel" },
+              { text: "Remove", style: "destructive", onPress: () => bulk(bulkRemove) },
+            ]) : undefined}>Remove</Text>
+          <Text style={[styles.bulkBtn, { color: C.sub }]} onPress={() => setSelected(null)}>Done</Text>
+        </View>
+      )}
 
       <FlatList
         data={filtered}
@@ -134,7 +175,10 @@ export default function LibraryScreen({ navigation }) {
             entry={entry}
             onPlus={entry.status === "watching" ? () => plus(entry) : undefined}
             columns={cols}
-            onPress={() => openDetail(navigation, entry.item)}
+            selecting={selecting}
+            selected={selecting && selected.has(keyOf(entry))}
+            onLongPress={() => (selecting ? toggle(entry) : setSelected(new Set([keyOf(entry)])))}
+            onPress={() => (selecting ? toggle(entry) : openDetail(navigation, entry.item))}
           />
         )}
         ListEmptyComponent={
@@ -142,6 +186,23 @@ export default function LibraryScreen({ navigation }) {
             {q ? `No ${tabLabel} titles match "${query.trim()}".` : `Nothing in ${tabLabel} yet. ${list === "read" ? "Find some manga to read!" : "Tag some titles!"}`}
           </Text>
         }
+      />
+      <OptionsSheet
+        visible={sheet === "status"}
+        title={`Move ${selected?.size || 0} to`}
+        options={statusesFor(current.segment).map((st) => ({ key: st.key, label: st.label }))}
+        onPick={(status) => bulk((keys) => bulkSetStatus(keys, status))}
+        onClose={() => setSheet(null)}
+      />
+      <OptionsSheet
+        visible={sheet === "category"}
+        title="Categories"
+        options={[
+          ...cats.map((c) => ({ key: `+${c.id}`, label: `Add to ${c.name}` })),
+          ...(cat ? [{ key: `-${cat}`, label: `Remove from ${cats.find((c) => c.id === cat)?.name}`, danger: true }] : []),
+        ]}
+        onPick={(k) => bulk((keys) => bulkCategory(keys, k.slice(1), k[0] === "+"))}
+        onClose={() => setSheet(null)}
       />
       {finishing && (
         <VerdictModal visible initial={null} onSave={finish} onClose={() => { setFinishing(null); reload(); }} />
@@ -166,6 +227,13 @@ const makeStyles = (C) => StyleSheet.create({
   switchLabel: { color: C.text, fontWeight: "800", fontSize: 14 },
   switchCount: { fontWeight: "600", opacity: 0.7 },
   switchHint: { color: C.faint, fontSize: 10, marginTop: 3 },
+  bulkBar: {
+    flexDirection: "row", alignItems: "center", gap: 16, marginHorizontal: 14, marginTop: 8, paddingHorizontal: 12, paddingVertical: 10,
+    borderRadius: 12, borderWidth: 1, borderColor: C.purple, backgroundColor: C.card, flexWrap: "wrap",
+  },
+  bulkCount: { color: C.text, fontWeight: "800", flex: 1 },
+  bulkBtn: { color: C.purple, fontWeight: "800" },
+  bulkOff: { opacity: 0.4 },
   empty: { color: C.faint, textAlign: "center", marginTop: 40, paddingHorizontal: 20 },
   search: {
     marginHorizontal: 14, marginTop: 8, height: 40, borderRadius: 10, borderWidth: 1, borderColor: C.border,

@@ -18,6 +18,8 @@ import { useSettings } from "@voidation/shared/backend/SettingsContext";
 import { useTheme } from "../context/ThemeContext.js";
 import { openDetail } from "../lib/nav";
 import PendingPanel from "../components/PendingPanel.js";
+import FilterChips from "../components/FilterChips.js";
+import { applyFilters } from "@voidation/shared/filters";
 
 const FOLLOWING = new Set(["watching", "plan", "onhold"]);
 
@@ -33,6 +35,7 @@ export default function ScheduleScreen({ navigation }) {
   const [excited, setExcited] = useState({});
   const [tracked, setTracked] = useState(new Set());
   const [onlyMine, setOnlyMine] = useState(false);
+  const [filters, setFilters] = useState({ genre: "", studio: "" });
   const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [fetched, setFetched] = useState(0); // bumps after fresh air times are saved
@@ -81,6 +84,7 @@ export default function ScheduleScreen({ navigation }) {
     (week || [])
       .filter((s) => secondsUntil(s.airingAt, now) > -3600)
       .filter((s) => !onlyMine || tracked.has(s.item.id))
+      .filter((s) => applyFilters([s.item], filters).length)
       .forEach((s) => {
         const label = dayLabel(s.airingAt, now);
         const last = groups[groups.length - 1];
@@ -88,7 +92,7 @@ export default function ScheduleScreen({ navigation }) {
         else groups.push({ label, items: [s] });
       });
     return groups;
-  }, [week, onlyMine, tracked, Math.floor(now / 60000)]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [week, onlyMine, tracked, filters, Math.floor(now / 60000)]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const open = (item) => openDetail(navigation, item);
   const onExcite = async (item) => {
@@ -154,10 +158,11 @@ export default function ScheduleScreen({ navigation }) {
             ))}
           </View>
         </View>
+        <FilterChips items={(week || []).map((s) => s.item)} value={filters} onChange={setFilters} style={{ paddingHorizontal: 14, marginTop: 6 }} />
         {week === null ? (
           <Text style={styles.empty}>Loading…</Text>
         ) : !days.length ? (
-          <Text style={styles.empty}>{onlyMine ? "None of your shows air this week." : "No episodes found for this week."}</Text>
+          <Text style={styles.empty}>{filters.genre || filters.studio ? "Nothing this week matches these filters." : onlyMine ? "None of your shows air this week." : "No episodes found for this week."}</Text>
         ) : (
           days.map((g) => (
             <View key={g.label}>

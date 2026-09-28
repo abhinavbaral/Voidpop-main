@@ -7,6 +7,8 @@ import { useNow } from "@voidation/shared/hooks/useNow";
 import { seasonOf, shiftSeason, seasonTitle, FORMAT_GROUPS, groupOf, fetchSeason } from "@voidation/shared/season";
 import Card, { CardSkeleton } from "../components/Card.jsx";
 import { useDocumentTitle } from "../lib/useDocumentTitle.js";
+import FilterBar from "../components/FilterBar.jsx";
+import { applyFilters } from "@voidation/shared/filters";
 
 export default function Season() {
   const { user } = useAuth();
@@ -17,6 +19,7 @@ export default function Season() {
   const [error, setError] = useState(false);
   const [group, setGroup] = useState("all");
   const [lib, setLib] = useState({});
+  const [filters, setFilters] = useState({ genre: "", studio: "" });
   useDocumentTitle(`${seasonTitle(season)} season`);
 
   useEffect(() => { getLibrary(user).then(setLib).catch(() => {}); }, [user]);
@@ -38,7 +41,7 @@ export default function Season() {
     (items || []).forEach((it) => { const g = groupOf(it); c[g] = (c[g] || 0) + 1; });
     return c;
   }, [items]);
-  const shown = (items || []).filter((it) => group === "all" || groupOf(it) === group);
+  const shown = applyFilters((items || []).filter((it) => group === "all" || groupOf(it) === group), filters);
   const label = (key) => statusesFor("anime").find((s) => s.key === key)?.label;
 
   // adds to Plan to Watch, or undoes that; never removes a title you're
@@ -70,11 +73,12 @@ export default function Season() {
           </button>
         ))}
       </div>
+      <FilterBar items={items} value={filters} onChange={setFilters} />
       {error && !items?.length && <p className="notice error">Couldn't load this season. Check your connection and try again.</p>}
       {items === null ? (
         <div className="grid">{Array.from({ length: 12 }, (_, i) => <CardSkeleton key={i} />)}</div>
       ) : !shown.length ? (
-        <p className="empty">{loadingMore ? "Loading…" : "Nothing announced for this season yet."}</p>
+        <p className="empty">{loadingMore ? "Loading…" : filters.genre || filters.studio ? "Nothing matches these filters." : "Nothing announced for this season yet."}</p>
       ) : (
         <div className="grid">
           {shown.map((it) => {

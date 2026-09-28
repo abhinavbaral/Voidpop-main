@@ -17,6 +17,16 @@ function roughUntil(airingAt) {
   return `in ${Math.round(h / 24)}d`;
 }
 
+// Shown if loading fails, so the widget is never an empty see-through box.
+export function WidgetMessage({ text }) {
+  return (
+    <FlexWidget clickAction="OPEN_APP" style={{ height: "match_parent", width: "match_parent", backgroundColor: C.bg, borderRadius: 18, padding: 14, justifyContent: "center", alignItems: "center" }}>
+      <TextWidget text="VOIDATION" style={{ fontSize: 13, fontWeight: "800", color: C.text }} />
+      <TextWidget text={text} style={{ fontSize: 12, color: C.sub, textAlign: "center", marginTop: 6 }} />
+    </FlexWidget>
+  );
+}
+
 export function NextEpisodesWidget({ rows, clock24 = false }) {
   const now = Date.now();
   return (

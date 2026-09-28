@@ -13,14 +13,16 @@ import { totalFor, unitFor, behindBy, maxProgress } from "@voidation/shared/back
 // `columns`: when used in a grid, each cell gets an exact 1/columns width so an
 // incomplete last row doesn't stretch its cards.
 // `entry` (Library only): shows your progress; with onPlus, a +1 button.
-export default function Card({ item, onPress, width, columns, entry, onPlus }) {
+// selecting / selected / onLongPress: the Library's select mode.
+export default function Card({ item, onPress, width, columns, entry, onPlus, selecting, selected, onLongPress }) {
   const { C } = useTheme();
   const styles = makeStyles(C);
 
   if (columns) {
     return (
       <View style={{ width: `${100 / columns}%`, padding: 6 }}>
-        <CardInner item={item} entry={entry} onPlus={onPlus} onPress={onPress} styles={styles} C={C} style={{ margin: 0, flex: undefined }} />
+        <CardInner item={item} entry={entry} onPlus={onPlus} onPress={onPress} onLongPress={onLongPress}
+          selecting={selecting} selected={selected} styles={styles} C={C} style={{ margin: 0, flex: undefined }} />
       </View>
     );
   }
@@ -32,16 +34,19 @@ export default function Card({ item, onPress, width, columns, entry, onPlus }) {
   );
 }
 
-function CardInner({ item, entry, onPlus, onPress, styles, C, style }) {
+function CardInner({ item, entry, onPlus, onPress, onLongPress, selecting, selected, styles, C, style }) {
   const creator = item.creator;
   const { settings } = useSettings();
   const next = settings.posterBadges ? item.nextEpisode : null;
   return (
     <Pressable
       onPress={onPress}
+      onLongPress={onLongPress}
+      delayLongPress={350}
       style={({ hovered, pressed }) => [
         styles.card,
         style,
+        selected && { borderColor: C.purple, borderWidth: 3 },
         hovered && styles.hovered,
         pressed && { opacity: 0.85 },
       ]}
@@ -52,6 +57,11 @@ function CardInner({ item, entry, onPlus, onPress, styles, C, style }) {
         ) : (
           <View style={[styles.poster, styles.noImg]}>
             <Text style={{ color: C.faint, fontSize: 12 }}>No image</Text>
+          </View>
+        )}
+        {selecting && (
+          <View style={[styles.tick, selected && { backgroundColor: C.purple, borderColor: C.purple }]}>
+            <Text style={{ color: "#fff", fontWeight: "900", fontSize: 12 }}>{selected ? "✓" : ""}</Text>
           </View>
         )}
         {next && (
@@ -73,7 +83,7 @@ function CardInner({ item, entry, onPlus, onPress, styles, C, style }) {
               {unitFor(item.segment)} {entry.progress || 0}{totalFor(item) ? `/${totalFor(item)}` : ""}
               {behindBy(entry) > 0 && <Text style={{ color: C.orange }}> · {behindBy(entry)} new</Text>}
             </Text>
-            {onPlus && (maxProgress(item) == null || (entry.progress || 0) < maxProgress(item)) && (
+            {onPlus && !selecting && (maxProgress(item) == null || (entry.progress || 0) < maxProgress(item)) && (
               <Pressable onPress={onPlus} hitSlop={8} style={styles.plus}
                 accessibilityLabel={item.segment === "manga" ? "Mark next chapter read" : "Mark next episode watched"}>
                 <Text style={styles.plusText}>+1</Text>
@@ -104,6 +114,10 @@ const makeStyles = (C) => StyleSheet.create({
   title: { color: C.text, fontWeight: "700", fontSize: 13 },
   creator: { color: C.orange, fontSize: 11, fontWeight: "600", marginTop: 3 },
   sub: { color: C.sub, fontSize: 11, marginTop: 2 },
+  tick: {
+    position: "absolute", top: 6, left: 6, width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: "#fff",
+    backgroundColor: "rgba(11,15,25,0.8)", alignItems: "center", justifyContent: "center",
+  },
   late: { backgroundColor: "rgba(190,18,60,0.92)" },
   progressRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 4, marginTop: 6 },
   progress: { flex: 1, color: C.sub, fontSize: 11, fontWeight: "700" },

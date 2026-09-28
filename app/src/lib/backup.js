@@ -2,8 +2,8 @@
 // Downloads/Voidation), and a backup file is written there on a schedule.
 // Files in a folder you chose survive uninstalling the app, unlike app storage.
 //
-// No background service: the check runs when the app starts and whenever it
-// comes back to the foreground, which covers anyone who opens it daily.
+// The check runs when the app starts, when it comes back to the foreground,
+// and in Android's background jobs while it's closed (see backgroundWork.js).
 //
 // Config lives in its own AsyncStorage key (not in the library), so restoring a
 // backup from another phone can't point this phone at a folder it can't reach.

@@ -70,10 +70,18 @@ export async function cacheSize() {
   return (await loadIndex()).reduce((n, e) => n + e.size, 0);
 }
 
-/* ---------- online / offline state, for the banner ---------- */
+/* ---------- online / offline, for the banner ---------- */
+//
+// "Offline" means the DEVICE has no internet (the app asks Android via NetInfo;
+// the website asks the browser). An AniList hiccup while you're online (it
+// allows only so many requests a minute) is not "offline": saved answers are
+// used quietly and no banner is shown.
 
-let state = { offline: false, since: null }; // since = age of the oldest saved answer shown
+let deviceOnline = true;
+let oldestShown = null; // save time of the oldest answer shown while offline
+let state = { offline: false, since: null };
 const listeners = new Set();
+
 export function onNetState(fn) {
   listeners.add(fn);
   fn(state);
@@ -84,7 +92,19 @@ function emit(next) {
   state = next;
   listeners.forEach((fn) => { try { fn(state); } catch { /* ignore */ } });
 }
-export const markOnline = () => emit({ offline: false, since: null });
-export const markOffline = (savedAt) =>
-  emit({ offline: true, since: state.offline && state.since ? Math.min(state.since, savedAt) : savedAt });
-export const markOfflineNoCopy = () => emit({ offline: true, since: state.offline ? state.since : null });
+
+export const isDeviceOnline = () => deviceOnline;
+
+// Called by each platform's startup code whenever connectivity changes.
+export function setDeviceOnline(online) {
+  deviceOnline = !!online;
+  if (deviceOnline) oldestShown = null;
+  emit({ offline: !deviceOnline, since: deviceOnline ? null : oldestShown });
+}
+
+// A saved answer was shown instead of a fresh one.
+export function noteSavedShown(savedAt) {
+  if (deviceOnline) return;
+  oldestShown = oldestShown ? Math.min(oldestShown, savedAt) : savedAt;
+  emit({ offline: true, since: oldestShown });
+}

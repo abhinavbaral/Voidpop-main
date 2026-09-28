@@ -10,6 +10,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import {
   getUserTier, TIERS, statusesFor, exportData, importData, clearData, storageSize, importAniListEntries,
+  getCategories, addCategory, renameCategory, moveCategory, deleteCategory,
 } from "@voidation/shared/backend/store";
 import { useSettings } from "@voidation/shared/backend/SettingsContext";
 import TierBadge from "../components/TierBadge.js";
@@ -19,6 +20,7 @@ import {
   FREQUENCIES, KEEP, getBackupConfig, setFrequency, chooseFolder, backupNow, restoreFromFile,
 } from "../lib/backup";
 import { ensurePermission, rescheduleEpisodeAlerts } from "../lib/episodeAlerts";
+import AniListSync from "../components/AniListSync.js";
 import { timeAgo } from "@voidation/shared/backend/store";
 
 const NATIVE = Platform.OS !== "web";
@@ -27,14 +29,14 @@ const AUTO_BACKUP = Platform.OS === "android"; // Android's folder picker (SAF)
 const VERSION = "1.0.0";
 const TITLES = {
   statistics: "Statistics", appearance: "Appearance", settings: "Settings",
-  data: "Data and storage", help: "Help", about: "About",
+  data: "Data and storage", categories: "Categories", anilist: "AniList", help: "Help", about: "About",
 };
 
 export default function MorePageScreen({ route, navigation }) {
   const { C } = useTheme();
   const styles = makeStyles(C);
   const page = route.params?.page;
-  const Body = { statistics: Statistics, appearance: Appearance, settings: Settings, data: DataStorage, help: Help, about: About }[page];
+  const Body = { statistics: Statistics, appearance: Appearance, settings: Settings, data: DataStorage, categories: Categories, anilist: AniListPage, help: Help, about: About }[page];
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -224,7 +226,7 @@ function DataStorage({ styles, C }) {
           <Text style={[styles.note, { marginTop: 10 }]}>
             {cfg.lastError ? cfg.lastError
               : cfg.last ? `Last backup ${timeAgo(cfg.last)}. The newest ${KEEP} are kept.`
-              : cfg.dirUri ? "No backup yet." : "Pick a folder like Download/Voidation. Backups run when you open the app."}
+              : cfg.dirUri ? "No backup yet." : "Pick a folder like Download/Voidation. Backups run in the background, and when you open the app."}
           </Text>
           <TouchableOpacity style={[styles.btn, { marginTop: 10, flex: undefined }]} disabled={!cfg.dirUri || busy} onPress={now}>
             <Text style={[styles.btnText, !cfg.dirUri && { color: C.faint }]}>Back up now</Text>
@@ -244,8 +246,6 @@ function DataStorage({ styles, C }) {
           </TouchableOpacity>
         </View>
       </View>
-
-      <AniListImport styles={styles} C={C} onDone={() => { reload(); measure(); }} />
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Offline copy</Text>
@@ -311,13 +311,88 @@ function AniListImport({ styles, C, onDone }) {
   );
 }
 
+// Your own Library groups ("Favourites", "Rewatch", "With friends"…), like
+// Mihon's categories. Titles can be in several; deleting one keeps the titles.
+function Categories({ styles, C }) {
+  const [cats, setCats] = useState(null);
+  const [name, setName] = useState("");
+  const [editing, setEditing] = useState(null); // { id, name }
+  const [message, setMessage] = useState("");
+  const refresh = useCallback(() => { getCategories().then(setCats); }, []);
+  useFocusEffect(refresh);
+
+  const add = async () => {
+    const cat = await addCategory(name);
+    setMessage(cat ? "" : name.trim() ? "You already have a category with that name." : "");
+    if (cat) setName("");
+    refresh();
+  };
+  const remove = (c) => Alert.alert(`Delete "${c.name}"?`, "The titles in it stay in your library.", [
+    { text: "Cancel", style: "cancel" },
+    { text: "Delete", style: "destructive", onPress: async () => { await deleteCategory(c.id); refresh(); } },
+  ]);
+  if (!cats) return <Text style={styles.note}>Loading…</Text>;
+  return (
+    <>
+      <Text style={styles.note}>
+        Group titles your own way: Favourites, Rewatch, With friends… A title can be in several. Filter by them in the
+        Library; add titles from a title's page, or long-press in the Library to select several.
+      </Text>
+      <View style={[styles.modeRow, { marginTop: 12 }]}>
+        <TextInput value={name} onChangeText={setName} placeholder="New category" placeholderTextColor={C.faint} maxLength={40}
+          onSubmitEditing={add} returnKeyType="done"
+          style={[styles.btn, { color: C.text, paddingHorizontal: 12, flex: 2, alignItems: undefined }]} />
+        <TouchableOpacity style={[styles.btn, styles.btnOn, !name.trim() && { opacity: 0.5 }]} disabled={!name.trim()} onPress={add}>
+          <Text style={[styles.btnText, { color: "#fff" }]}>Add</Text>
+        </TouchableOpacity>
+      </View>
+      {!!message && <Text style={{ color: C.rose, fontSize: 12, marginTop: 6 }}>{message}</Text>}
+      {cats.length === 0 ? <Text style={[styles.note, { marginTop: 16 }]}>No categories yet.</Text> : (
+        <View style={styles.card}>
+          {cats.map((c, i) => (
+            <View key={c.id} style={[styles.trackerRow, i === 0 && { borderTopWidth: 0, marginTop: 0 }, { alignItems: "center", gap: 10 }]}>
+              {editing?.id === c.id ? (
+                <>
+                  <TextInput value={editing.name} autoFocus maxLength={40} onChangeText={(t) => setEditing({ ...editing, name: t })}
+                    style={[styles.btn, { color: C.text, paddingHorizontal: 10, flex: 1, alignItems: undefined, height: 36 }]} />
+                  <Text style={{ color: C.purple, fontWeight: "800" }}
+                    onPress={async () => { await renameCategory(c.id, editing.name); setEditing(null); refresh(); }}>Save</Text>
+                </>
+              ) : (
+                <>
+                  <Text style={[styles.trackerLabel, { flex: 1, color: C.text, fontWeight: "700" }]}>{c.name}</Text>
+                  <Text style={{ color: i === 0 ? C.border : C.sub, fontSize: 16 }} onPress={i === 0 ? undefined : async () => { await moveCategory(c.id, -1); refresh(); }}>↑</Text>
+                  <Text style={{ color: i === cats.length - 1 ? C.border : C.sub, fontSize: 16 }} onPress={i === cats.length - 1 ? undefined : async () => { await moveCategory(c.id, 1); refresh(); }}>↓</Text>
+                  <Text style={{ color: C.purple, fontWeight: "700" }} onPress={() => setEditing({ id: c.id, name: c.name })}>Rename</Text>
+                  <Text style={{ color: C.rose, fontWeight: "700" }} onPress={() => remove(c)}>Delete</Text>
+                </>
+              )}
+            </View>
+          ))}
+        </View>
+      )}
+    </>
+  );
+}
+
+// AniList: two-way sync (sign in) or a one-time import by username.
+function AniListPage({ styles, C }) {
+  const { reload } = useSettings();
+  return (
+    <>
+      <AniListSync styles={styles} C={C} onChange={() => { reload(); rescheduleEpisodeAlerts(); }} />
+      <AniListImport styles={styles} C={C} onDone={() => { reload(); rescheduleEpisodeAlerts(); }} />
+    </>
+  );
+}
+
 const FAQ = [
   ["Where is my library saved?", "On this phone. There is no account and nothing is uploaded. Use Data and storage to back it up."],
   ["How do I move to a new phone?", "Copy a backup file from your backup folder (or Share backup), then use Restore from file on the new phone."],
   ["Can I bring my AniList lists?", "Yes. Data and storage → Import from AniList, then type your username. Your lists need to be public; nothing is changed on AniList."],
   ["What does Delayed mean?", "The next episode was going to air earlier, and its date has since moved later. Voidation shows the original date next to the new one."],
   ["Does uninstalling delete my library?", "The library inside the app, yes. Backups in the folder you chose under Data and storage stay, so you can restore them after reinstalling."],
-  ["Why didn't I get an episode alert?", "Alerts are set up each time you open Voidation, for the next episode of everything you follow. Open the app at least once a week, and check that notifications are allowed and New episode alerts is on in Settings."],
+  ["Why didn't I get an episode alert?", "Alerts are set up when you open Voidation and about hourly in the background, for the next episode of everything you follow. Check that notifications are allowed and New episode alerts is on in Settings. Some phones (Xiaomi, Oppo, Vivo…) stop background work to save battery; allow Voidation to run in the background in your phone's battery settings."],
   ["Why doesn't a show have a countdown?", "It has finished airing, or AniList doesn't know the next episode's date yet. Countdowns appear as soon as a date is announced."],
   ["What time zone are the airing times in?", "Yours. Voidation converts every broadcast time to your phone's time zone."],
   ["What shows up in History?", "Episodes from the last 14 days for anime you mark Watching, Plan to Watch, On Hold, or Excited."],

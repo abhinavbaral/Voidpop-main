@@ -2,7 +2,7 @@
 // so every view can be bookmarked and shared.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { fetchAniList, SORTS, SEASONS, ANIME_ORIGINS, MANGA_ORIGINS } from "@voidation/shared/api/anilist";
+import { fetchAniList, SORTS, SEASONS, GENRES, ANIME_ORIGINS, MANGA_ORIGINS } from "@voidation/shared/api/anilist";
 import { useNow } from "@voidation/shared/hooks/useNow";
 import Card, { CardSkeleton } from "../components/Card.jsx";
 import { SEGMENTS, SEGMENT_LABEL } from "../lib/titles.js";
@@ -19,6 +19,7 @@ export default function Browse() {
   const sort = params.get("sort") || "popular";
   const season = segment === "anime" ? params.get("season") || "" : "";
   const year = params.get("year") || String(THIS_YEAR);
+  const genre = params.get("genre") || "";
   useDocumentTitle(`Browse ${SEGMENT_LABEL[segment]}`);
   const now = useNow(30000);
 
@@ -45,7 +46,7 @@ export default function Browse() {
     setLoading(true);
     setError(null);
     try {
-      const opts = { page: pageToLoad, sort, origin };
+      const opts = { page: pageToLoad, sort, origin, genre };
       const res = await fetchAniList(segment, { ...opts, season, year: Number(year) });
       if (id !== reqId.current) return; // stale
       setItems((prev) => {
@@ -62,7 +63,7 @@ export default function Browse() {
     } finally {
       if (id === reqId.current) { busy.current = false; setLoading(false); }
     }
-  }, [segment, origin, sort, season, year]);
+  }, [segment, origin, sort, season, year, genre]);
 
   useEffect(() => {
     setItems([]);
@@ -97,6 +98,8 @@ export default function Browse() {
       <div className="filters">
         <Select id="f-origin" label="Origin"
           value={origin} onChange={(v) => set({ origin: v })} options={ORIGINS[segment]} />
+        <Select id="f-genre" label="Genre" value={genre} onChange={(v) => set({ genre: v })}
+          options={[{ key: "", label: "All genres" }, ...GENRES.map((g) => ({ key: g, label: g }))]} />
         {segment === "anime" && (
           <Select id="f-season" label="Season" value={season} onChange={(v) => set({ season: v })}
             options={[{ key: "", label: "All time" }, ...SEASONS.map((s) => ({ key: s, label: s[0].toUpperCase() + s.slice(1) }))]} />

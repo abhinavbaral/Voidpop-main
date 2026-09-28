@@ -8,7 +8,8 @@ import { getLibrary, getExcited } from "@voidation/shared/backend/store";
 export const WIDGET_LIMIT = 30;
 const FOLLOWING = new Set(["watching", "plan", "onhold"]);
 
-export async function loadWidgetRows() {
+// quick: saved data only (no network), so the widget can draw immediately
+export async function loadWidgetRows({ quick = false } = {}) {
   const [lib, excited] = await Promise.all([getLibrary(), getExcited()]);
   const saved = {};
   Object.values(lib).forEach((e) => {
@@ -19,7 +20,9 @@ export async function loadWidgetRows() {
   });
   const ids = Object.keys(saved);
   let fresh = {};
-  try { fresh = await fetchNextEpisodes(ids); } catch { /* offline, nothing cached: use snapshots */ }
+  if (!quick) {
+    try { fresh = await fetchNextEpisodes(ids); } catch { /* offline, nothing cached: use snapshots */ }
+  }
   const now = Date.now() / 1000;
   return ids
     .map((id) => {

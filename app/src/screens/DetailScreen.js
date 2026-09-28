@@ -20,6 +20,7 @@ import { useAuth } from "@voidation/shared/backend/AuthContext";
 import {
   statusesFor, getStatus, setStatus, addReview, getMyReview,
   getExcited, toggleExcited, getEntry, setProgress, noteAiring, totalFor, unitFor, airedFor, maxProgress, checkProgress,
+  getCategories, setEntryCategories,
 } from "@voidation/shared/backend/store";
 import { fetchAniListDetail, fetchAniListItem, fetchNextEpisodes } from "@voidation/shared/api/anilist";
 import ReviewCard from "../components/ReviewCard.js";
@@ -98,6 +99,8 @@ function DetailBody({ item, navigation }) {
   const [isExcited, setIsExcited] = useState(false);
   const [progress, setProgressState] = useState(0);
   const [delay, setDelay] = useState(null);
+  const [cats, setCats] = useState([]);
+  const [myCats, setMyCats] = useState([]);
   const [shareOpen, setShareOpen] = useState(false);
   const [countdownOpen, setCountdownOpen] = useState(false);
   const [zoom, setZoom] = useState(false);
@@ -109,6 +112,8 @@ function DetailBody({ item, navigation }) {
   const refresh = useCallback(async () => {
     const entry = await getEntry(item.segment, item.id);
     setProgressState(entry?.progress || 0);
+    setMyCats(entry?.cats || []);
+    setCats(await getCategories());
     setDelay(entry?.delay?.episode === entry?.item.nextEpisode?.episode ? entry?.delay : null);
     setStatusState(await getStatus(user, item.segment, item.id));
     setMyReview(await getMyReview(user, item.segment, item.id));
@@ -203,6 +208,24 @@ function DetailBody({ item, navigation }) {
           </TouchableOpacity>
         )}
       </View>
+      {!!status && cats.length > 0 && (
+        <View style={[styles.statusRow, { marginTop: 10 }]}>
+          {cats.map((c) => {
+            const on = myCats.includes(c.id);
+            return (
+              <TouchableOpacity key={c.id}
+                onPress={async () => {
+                  const next = on ? myCats.filter((x) => x !== c.id) : [...myCats, c.id];
+                  setMyCats(next);
+                  await setEntryCategories(item.segment, item.id, next);
+                }}
+                style={[styles.catChip, on && { backgroundColor: C.purple, borderColor: C.purple }]}>
+                <Text style={[styles.statusText, { fontSize: 11 }, on && { color: "#fff" }]}>{on ? "✓ " : "+ "}{c.name}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
     </>
   );
 
@@ -439,6 +462,7 @@ function ProgressBox({ item, progress, onChange, styles, C }) {
 }
 
 const makeStyles = (C) => StyleSheet.create({
+  catChip: { paddingHorizontal: 10, height: 28, borderRadius: 999, borderWidth: 1, borderColor: C.border, justifyContent: "center" },
   progressBox: { flexDirection: "row", alignItems: "center", gap: 8 },
   progressInput: {
     minWidth: 80, height: 40, borderRadius: 8, borderWidth: 1, borderColor: C.purple, backgroundColor: C.bg,

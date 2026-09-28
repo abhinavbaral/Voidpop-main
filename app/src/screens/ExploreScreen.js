@@ -8,7 +8,7 @@ import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from "react-nati
 import { SafeAreaView } from "react-native-safe-area-context";
 import PosterRow from "../components/PosterRow.js";
 import Brand from "../components/Brand.js";
-import { loadExplore, loadVerdictRows } from "@voidation/shared/explore";
+import { loadExplorePools, buildExplore, knownKeys, loadVerdictRows } from "@voidation/shared/explore";
 import { useTheme } from "../context/ThemeContext.js";
 import { openDetail } from "../lib/nav";
 import { useIsWide } from "../lib/layout";
@@ -24,13 +24,18 @@ export default function ExploreScreen({ navigation }) {
   // your verdicts change as you use the app, so these rows refresh on every visit
   useFocusEffect(useCallback(() => { loadVerdictRows().then(setVerdictRows).catch(() => {}); }, []));
 
+  const [pools, setPools] = useState(null);
   useEffect(() => {
     // same sections, same daily picks as the website
-    loadExplore()
-      .then(setData)
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    loadExplorePools()
+      .then(setPools)
+      .catch(() => setLoading(false));
   }, []);
+  // anything you add to your library disappears from Explore when you come back
+  useFocusEffect(useCallback(() => {
+    if (!pools) return;
+    knownKeys().then((known) => { setData(buildExplore(pools, known)); setLoading(false); }).catch(() => {});
+  }, [pools]));
 
   const open = (item) => openDetail(navigation, item);
 

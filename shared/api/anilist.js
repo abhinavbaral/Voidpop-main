@@ -3,8 +3,8 @@
 // upcoming (unreleased) titles, and per-title details (trailer + related seasons).
 
 import { formatDateParts } from "../format.js";
-import { cacheKey, cacheGet, cachePut, markOnline, markOffline, markOfflineNoCopy } from "./cache.js";
-export { onNetState, cacheClear, cacheSize } from "./cache.js";
+import { cacheKey, cacheGet, cachePut, isDeviceOnline, noteSavedShown } from "./cache.js";
+export { onNetState, cacheClear, cacheSize, setDeviceOnline } from "./cache.js";
 
 const URL = "https://graphql.anilist.co";
 
@@ -23,6 +23,12 @@ const sortMap = {
 };
 
 export const SEASONS = ["winter", "spring", "summer", "fall"];
+
+// AniList's genre list (its adult genre left out)
+export const GENRES = [
+  "Action", "Adventure", "Comedy", "Drama", "Ecchi", "Fantasy", "Horror", "Mahou Shoujo", "Mecha", "Music",
+  "Mystery", "Psychological", "Romance", "Sci-Fi", "Slice of Life", "Sports", "Supernatural", "Thriller",
+];
 
 export const ANIME_ORIGINS = [
   { key: "", label: "All" },
@@ -104,36 +110,87 @@ function normalize(m, segment) {
   };
 }
 
-// Online first; when that fails, the last saved answer for the same request
-// (see cache.js). AniList's own errors (user not found, private list…) are
-// real answers and are passed through, not replaced by old data.
-async function gql(query, variables, { save = true } = {}) {
+// How every AniList request is made:
+//  1. An answer saved in the last few minutes is reused (AniList allows only
+//     ~30–90 requests a minute, and several screens ask the same things).
+//  2. The same request already on its way is shared, not sent twice.
+//  3. Offline (the device says so): saved answer straight away, no waiting.
+//  4. "Too many requests": wait as long as AniList asks (up to 15 s), try once more.
+//  5. Still failing: the last saved answer, quietly. Only a real lack of
+//     internet shows the Offline banner (see cache.js).
+// AniList's own errors (user not found, private list…) are real answers and
+// are passed through, not replaced by old data.
+const FRESH_MS = 3 * 60 * 1000;
+const inflight = new Map();
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function gql(query, variables, { save = true, token = null } = {}) {
   const body = JSON.stringify({ query, variables });
+  // signed-in requests (your own lists, changes) are never cached or shared
+  if (token) return request(body, null, false, token);
   const k = cacheKey(body);
-  let json;
+  if (save) {
+    const saved = await cacheGet(k);
+    if (saved && (Date.now() - saved.at < FRESH_MS || !isDeviceOnline())) {
+      noteSavedShown(saved.at);
+      return saved.data;
+    }
+  }
+  if (!isDeviceOnline()) throw new Error("You're offline, and this hasn't been saved yet.");
+  if (inflight.has(k)) return inflight.get(k);
+  const p = request(body, k, save).finally(() => inflight.delete(k));
+  inflight.set(k, p);
+  return p;
+}
+
+async function post(body, token) {
+  const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+  const timer = ctrl && setTimeout(() => ctrl.abort(), 15000);
   try {
-    const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
-    const timer = ctrl && setTimeout(() => ctrl.abort(), 12000);
-    const res = await fetch(URL, {
+    return await fetch(URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body,
       signal: ctrl?.signal,
     });
+  } finally {
     if (timer) clearTimeout(timer);
-    if (res.status >= 500 || res.status === 429) throw new Error(`AniList ${res.status}`);
+  }
+}
+
+// thrown when AniList rejects the sign-in (expired or revoked)
+export class AniListAuthError extends Error {}
+
+async function request(body, k, save, token = null) {
+  let json;
+  try {
+    let res = await post(body, token);
+    if (res.status === 429) {
+      const wait = Math.min(Number(res.headers?.get?.("Retry-After")) || 5, 15);
+      await sleep(wait * 1000);
+      res = await post(body, token);
+    }
+    if (res.status === 401) throw new AniListAuthError("Your AniList sign-in has expired. Sign in again.");
+    if (res.status >= 500 || res.status === 429) throw new Error(`AniList is busy (${res.status}). Try again in a minute.`);
     json = await res.json();
-  } catch (networkError) {
-    const saved = await cacheGet(k);
+  } catch (err) {
+    if (err instanceof AniListAuthError) throw err;
+    const saved = save ? await cacheGet(k) : null;
     if (saved) {
-      markOffline(saved.at);
+      noteSavedShown(saved.at);
       return saved.data;
     }
-    markOfflineNoCopy();
-    throw networkError;
+    throw err;
   }
-  markOnline();
-  if (json.errors) throw new Error(json.errors[0].message);
+  if (json.errors) {
+    const msg = json.errors[0].message || "AniList error";
+    if (token && /invalid token|unauthori[sz]ed|expired/i.test(msg)) throw new AniListAuthError("Your AniList sign-in has expired. Sign in again.");
+    throw new Error(msg);
+  }
   if (save) cachePut(k, json.data);
   return json.data;
 }
@@ -142,7 +199,7 @@ async function gql(query, variables, { save = true } = {}) {
 export async function fetchAniList(segment, opts = {}) {
   const {
     page = 1, sort = "popular", search = "", origin = "",
-    season = "", year = null, unreleasedOnly = false, perPage = 24,
+    season = "", year = null, unreleasedOnly = false, perPage = 24, genre = "",
   } = opts;
 
   const args = ["type: $type", "isAdult: false", "sort: $sort"];
@@ -156,6 +213,7 @@ export async function fetchAniList(segment, opts = {}) {
   if (search) { varDefs.push("$search: String"); args.push("search: $search"); variables.search = search; }
   if (origin) { varDefs.push("$country: CountryCode"); args.push("countryOfOrigin: $country"); variables.country = origin; }
   if (unreleasedOnly) { args.push("status: NOT_YET_RELEASED"); }
+  if (genre) { varDefs.push("$genre: String"); args.push("genre: $genre"); variables.genre = genre; }
   if (segment === "anime" && season) {
     varDefs.push("$season: MediaSeason", "$seasonYear: Int");
     args.push("season: $season", "seasonYear: $seasonYear");
@@ -186,11 +244,15 @@ const LIST_FIELDS = `
   startDate { year month day } genres siteUrl status
   episodes chapters nextAiringEpisode { episode airingAt }
 `;
-export async function fetchAniListUserList(userName) {
-  const query = `query ($user: String, $type: MediaType, $chunk: Int) {
-    MediaListCollection(userName: $user, type: $type, chunk: $chunk, perChunk: 500) {
+// Pass a username (public lists), or { userId, token } when signed in (then
+// private lists work too, and each entry's AniList list id comes back for sync).
+export async function fetchAniListUserList(who) {
+  const byName = typeof who === "string";
+  const userName = byName ? who : "";
+  const query = `query (${byName ? "$user: String" : "$userId: Int"}, $type: MediaType, $chunk: Int) {
+    MediaListCollection(${byName ? "userName: $user" : "userId: $userId"}, type: $type, chunk: $chunk, perChunk: 500) {
       hasNextChunk
-      lists { isCustomList entries { status progress updatedAt media { ${LIST_FIELDS} } } }
+      lists { isCustomList entries { id status progress updatedAt media { ${LIST_FIELDS} } } }
     }
   }`;
   const out = [];
@@ -198,8 +260,12 @@ export async function fetchAniListUserList(userName) {
     for (let chunk = 1; chunk <= 20; chunk++) {
       let data;
       try {
-        data = await gql(query, { user: userName.trim(), type: segment === "anime" ? "ANIME" : "MANGA", chunk }, { save: false });
+        const type = segment === "anime" ? "ANIME" : "MANGA";
+        data = byName
+          ? await gql(query, { user: userName.trim(), type, chunk }, { save: false })
+          : await gql(query, { userId: who.userId, type, chunk }, { token: who.token });
       } catch (e) {
+        if (e instanceof AniListAuthError) throw e;
         const msg = String(e.message || "");
         if (/not found/i.test(msg)) throw new Error(`No AniList user called "${userName.trim()}".`);
         if (/private/i.test(msg)) throw new Error("That AniList profile is private. Make your lists public in AniList settings, import, then switch it back.");
@@ -209,7 +275,7 @@ export async function fetchAniListUserList(userName) {
       // custom lists repeat titles that are already in the status lists
       col.lists.filter((l) => !l.isCustomList).forEach((l) =>
         l.entries.forEach((en) => out.push({
-          status: en.status, progress: en.progress, updatedAt: en.updatedAt,
+          listId: en.id, status: en.status, progress: en.progress, updatedAt: en.updatedAt,
           item: { ...normalize(en.media, segment), partial: true },
         }))
       );
@@ -217,6 +283,43 @@ export async function fetchAniListUserList(userName) {
     }
   }
   return out;
+}
+
+/* ---------- signed-in AniList (sync) ---------- */
+
+export async function fetchViewer(token) {
+  const data = await gql(`query { Viewer { id name avatar { medium } } }`, {}, { token });
+  return { id: data.Viewer.id, name: data.Viewer.name, avatar: data.Viewer.avatar?.medium || null };
+}
+
+// Create or update your AniList entry. Returns its list id.
+export async function saveListEntry(token, mediaId, status, progress) {
+  const data = await gql(
+    `mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int) {
+      SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress) { id }
+    }`,
+    { mediaId: Number(mediaId), status, progress },
+    { token }
+  );
+  return data.SaveMediaListEntry.id;
+}
+
+// Remove from your AniList list. listId unknown? It's looked up first.
+export async function deleteListEntry(token, { listId, userId, mediaId }) {
+  let id = listId;
+  if (!id) {
+    try {
+      const data = await gql(`query ($u: Int, $m: Int) { MediaList(userId: $u, mediaId: $m) { id } }`,
+        { u: userId, m: Number(mediaId) }, { token });
+      id = data.MediaList?.id;
+    } catch (e) {
+      if (e instanceof AniListAuthError) throw e;
+      if (/not found/i.test(e.message)) return; // not on AniList: nothing to delete
+      throw e;
+    }
+  }
+  if (!id) return;
+  await gql(`mutation ($id: Int) { DeleteMediaListEntry(id: $id) { deleted } }`, { id }, { token });
 }
 
 // "If you liked this": AniList's community recommendations for one title,

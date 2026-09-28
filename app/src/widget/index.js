@@ -16,17 +16,24 @@ function lib() {
   }
 }
 
-async function render() {
+async function render(quick = false) {
   const { loadWidgetRows } = require("./data");
-  const { NextEpisodesWidget } = require("./NextEpisodesWidget");
-  const [rows, settings] = await Promise.all([loadWidgetRows(), getSettings().catch(() => ({}))]);
-  return <NextEpisodesWidget rows={rows} clock24={!!settings.clock24} />;
+  const { NextEpisodesWidget, WidgetMessage } = require("./NextEpisodesWidget");
+  try {
+    const [rows, settings] = await Promise.all([loadWidgetRows({ quick }), getSettings().catch(() => ({}))]);
+    return <NextEpisodesWidget rows={rows} clock24={!!settings.clock24} />;
+  } catch {
+    return <WidgetMessage text="Couldn't load your shows. Tap to open Voidation." />;
+  }
 }
 
 // Called by Android: widget added, resized, or its 30-minute refresh.
+// Draws at once from saved data (a widget that hasn't been drawn yet shows as
+// an empty see-through box), then again with fresh air times from AniList.
 async function taskHandler({ widgetAction, renderWidget }) {
   if (widgetAction === "WIDGET_DELETED" || widgetAction === "WIDGET_CLICK") return;
-  renderWidget(await render());
+  renderWidget(await render(true));
+  renderWidget(await render(false));
 }
 
 export function registerWidget() {
@@ -39,6 +46,6 @@ export async function updateWidget() {
   const w = lib();
   if (!w) return;
   try {
-    await w.requestWidgetUpdate({ widgetName: WIDGET_NAME, renderWidget: render });
+    await w.requestWidgetUpdate({ widgetName: WIDGET_NAME, renderWidget: () => render(false) });
   } catch { /* no widget on the home screen, or it failed to draw: try again next time */ }
 }

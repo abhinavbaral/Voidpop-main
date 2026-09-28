@@ -8,12 +8,16 @@ import { titlePath, cacheTitle } from "../lib/titles.js";
 import { progressLabel, behind, canAddOne } from "./Progress.jsx";
 
 // `entry` (Library only): shows your progress and, with onPlus, a +1 button.
-export default function Card({ item, now, entry, onPlus }) {
+// `selecting` (Library's Select mode): a tap selects instead of opening.
+export default function Card({ item, now, entry, onPlus, selecting, selected, onToggle }) {
   const creator = item.creator;
   const { settings } = useSettings();
   const next = settings.posterBadges ? item.nextEpisode : null;
   return (
-    <Link to={titlePath(item)} className="card" onClick={() => cacheTitle(item)}>
+    <Link to={titlePath(item)} className={`card${selecting ? " selecting" : ""}${selected ? " selected" : ""}`}
+      aria-pressed={selecting ? !!selected : undefined}
+      onClick={(e) => { if (selecting) { e.preventDefault(); onToggle?.(); } else cacheTitle(item); }}>
+      {selecting && <span className="select-tick" aria-hidden="true">{selected ? "✓" : ""}</span>}
       <div className="card-poster">
         {item.image ? <img src={item.image} alt="" loading="lazy" /> : <span>No image</span>}
         {next && (
@@ -33,7 +37,7 @@ export default function Card({ item, now, entry, onPlus }) {
               {progressLabel(item, entry.progress)}
               {behind(item, entry.progress) > 0 && <span className="behind"> · {behind(item, entry.progress)} new</span>}
             </span>
-            {onPlus && canAddOne(item, entry.progress || 0) && (
+            {onPlus && !selecting && canAddOne(item, entry.progress || 0) && (
               <button className="plus-btn" aria-label={`Mark next ${item.segment === "manga" ? "chapter read" : "episode watched"}`}
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); onPlus(); }}>+1</button>
             )}

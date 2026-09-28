@@ -3,7 +3,8 @@
 //
 // There are no accounts. Everything lives in one JSON document on this device
 // (see storage.js):
-//   library  {"segment:id" -> { status, progress, item snapshot, updatedAt, delay? }}
+//   library  {"segment:id" -> { status, progress, cats, item snapshot, updatedAt, delay? }}
+//   categories [{ id, name }]  your own groups, like Mihon's ("Favourites", "Rewatch"…)
 //   reviews  {"segment:id" -> { verdict, vibes, comment, date }}
 //   excited  {"segment:id" -> { item, at }}
 //   settings { clock24, posterBadges, notifyEpisodes }
@@ -19,7 +20,7 @@ import { readKey, writeKey } from "./storage.js";
 const DB_KEY = "voidation:db:v1";
 // notifyEpisodes only matters in the app (the website can't schedule alerts)
 export const DEFAULT_SETTINGS = { clock24: false, posterBadges: true, notifyEpisodes: true };
-const EMPTY = () => ({ library: {}, reviews: {}, excited: {}, log: [], settings: { ...DEFAULT_SETTINGS } });
+const EMPTY = () => ({ library: {}, reviews: {}, excited: {}, log: [], categories: [], settings: { ...DEFAULT_SETTINGS } });
 
 let cache = null;
 let writing = Promise.resolve();
@@ -29,7 +30,8 @@ async function load() {
   try {
     const raw = await readKey(DB_KEY);
     const saved = raw ? JSON.parse(raw) : {};
-    cache = { ...EMPTY(), ...saved, log: Array.isArray(saved.log) ? saved.log : [], settings: { ...DEFAULT_SETTINGS, ...(saved.settings || {}) } };
+    cache = { ...EMPTY(), ...saved, log: Array.isArray(saved.log) ? saved.log : [],
+      categories: Array.isArray(saved.categories) ? saved.categories : [], settings: { ...DEFAULT_SETTINGS, ...(saved.settings || {}) } };
   } catch {
     cache = EMPTY(); // corrupt or unreadable storage: start clean rather than crash
   }
@@ -53,6 +55,15 @@ function save() {
 }
 
 const keyOf = (segment, id) => `${segment}:${id}`;
+
+// AniList sync listens here for YOUR changes (status, progress, removal).
+// Changes that come FROM AniList (applyAniListPull) don't call it, so nothing
+// bounces back and forth.
+let entryHook = null;
+export function setEntryChangeHook(fn) { entryHook = fn; }
+function entryChanged(key, entry) {
+  try { entryHook?.(key, entry ? { status: entry.status, progress: entry.progress || 0, item: entry.item } : null); } catch { /* sync must never break saving */ }
+}
 
 function logChange(db, key, change, source) {
   if (change) db.log.push([Date.now(), key, change, source]);
@@ -91,6 +102,7 @@ export async function setStatus(_user, segment, item, status) {
   const key = keyOf(segment, item.id);
   if (status === null) {
     delete db.library[key];
+    entryChanged(key, null);
     return save();
   }
   const prev = db.library[key];
@@ -105,6 +117,7 @@ export async function setStatus(_user, segment, item, status) {
     item: freshest(prev?.item, { ...item, segment }),
     updatedAt: new Date().toISOString(),
   };
+  entryChanged(key, db.library[key]);
   return save();
 }
 
@@ -187,6 +200,7 @@ export async function setProgress(_user, item, n, source = "plus") {
     item: freshest(prev?.item, item),
     updatedAt: new Date().toISOString(),
   };
+  entryChanged(key, db.library[key]);
   await save();
   return { progress, status, reachedEnd: !!total && progress >= total && status !== "completed" };
 }
@@ -209,6 +223,86 @@ export function sortEntries(list, sort) {
   } else if (sort === "behind") s.sort((a, b) => behindBy(b) - behindBy(a));
   else s.sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
   return s;
+}
+
+/* ---------- categories (your own groups) and bulk actions ---------- */
+
+export async function getCategories() {
+  return [...(await load()).categories];
+}
+
+export async function addCategory(name) {
+  const db = await load();
+  const clean = String(name || "").trim().slice(0, 40);
+  if (!clean) return null;
+  if (db.categories.some((c) => c.name.toLowerCase() === clean.toLowerCase())) return null;
+  const cat = { id: `c${Date.now().toString(36)}`, name: clean };
+  db.categories = [...db.categories, cat];
+  await save();
+  return cat;
+}
+
+export async function renameCategory(id, name) {
+  const db = await load();
+  const clean = String(name || "").trim().slice(0, 40);
+  if (!clean) return;
+  db.categories = db.categories.map((c) => (c.id === id ? { ...c, name: clean } : c));
+  await save();
+}
+
+export async function moveCategory(id, by) {
+  const db = await load();
+  const i = db.categories.findIndex((c) => c.id === id);
+  const j = i + by;
+  if (i < 0 || j < 0 || j >= db.categories.length) return;
+  const list = [...db.categories];
+  [list[i], list[j]] = [list[j], list[i]];
+  db.categories = list;
+  await save();
+}
+
+// Deleting a category never deletes titles; they just leave that category.
+export async function deleteCategory(id) {
+  const db = await load();
+  db.categories = db.categories.filter((c) => c.id !== id);
+  Object.values(db.library).forEach((e) => { if (e.cats?.includes(id)) e.cats = e.cats.filter((c) => c !== id); });
+  await save();
+}
+
+export async function setEntryCategories(segment, id, cats) {
+  const db = await load();
+  const e = db.library[keyOf(segment, id)];
+  if (!e) return;
+  e.cats = [...new Set(cats)];
+  await save();
+}
+
+// keys: ["anime:123", …]. Status changes go through setStatus so sync and
+// progress rules apply exactly as if you'd changed them one by one.
+export async function bulkSetStatus(keys, status) {
+  const db = await load();
+  for (const k of keys) {
+    const e = db.library[k];
+    if (e) await setStatus(null, e.item.segment, e.item, status);
+  }
+}
+export async function bulkCategory(keys, catId, add) {
+  const db = await load();
+  keys.forEach((k) => {
+    const e = db.library[k];
+    if (!e) return;
+    const cats = new Set(e.cats || []);
+    if (add) cats.add(catId); else cats.delete(catId);
+    e.cats = [...cats];
+  });
+  await save();
+}
+export async function bulkRemove(keys) {
+  const db = await load();
+  for (const k of keys) {
+    const e = db.library[k];
+    if (e) await setStatus(null, e.item.segment, e.item, null);
+  }
 }
 
 /* ---------- pending: aired but not watched yet ---------- */
@@ -261,6 +355,35 @@ export async function noteAiring(fresh) {
 }
 
 /* ---------- import from AniList ---------- */
+
+// Sync pull: apply AniList's list to the library.
+//   remote: [{ status, progress, updatedAt, item }]  (your whole AniList list)
+//   skip:   keys with changes of yours still waiting to be sent (yours win)
+//   removed: keys AniList had last time but not now (you deleted them there)
+// Newest change wins, like the import. Categories, verdicts and the log are untouched.
+export async function applyAniListPull(remote, { skip = new Set(), removed = [] } = {}) {
+  const db = await load();
+  const result = { added: 0, updated: 0, removed: 0, oursNewer: [] };
+  remote.forEach((a) => {
+    const status = ANILIST_STATUS[a.status];
+    const key = keyOf(a.item.segment, a.item.id);
+    if (!status || skip.has(key)) return;
+    const prev = db.library[key];
+    const theirs = new Date((a.updatedAt || 0) * 1000).toISOString();
+    const same = prev && prev.status === status && (prev.progress || 0) === (a.progress || 0);
+    if (same) return;
+    if (prev && prev.updatedAt >= theirs) { result.oursNewer.push(key); return; } // ours is newer: sync sends it up
+    db.library[key] = { ...prev, status, progress: a.progress || 0, item: freshest(prev?.item, a.item), updatedAt: theirs };
+    result[prev ? "updated" : "added"]++;
+  });
+  removed.forEach((key) => {
+    if (skip.has(key) || !db.library[key]) return;
+    delete db.library[key];
+    result.removed++;
+  });
+  if (result.added || result.updated || result.removed) await save();
+  return result;
+}
 
 const ANILIST_STATUS = {
   CURRENT: "watching", REPEATING: "watching", PLANNING: "plan",
@@ -432,6 +555,7 @@ export async function importData(json) {
   cache = {
     library: data.library || {}, reviews: data.reviews || {}, excited: data.excited || {},
     log: Array.isArray(data.log) ? data.log : [],
+    categories: Array.isArray(data.categories) ? data.categories : [],
     settings: { ...DEFAULT_SETTINGS, ...(data.settings || {}) },
   };
   await save();
@@ -446,7 +570,7 @@ export async function storageSize() {
 // Wipe the library, verdicts and Excited list. Settings stay.
 export async function clearData() {
   const db = await load();
-  cache = { ...EMPTY(), settings: db.settings };
+  cache = { ...EMPTY(), settings: db.settings, categories: db.categories }; // your categories stay, empty
   await save();
 }
 

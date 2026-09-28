@@ -11,6 +11,7 @@ import Search from "./pages/Search.jsx";
 import Library from "./pages/Library.jsx";
 import History from "./pages/History.jsx";
 import Season from "./pages/Season.jsx";
+import AuthAniList from "./pages/AuthAniList.jsx";
 import More from "./pages/More.jsx";
 import NotFound from "./pages/NotFound.jsx";
 import OfflineBanner from "./components/OfflineBanner.jsx";
@@ -34,6 +35,7 @@ export default function App() {
           <Route path="/library" element={<Library />} />
           <Route path="/history" element={<History />} />
           <Route path="/season" element={<Season />} />
+          <Route path="/auth/anilist" element={<AuthAniList />} />
           <Route path="/more" element={<More />} />
           <Route path="/more/:page" element={<More />} />
           <Route path="/profile" element={<Navigate to="/more" replace />} />

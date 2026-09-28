@@ -12,24 +12,50 @@ const daySeed = () =>
 const rotate = (arr, by) =>
   arr.length ? [...arr.slice(by % arr.length), ...arr.slice(0, by % arr.length)] : [];
 
-export async function loadExplore() {
-  const seed = daySeed();
-  const [trA, trM, popA, popM] = await Promise.all([
-    fetchAniList("anime", { sort: "trending", perPage: 15 }).catch(() => ({ items: [] })),
-    fetchAniList("manga", { sort: "trending", perPage: 15 }).catch(() => ({ items: [] })),
-    fetchAniList("anime", { sort: "popular", perPage: 25 }).catch(() => ({ items: [] })),
-    fetchAniList("manga", { sort: "popular", perPage: 25 }).catch(() => ({ items: [] })),
+// Explore is for finding NEW things: anything already in your library (any
+// status) or marked Excited is left out of the rows, except Talk of the Week. Pools are fetched larger
+// than the rows so they stay full after that.
+export async function loadExplorePools() {
+  const get = (segment, sort, page) =>
+    fetchAniList(segment, { sort, perPage: 25, page }).then((r) => r.items).catch(() => []);
+  const [trA, trM, popA1, popA2, popM1, popM2] = await Promise.all([
+    get("anime", "trending", 1), get("manga", "trending", 1),
+    get("anime", "popular", 1), get("anime", "popular", 2),
+    get("manga", "popular", 1), get("manga", "popular", 2),
   ]);
+  return { trA, trM, popA: [...popA1, ...popA2], popM: [...popM1, ...popM2] };
+}
 
+export async function knownKeys() {
+  const [lib, excited] = await Promise.all([getLibrary(), getExcited()]);
+  return new Set([...Object.keys(lib), ...Object.keys(excited)]);
+}
+
+export function buildExplore(pools, known = new Set()) {
+  const seed = daySeed();
+  const fresh = (items) => items.filter((it) => !known.has(`${it.segment}:${it.id}`));
+  const popA = fresh(pools.popA);
+  const popM = fresh(pools.popM);
+  const dontMissAnime = rotate(popA, seed).slice(0, 10);
+  const dontMissManga = rotate(popM, seed).slice(0, 10);
+  // Voidation picks never repeat what "Don't miss this" already shows
+  const shown = new Set([...dontMissAnime, ...dontMissManga].map((it) => `${it.segment}:${it.id}`));
+  const notShown = (items) => items.filter((it) => !shown.has(`${it.segment}:${it.id}`));
   return {
-    talk: [...trA.items.slice(0, 7), ...trM.items.slice(0, 5)],
-    dontMissAnime: rotate(popA.items, seed).slice(0, 10),
-    dontMissManga: rotate(popM.items, seed).slice(0, 10),
+    // Talk of the Week is what everyone's talking about, so it includes shows you've seen
+    talk: [...pools.trA.slice(0, 7), ...pools.trM.slice(0, 5)],
+    dontMissAnime,
+    dontMissManga,
     voidpicks: [
-      ...rotate(popA.items, seed * 3).slice(0, 6),
-      ...rotate(popM.items, seed * 5).slice(0, 4),
+      ...rotate(notShown(popA), seed * 3).slice(0, 6),
+      ...rotate(notShown(popM), seed * 5).slice(0, 4),
     ],
   };
+}
+
+export async function loadExplore() {
+  const [pools, known] = await Promise.all([loadExplorePools(), knownKeys()]);
+  return buildExplore(pools, known);
 }
 
 // Rows built from your verdicts: "Peak like Attack on Titan", "Dive in like

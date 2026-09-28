@@ -11,6 +11,7 @@ import { Link, Navigate, useParams } from "react-router-dom";
 import {
   getUserTier, TIERS, statusesFor, exportData, importData, clearData, storageSize,
   importAniListEntries,
+  getCategories, addCategory, renameCategory, moveCategory, deleteCategory,
 } from "@voidation/shared/backend/store";
 import { useSettings } from "@voidation/shared/backend/SettingsContext";
 import { fetchAniListUserList, cacheSize, cacheClear } from "@voidation/shared/api/anilist";
@@ -19,6 +20,7 @@ import Icon from "../components/Icon.jsx";
 import { useTheme } from "../theme.jsx";
 import { useDocumentTitle } from "../lib/useDocumentTitle.js";
 import logo from "../assets/logo.png";
+import AniListSync from "../components/AniListSync.jsx";
 
 const VERSION = "1.0.0";
 
@@ -27,6 +29,8 @@ const PAGES = [
   { key: "appearance", label: "Appearance", hint: "Dark or light" },
   { key: "settings", label: "Settings", hint: "Clock, countdown badges" },
   { key: "data", label: "Data and storage", hint: "Backup, restore, clear" },
+  { key: "categories", label: "Categories", hint: "Your own groups in the Library" },
+  { key: "anilist", label: "AniList", hint: "Sync or import your lists" },
   { key: "help", label: "Help", hint: "Common questions" },
   { key: "about", label: "About", hint: `Version ${VERSION}` },
 ];
@@ -45,7 +49,7 @@ export default function More() {
   if (page && !current) return <Navigate to="/more" replace />;
   if (!current) return <MoreMenu />;
 
-  const Body = { statistics: Statistics, appearance: Appearance, settings: Settings, data: DataStorage, help: Help, about: About }[page];
+  const Body = { statistics: Statistics, appearance: Appearance, settings: Settings, data: DataStorage, categories: Categories, anilist: AniListPage, help: Help, about: About }[page];
   return (
     <div className="stack narrow">
       <Link to="/more" className="link-btn"><Icon name="back" size={16} /> More</Link>
@@ -89,6 +93,10 @@ function MoreMenu() {
         {row("statistics", "stats", "Statistics")}
         {row("appearance", "palette", "Appearance")}
         {row("data", "storage", "Data and storage")}
+      </ul>
+      <ul className="menu-list">
+        {row("categories", "library", "Categories")}
+        {row("anilist", "browse", "AniList")}
       </ul>
       <ul className="menu-list">
         {row("settings", "settings", "Settings")}
@@ -221,7 +229,6 @@ function DataStorage() {
           <input ref={fileInput} type="file" accept="application/json,.json" onChange={restore} hidden />
         </div>
       </section>
-      <AniListImport onDone={() => { reload(); measure(); }} />
       <section className="panel stack-sm">
         <b>Offline copy</b>
         <p className="faint small">
@@ -278,6 +285,75 @@ function AniListImport({ onDone }) {
       </form>
       {result && <p className="faint small" role="status">{result}</p>}
     </section>
+  );
+}
+
+// Your own Library groups ("Favourites", "Rewatch", "With friends"…), like
+// Mihon's categories. Titles can be in several; deleting one keeps the titles.
+function Categories() {
+  const [cats, setCats] = useState(null);
+  const [name, setName] = useState("");
+  const [editing, setEditing] = useState(null); // { id, name }
+  const [message, setMessage] = useState("");
+  const refresh = () => getCategories().then(setCats);
+  useEffect(() => { refresh(); }, []);
+
+  const add = async (e) => {
+    e.preventDefault();
+    const cat = await addCategory(name);
+    setMessage(cat ? "" : name.trim() ? "You already have a category with that name." : "");
+    if (cat) setName("");
+    refresh();
+  };
+  const remove = async (c) => {
+    if (!window.confirm(`Delete "${c.name}"? The titles in it stay in your library.`)) return;
+    await deleteCategory(c.id);
+    refresh();
+  };
+  if (!cats) return <p className="muted">Loading…</p>;
+  return (
+    <div className="stack-sm">
+      <p className="muted">Group titles your own way: Favourites, Rewatch, With friends… A title can be in several. Filter by them in the Library, and add titles from a title's page or with Select in the Library.</p>
+      <form className="row gap-8" onSubmit={add}>
+        <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="New category" maxLength={40} aria-label="New category name" />
+        <button className="btn primary" disabled={!name.trim()}>Add</button>
+      </form>
+      {message && <p className="field-error">{message}</p>}
+      {cats.length === 0 ? <p className="empty">No categories yet.</p> : (
+        <ul className="menu-list">
+          {cats.map((c, i) => (
+            <li key={c.id} className="menu-row cat-row">
+              {editing?.id === c.id ? (
+                <form className="row gap-8 grow" onSubmit={async (e) => { e.preventDefault(); await renameCategory(c.id, editing.name); setEditing(null); refresh(); }}>
+                  <input className="input" autoFocus value={editing.name} maxLength={40} onChange={(e) => setEditing({ ...editing, name: e.target.value })} aria-label="Category name" />
+                  <button className="btn primary">Save</button>
+                  <button type="button" className="btn ghost" onClick={() => setEditing(null)}>Cancel</button>
+                </form>
+              ) : (
+                <>
+                  <b className="grow">{c.name}</b>
+                  <button className="icon-btn" aria-label={`Move ${c.name} up`} disabled={i === 0} onClick={async () => { await moveCategory(c.id, -1); refresh(); }}>↑</button>
+                  <button className="icon-btn" aria-label={`Move ${c.name} down`} disabled={i === cats.length - 1} onClick={async () => { await moveCategory(c.id, 1); refresh(); }}>↓</button>
+                  <button className="link-btn" onClick={() => setEditing({ id: c.id, name: c.name })}>Rename</button>
+                  <button className="link-btn danger-text" onClick={() => remove(c)}>Delete</button>
+                </>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// AniList: two-way sync (sign in) or a one-time import by username.
+function AniListPage() {
+  const { reload } = useSettings();
+  return (
+    <div className="stack-sm">
+      <AniListSync onChange={reload} />
+      <AniListImport onDone={reload} />
+    </div>
   );
 }
 

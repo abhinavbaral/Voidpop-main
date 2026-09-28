@@ -18,6 +18,12 @@ Android app, built from one codebase. No sign-up and no API keys: open it and us
 - **Import from AniList** by username (public lists, no key); a title in both keeps whichever copy changed last
 - **Library search and sort** (recently updated, A–Z, airing soonest, most to catch up)
 - **Delayed label** when a followed show's next episode moves later, with the original date
+- **AniList sync (two-way):** sign in with AniList; status and progress stay the same on the app, the website and
+  AniList. Verdicts, categories, Excited and the watch log stay on the device. See "Set up AniList sync" below.
+- **Categories + Select:** your own Library groups (More → Categories), bulk move / categorise / remove
+- **Genre and studio filters** on the Season chart and Schedule; genre filter in Browse
+- **Background work (Android):** about hourly while closed: backup, episode alerts, widget, sync
+- **Explore only shows new things:** titles in your library or marked Excited are left out
 - **Watching this season + Pending:** aired-but-unwatched episodes of your Watching anime; new episodes add
   to it automatically, +1 takes one off; a count badge on the Schedule tab
 - **Watch log:** every progress change is saved with its date (for a future Wrapped); imports don't count
@@ -86,3 +92,21 @@ eas build -p android --profile preview   # gives you a download link to an .apk
 Voidation started as a fork of VoidPop, my larger pop-culture tracker. It keeps only the
 anime and manga side, with the social feed, accounts and the movie and web-series
 sections taken out, and adds the airing countdowns.
+
+## Set up AniList sync (free, once)
+
+AniList lets any app sign users in for free; it just needs to know where to send
+them back. Each place Voidation runs needs its own AniList app (one redirect URL each).
+
+1. Sign in at anilist.co, open **Settings → Developer → Create new client**.
+2. **App (APK):** name `Voidation`, redirect URL `voidation://auth`. Copy the client id into
+   `app/.env` as `EXPO_PUBLIC_ANILIST_CLIENT_ID=…`, then build the APK.
+   (For EAS, also add it under the build profile's `env`, or as an EAS environment variable.)
+3. **Website:** create a second client with redirect URL `https://<your site>/auth/anilist`
+   (and a third with `http://localhost:5173/auth/anilist` for local testing if you like).
+   Put its id in `web/.env` as `VITE_ANILIST_CLIENT_ID=…`, or in Vercel's environment variables.
+4. More → AniList → **Sign in with AniList**.
+
+Client ids aren't secret (the sign-in happens on AniList's own page), but keep
+`.env` files out of git anyway. Expo Go uses a different return address, shown
+on the More → AniList page, so test sign-in on the website or the APK.

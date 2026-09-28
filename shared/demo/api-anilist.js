@@ -2,11 +2,12 @@
 // local catalog. Constants are re-exported from the real module so the
 // filters in the UI can never drift from production.
 import { CATALOG, findItem, toAppItem } from "./catalog.js";
-export { SORTS, SEASONS, ANIME_ORIGINS, MANGA_ORIGINS } from "../api/anilist.js";
+export { SORTS, SEASONS, GENRES, ANIME_ORIGINS, MANGA_ORIGINS } from "../api/anilist.js";
 // the demo is always "online"; these keep the same exports as the real module
 export const onNetState = (fn) => { fn({ offline: false, since: null }); return () => {}; };
 export const cacheClear = async () => {};
 export const cacheSize = async () => 0;
+export const setDeviceOnline = () => {};
 
 const wait = (ms = 250) => new Promise((r) => setTimeout(r, ms));
 // AniList's seasons: Winter = Jan–Mar, Spring = Apr–Jun, Summer = Jul–Sep, Fall = Oct–Dec
@@ -25,10 +26,11 @@ function sortItems(items, sort) {
 export async function fetchAniList(segment, opts = {}) {
   const {
     page = 1, sort = "popular", search = "", origin = "",
-    season = "", year = null, unreleasedOnly = false, perPage = 24,
+    season = "", year = null, unreleasedOnly = false, perPage = 24, genre = "",
   } = opts;
   await wait();
   let items = CATALOG[segment] || [];
+  if (genre) items = items.filter((i) => i.genres.includes(genre));
   if (search) items = items.filter((i) => i.title.toLowerCase().includes(search.toLowerCase()));
   if (origin) items = items.filter((i) => i.country === origin);
   if (unreleasedOnly) items = items.filter((i) => i.unreleased);
@@ -145,3 +147,9 @@ export async function fetchRecommendations(segment, id, perPage = 12) {
     .slice(0, perPage)
     .map(toAppItem);
 }
+
+// Signed-in AniList isn't available in the demo (no sign-in there).
+export class AniListAuthError extends Error {}
+export const fetchViewer = async () => { throw new Error("Not available in the demo."); };
+export const saveListEntry = async () => { throw new Error("Not available in the demo."); };
+export const deleteListEntry = async () => { throw new Error("Not available in the demo."); };
