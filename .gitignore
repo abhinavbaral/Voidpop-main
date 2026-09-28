@@ -1,0 +1,6 @@
+node_modules/
+.expo/
+**/dist/
+**/dist-demo/
+**/dist-preview/
+web/.env.local

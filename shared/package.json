@@ -1,0 +1,12 @@
+{
+  "name": "@voidation/shared",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Logic shared by the Voidation app and website: on-device data layer, AniList client, tiers, countdowns, demo data.",
+  "exports": {
+    "./*": "./*.js"
+  },
+  "peerDependencies": {
+    "react": "*"
+  }
+}

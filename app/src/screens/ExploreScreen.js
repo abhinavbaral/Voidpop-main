@@ -1,0 +1,67 @@
+// EXPLORE — the homepage.
+// Sections: Talk of the Week, Don't Miss This (Anime / Manga), and daily
+// Voidation Recommendations (6 anime, 4 manga). Picks rotate each day.
+
+import { useEffect, useState } from "react";
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import PosterRow from "../components/PosterRow.js";
+import Brand from "../components/Brand.js";
+import { loadExplore } from "@voidation/shared/explore";
+import { useTheme } from "../context/ThemeContext.js";
+import { openDetail } from "../lib/nav";
+import { useIsWide } from "../lib/layout";
+
+export default function ExploreScreen({ navigation }) {
+  const { C } = useTheme();
+  const styles = makeStyles(C);
+  const wide = useIsWide();
+  const [data, setData] = useState({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // same sections, same daily picks as the website
+    loadExplore()
+      .then(setData)
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const open = (item) => openDetail(navigation, item);
+
+  return (
+    <SafeAreaView style={styles.safe} edges={["top"]}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 30 }}>
+        {!wide && (
+        <View style={styles.header}>
+          <Brand size={20} />
+          <TouchableOpacity
+            onPress={() => navigation.navigate("Search")}
+            style={styles.searchBtn}
+          >
+            <Text style={{ color: C.faint, fontSize: 13 }}>
+              Search anime and manga...
+            </Text>
+          </TouchableOpacity>
+        </View>
+        )}
+
+        <PosterRow title="🔥 Talk of the Week" items={data.talk} loading={loading} onOpen={open} />
+        <PosterRow title="🎌 Don't Miss This — Anime" items={data.dontMissAnime} loading={loading} onOpen={open} />
+        <PosterRow title="📖 Don't Miss This — Manga" items={data.dontMissManga} loading={loading} onOpen={open} />
+        <PosterRow title="⭐ Voidation Recommendations" items={data.voidpicks} loading={loading} onOpen={open} />
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const makeStyles = (C) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: C.bg },
+  header: { paddingHorizontal: 14, paddingTop: 8 },
+  brand: { color: C.text, fontSize: 22, fontWeight: "800" },
+  searchBtn: {
+    marginTop: 10, height: 40, borderRadius: 12, borderWidth: 1,
+    borderColor: C.border, backgroundColor: C.card,
+    justifyContent: "center", paddingHorizontal: 14,
+  },
+});
