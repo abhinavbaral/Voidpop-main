@@ -1,6 +1,6 @@
 // Home. Same sections and same daily picks as the app (shared/explore.js).
 import { useEffect, useState } from "react";
-import { loadExplore, loadVerdictRows } from "@voidation/shared/explore";
+import { loadExplore, loadVerdictRows, loadNewSeasons } from "@voidation/shared/explore";
 import { useNow } from "@voidation/shared/hooks/useNow";
 import PosterRow from "../components/PosterRow.jsx";
 import { useDocumentTitle } from "../lib/useDocumentTitle.js";
@@ -11,14 +11,17 @@ export default function Explore() {
   const [data, setData] = useState({});
   const [loading, setLoading] = useState(true);
   const [verdictRows, setVerdictRows] = useState([]);
+  const [newSeasons, setNewSeasons] = useState([]);
 
   useEffect(() => {
     loadExplore().then(setData).catch(() => {}).finally(() => setLoading(false));
     loadVerdictRows().then(setVerdictRows).catch(() => {});
+    loadNewSeasons().then(setNewSeasons).catch(() => {});
   }, []);
 
   return (
     <div className="stack">
+      {newSeasons.length > 0 && <PosterRow title="🆕 New seasons of shows you watched" items={newSeasons} now={now} />}
       {verdictRows.map((r) => (
         <PosterRow key={r.verdict} title={r.title} dot={r.color} items={r.items} now={now} />
       ))}

@@ -3,7 +3,8 @@
 // Recommendations (6 anime, 4 manga). Picks rotate deterministically each day,
 // so both clients agree all day.
 
-import { fetchAniList, fetchRecommendations } from "./api/anilist.js";
+import { fetchAniList, fetchRecommendations, fetchSequels } from "./api/anilist.js";
+import { readKey, writeKey } from "./backend/storage.js";
 import { getReviews, getLibrary, getExcited, VERDICTS } from "./backend/store.js";
 
 const daySeed = () =>
@@ -91,4 +92,53 @@ export async function loadVerdictRows() {
     } catch { /* offline with nothing saved: skip the row */ }
   }
   return rows;
+}
+
+// "New seasons of shows you watched": sequels of anime you've completed or are
+// watching that are airing now, announced, or came out in the last 12 months,
+// and aren't in your library yet. Airing first, then announced, then recent.
+//
+// Each show's sequels are checked at most once a day and remembered on the
+// device, so a big library doesn't flood AniList with requests.
+const SEQ_KEY = "voidation:sequels:v1";
+const SEQ_TTL = 24 * 3600 * 1000;
+const YEAR_MS = 365 * 864e5;
+
+export async function loadNewSeasons() {
+  const [lib, excited] = await Promise.all([getLibrary(), getExcited()]);
+  const known = new Set([...Object.keys(lib), ...Object.keys(excited)]);
+  const sources = Object.values(lib)
+    .filter((e) => e.item.segment === "anime" && (e.status === "completed" || e.status === "watching"))
+    .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""))
+    .slice(0, 150)
+    .map((e) => e.item);
+
+  let saved = {};
+  try { saved = JSON.parse((await readKey(SEQ_KEY)) || "{}"); } catch { saved = {}; }
+  const stale = sources.filter((s) => !saved[s.id] || Date.now() - saved[s.id].at > SEQ_TTL).map((s) => s.id);
+  if (stale.length) {
+    try {
+      const fresh = await fetchSequels(stale);
+      Object.entries(fresh).forEach(([id, items]) => { saved[id] = { at: Date.now(), items }; });
+      await writeKey(SEQ_KEY, JSON.stringify(saved));
+    } catch { /* offline or AniList busy: use what was saved */ }
+  }
+
+  const now = Date.now();
+  const rank = (it) => (!it.unreleased && !it.finished ? 0 : it.unreleased ? 1 : 2);
+  const seen = new Set();
+  const out = [];
+  sources.forEach((src) => {
+    (saved[src.id]?.items || []).forEach((it) => {
+      const key = `anime:${it.id}`;
+      if (known.has(key) || seen.has(key)) return;
+      const recent = it.date && now - new Date(it.date).getTime() < YEAR_MS;
+      if (!(it.unreleased || !it.finished || recent)) return; // an old sequel isn't "new"
+      seen.add(key);
+      out.push({ ...it, sequelOf: src.title });
+    });
+  });
+  return out
+    .sort((a, b) => rank(a) - rank(b) || (b.date || "").localeCompare(a.date || ""))
+    .slice(0, 20);
 }

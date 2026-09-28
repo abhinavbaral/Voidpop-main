@@ -90,6 +90,14 @@ function MoreMenu() {
         </li>
       </ul>
       <ul className="menu-list">
+        <li>
+          <Link to="/wrapped" className="menu-row wrapped-row">
+            <Icon name="stats" size={22} className="menu-icon" />
+            <span className="grow"><b>Wrapped {new Date().getFullYear()}</b><span className="faint small">Your year in anime and manga</span></span>
+          </Link>
+        </li>
+      </ul>
+      <ul className="menu-list">
         {row("statistics", "stats", "Statistics")}
         {row("appearance", "palette", "Appearance")}
         {row("data", "storage", "Data and storage")}
@@ -360,7 +368,7 @@ function AniListPage() {
 const FAQ = [
   ["Where is my library saved?", "In this browser (or on your phone in the app). There is no account and nothing is uploaded. Use Data and storage to back it up."],
   ["How do I move to a new phone or browser?", "Download a backup under Data and storage, then use Restore from backup on the new device."],
-  ["Can I bring my AniList lists?", "Yes. Data and storage → Import from AniList, then type your username. Your lists need to be public; nothing is changed on AniList."],
+  ["Can I bring my AniList lists?", "Yes, two ways under More → AniList: sign in to keep them in sync both ways, or import once by username (public lists; nothing is changed on AniList)."],
   ["What does Delayed mean?", "The next episode was going to air earlier, and its date has since moved later. Voidation shows the original date next to the new one."],
   ["Why doesn't a show have a countdown?", "It has finished airing, or AniList doesn't know the next episode's date yet. Countdowns appear as soon as a date is announced."],
   ["What time zone are the airing times in?", "Yours. Voidation converts every broadcast time to your device's time zone."],

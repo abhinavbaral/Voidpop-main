@@ -153,3 +153,17 @@ export class AniListAuthError extends Error {}
 export const fetchViewer = async () => { throw new Error("Not available in the demo."); };
 export const saveListEntry = async () => { throw new Error("Not available in the demo."); };
 export const deleteListEntry = async () => { throw new Error("Not available in the demo."); };
+
+// Sequels (demo): catalog titles listed as related and released after this one.
+export async function fetchSequels(ids) {
+  await wait(200);
+  const out = {};
+  ids.forEach((id) => {
+    const it = findItem("anime", id);
+    out[id] = (it?.related || [])
+      .map((rid) => findItem("anime", rid))
+      .filter((r) => r && new Date(r.date) > new Date(it.date))
+      .map(toAppItem);
+  });
+  return out;
+}

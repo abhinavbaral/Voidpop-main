@@ -26,6 +26,7 @@ import DetailScreen from "./src/screens/DetailScreen.js";
 import SearchScreen from "./src/screens/SearchScreen.js";
 import LibraryScreen from "./src/screens/LibraryScreen.js";
 import SeasonScreen from "./src/screens/SeasonScreen.js";
+import WrappedScreen from "./src/screens/WrappedScreen.js";
 import OfflineBanner from "./src/components/OfflineBanner.js";
 
 const Stack = createNativeStackNavigator();
@@ -40,6 +41,7 @@ const linking = Platform.OS === "web" ? undefined : {
       Main: { screens: { Schedule: "schedule", Library: "library", History: "history" } },
       Detail: "title/:segment/:id",
       Season: "season",
+      Wrapped: "wrapped",
     },
   },
 };
@@ -163,6 +165,7 @@ function ThemedApp() {
         <Stack.Screen name="Search" component={SearchScreen} />
         <Stack.Screen name="MorePage" component={MorePageScreen} />
         <Stack.Screen name="Season" component={SeasonScreen} />
+        <Stack.Screen name="Wrapped" component={WrappedScreen} options={{ animation: "fade" }} />
       </Stack.Navigator>
       <OfflineBanner />
     </NavigationContainer>

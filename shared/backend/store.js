@@ -9,8 +9,9 @@
 //   excited  {"segment:id" -> { item, at }}
 //   settings { clock24, posterBadges, notifyEpisodes }
 //   log      [[time ms, "segment:id", change, source], …] every progress change
-//            (source: plus / typed / history / complete). Powers Wrapped later;
-//            imports are never logged, so they don't count as "watched this year".
+//            (source: plus / typed / history / complete) and status change
+//            (change 0, source "status:completed" etc.). Powers Wrapped;
+//            imports and AniList pulls are never logged.
 //
 // Functions still take `user` as their first argument, so screens written for
 // the account version didn't have to change. It is always the local user.
@@ -68,6 +69,9 @@ function entryChanged(key, entry) {
 function logChange(db, key, change, source) {
   if (change) db.log.push([Date.now(), key, change, source]);
 }
+function logStatus(db, key, prevStatus, status) {
+  if (prevStatus !== status) db.log.push([Date.now(), key, 0, `status:${status || "removed"}`]);
+}
 
 // The watch log (read-only copy), oldest first.
 export async function getLog() {
@@ -101,6 +105,7 @@ export async function setStatus(_user, segment, item, status) {
   const db = await load();
   const key = keyOf(segment, item.id);
   if (status === null) {
+    logStatus(db, key, db.library[key]?.status, null);
     delete db.library[key];
     entryChanged(key, null);
     return save();
@@ -110,6 +115,7 @@ export async function setStatus(_user, segment, item, status) {
   // finishing a title fills its progress, the way AniList does
   const progress = status === "completed" && total ? total : prev?.progress || 0;
   logChange(db, key, progress - (prev?.progress || 0), "complete");
+  logStatus(db, key, prev?.status, status);
   db.library[key] = {
     ...prev,
     status,
@@ -193,6 +199,7 @@ export async function setProgress(_user, item, n, source = "plus") {
   if (progress > (prev?.progress || 0) && (!status || ["plan", "onhold", "dropped"].includes(status))) status = "watching";
   if (!status) status = "watching";
   logChange(db, key, progress - (prev?.progress || 0), source);
+  logStatus(db, key, prev?.status, status);
   db.library[key] = {
     ...prev,
     status,

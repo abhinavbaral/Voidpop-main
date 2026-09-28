@@ -44,6 +44,15 @@ export default function MoreScreen({ navigation }) {
           {toggle("◷", "24-hour clock", "Airing times as 16:30", "clock24")}
           {toggle("▣", "Countdown badges", "Next episode on posters", "posterBadges")}
         </View>
+        <View style={styles.group}>
+          <Pressable style={({ pressed }) => [styles.row, pressed && { backgroundColor: C.card }]} onPress={() => navigation.navigate("Wrapped")}>
+            <Text style={[styles.icon, { color: C.orange }]}>★</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.label, { color: C.orange }]}>Wrapped {new Date().getFullYear()}</Text>
+              <Text style={styles.hint}>Your year in anime and manga</Text>
+            </View>
+          </Pressable>
+        </View>
         {GROUPS.map((group, i) => (
           <View key={i} style={styles.group}>
             {group.map(([page, icon, label]) => (

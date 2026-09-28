@@ -1,4 +1,4 @@
-// "Share Review" — renders a branded card (poster, username, verdict, review,
+// "Share Review" — renders a branded card (poster, your verdict, review,
 // Voidation branding), captures it as an image, and opens the share sheet.
 
 import { useRef, useState } from "react";

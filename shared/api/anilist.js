@@ -58,6 +58,7 @@ const MEDIA_FIELDS = `
   siteUrl
   status
   format
+  duration
 `;
 
 // Creator line: animation studio for anime, mangaka for manga. Requested only
@@ -100,6 +101,7 @@ function normalize(m, segment) {
     unreleased: m.status === "NOT_YET_RELEASED",
     finished: m.status === "FINISHED",
     format: m.format || null, // TV, TV_SHORT, ONA, MOVIE, OVA, SPECIAL…
+    duration: m.duration ?? null, // minutes per episode (anime)
     // anime only: total episodes (null while unknown) and the next one to air
     episodes: m.episodes ?? null,
     // manga only: total chapters (null while still publishing)
@@ -241,7 +243,7 @@ export async function fetchAniList(segment, opts = {}) {
 // creator load the first time its page is opened (item.partial).
 const LIST_FIELDS = `
   id title { english romaji } coverImage { large extraLarge } bannerImage
-  startDate { year month day } genres siteUrl status
+  startDate { year month day } genres siteUrl status format duration
   episodes chapters nextAiringEpisode { episode airingAt }
 `;
 // Pass a username (public lists), or { userId, token } when signed in (then
@@ -320,6 +322,30 @@ export async function deleteListEntry(token, { listId, userId, mediaId }) {
   }
   if (!id) return;
   await gql(`mutation ($id: Int) { DeleteMediaListEntry(id: $id) { deleted } }`, { id }, { token });
+}
+
+// Sequels (next seasons) of many anime at once: { id -> [sequel items] }.
+// Light fields for the sequels (no synopsis): their page fills in when opened.
+export async function fetchSequels(ids) {
+  const query = `query ($ids: [Int]) {
+    Page(perPage: 10) {
+      media(id_in: $ids, type: ANIME) {
+        id
+        relations { edges { relationType node { type ${LIST_FIELDS} studios(isMain: true) { nodes { name } } } } }
+      }
+    }
+  }`;
+  const out = {};
+  for (let i = 0; i < ids.length; i += 10) {
+    const data = await gql(query, { ids: ids.slice(i, i + 10).map(Number) });
+    data.Page.media.forEach((m) => {
+      out[m.id] = (m.relations?.edges || [])
+        .filter((e) => e.relationType === "SEQUEL" && e.node.type === "ANIME")
+        .map((e) => ({ ...normalize(e.node, "anime"), partial: true }));
+    });
+    ids.slice(i, i + 10).forEach((id) => { if (!out[id]) out[id] = []; });
+  }
+  return out;
 }
 
 // "If you liked this": AniList's community recommendations for one title,

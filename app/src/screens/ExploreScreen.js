@@ -8,7 +8,7 @@ import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from "react-nati
 import { SafeAreaView } from "react-native-safe-area-context";
 import PosterRow from "../components/PosterRow.js";
 import Brand from "../components/Brand.js";
-import { loadExplorePools, buildExplore, knownKeys, loadVerdictRows } from "@voidation/shared/explore";
+import { loadExplorePools, buildExplore, knownKeys, loadVerdictRows, loadNewSeasons } from "@voidation/shared/explore";
 import { useTheme } from "../context/ThemeContext.js";
 import { openDetail } from "../lib/nav";
 import { useIsWide } from "../lib/layout";
@@ -20,9 +20,13 @@ export default function ExploreScreen({ navigation }) {
   const [data, setData] = useState({});
   const [loading, setLoading] = useState(true);
   const [verdictRows, setVerdictRows] = useState([]);
+  const [newSeasons, setNewSeasons] = useState([]);
 
   // your verdicts change as you use the app, so these rows refresh on every visit
-  useFocusEffect(useCallback(() => { loadVerdictRows().then(setVerdictRows).catch(() => {}); }, []));
+  useFocusEffect(useCallback(() => {
+    loadVerdictRows().then(setVerdictRows).catch(() => {});
+    loadNewSeasons().then(setNewSeasons).catch(() => {});
+  }, []));
 
   const [pools, setPools] = useState(null);
   useEffect(() => {
@@ -56,6 +60,7 @@ export default function ExploreScreen({ navigation }) {
         </View>
         )}
 
+        {newSeasons.length > 0 && <PosterRow title="🆕 New seasons of shows you watched" items={newSeasons} onOpen={open} />}
         {verdictRows.map((r) => (
           <PosterRow key={r.verdict} title={r.title} dot={r.color} items={r.items} onOpen={open} />
         ))}

@@ -389,7 +389,7 @@ function AniListPage({ styles, C }) {
 const FAQ = [
   ["Where is my library saved?", "On this phone. There is no account and nothing is uploaded. Use Data and storage to back it up."],
   ["How do I move to a new phone?", "Copy a backup file from your backup folder (or Share backup), then use Restore from file on the new phone."],
-  ["Can I bring my AniList lists?", "Yes. Data and storage → Import from AniList, then type your username. Your lists need to be public; nothing is changed on AniList."],
+  ["Can I bring my AniList lists?", "Yes, two ways under More → AniList: sign in to keep them in sync both ways, or import once by username (public lists; nothing is changed on AniList)."],
   ["What does Delayed mean?", "The next episode was going to air earlier, and its date has since moved later. Voidation shows the original date next to the new one."],
   ["Does uninstalling delete my library?", "The library inside the app, yes. Backups in the folder you chose under Data and storage stay, so you can restore them after reinstalling."],
   ["Why didn't I get an episode alert?", "Alerts are set up when you open Voidation and about hourly in the background, for the next episode of everything you follow. Check that notifications are allowed and New episode alerts is on in Settings. Some phones (Xiaomi, Oppo, Vivo…) stop background work to save battery; allow Voidation to run in the background in your phone's battery settings."],
