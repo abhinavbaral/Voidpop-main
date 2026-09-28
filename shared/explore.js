@@ -5,6 +5,7 @@
 
 import { fetchAniList, fetchRecommendations, fetchSequels } from "./api/anilist.js";
 import { readKey, writeKey } from "./backend/storage.js";
+import { seasonOf, shiftSeason, seasonTitle } from "./season.js";
 import { getReviews, getLibrary, getExcited, VERDICTS } from "./backend/store.js";
 
 const daySeed = () =>
@@ -19,12 +20,24 @@ const rotate = (arr, by) =>
 export async function loadExplorePools() {
   const get = (segment, sort, page) =>
     fetchAniList(segment, { sort, perPage: 25, page }).then((r) => r.items).catch(() => []);
-  const [trA, trM, popA1, popA2, popM1, popM2] = await Promise.all([
+  // "Coming soon": this season and the next (Summer 2026 → Summer + Fall 2026;
+  // Fall 2026 → Fall 2026 + Winter 2027), titles that haven't started yet
+  const now = seasonOf();
+  const next = shiftSeason(now, 1);
+  const coming = (s) =>
+    fetchAniList("anime", { season: s.season, year: s.year, unreleasedOnly: true, sort: "popular", perPage: 25 })
+      .then((r) => r.items).catch(() => []);
+  const [trA, trM, popA1, popA2, popM1, popM2, comingNow, comingNext] = await Promise.all([
     get("anime", "trending", 1), get("manga", "trending", 1),
     get("anime", "popular", 1), get("anime", "popular", 2),
     get("manga", "popular", 1), get("manga", "popular", 2),
+    coming(now), coming(next),
   ]);
-  return { trA, trM, popA: [...popA1, ...popA2], popM: [...popM1, ...popM2] };
+  return {
+    trA, trM, popA: [...popA1, ...popA2], popM: [...popM1, ...popM2],
+    coming: [...comingNow, ...comingNext],
+    comingTitle: `Coming in ${seasonTitle(now)} & ${seasonTitle(next)}`,
+  };
 }
 
 export async function knownKeys() {
@@ -42,7 +55,15 @@ export function buildExplore(pools, known = new Set()) {
   // Voidation picks never repeat what "Don't miss this" already shows
   const shown = new Set([...dontMissAnime, ...dontMissManga].map((it) => `${it.segment}:${it.id}`));
   const notShown = (items) => items.filter((it) => !shown.has(`${it.segment}:${it.id}`));
+  // soonest premiere first; titles without a date yet go last, most popular first
+  const seenComing = new Set();
+  const coming = fresh(pools.coming || [])
+    .filter((it) => !seenComing.has(it.id) && seenComing.add(it.id))
+    .sort((a, b) => (a.date ? 0 : 1) - (b.date ? 0 : 1) || (a.date || "").localeCompare(b.date || ""))
+    .slice(0, 20);
   return {
+    coming,
+    comingTitle: pools.comingTitle,
     // Talk of the Week is what everyone's talking about, so it includes shows you've seen
     talk: [...pools.trA.slice(0, 7), ...pools.trM.slice(0, 5)],
     dontMissAnime,

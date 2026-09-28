@@ -12,6 +12,7 @@ import {
   getUserTier, TIERS, statusesFor, exportData, importData, clearData, storageSize,
   importAniListEntries,
   getCategories, addCategory, renameCategory, moveCategory, deleteCategory,
+  getExcited, toggleExcited,
 } from "@voidation/shared/backend/store";
 import { useSettings } from "@voidation/shared/backend/SettingsContext";
 import { fetchAniListUserList, cacheSize, cacheClear } from "@voidation/shared/api/anilist";
@@ -21,6 +22,10 @@ import { useTheme } from "../theme.jsx";
 import { useDocumentTitle } from "../lib/useDocumentTitle.js";
 import logo from "../assets/logo.png";
 import AniListSync from "../components/AniListSync.jsx";
+import { loadAnnounced, daysLeft, ANNOUNCED_DAYS } from "@voidation/shared/announced";
+import { useAuth } from "@voidation/shared/backend/AuthContext";
+import { releaseLabel } from "@voidation/shared/format";
+import { titlePath, cacheTitle } from "../lib/titles.js";
 
 const VERSION = "1.0.0";
 
@@ -29,6 +34,7 @@ const PAGES = [
   { key: "appearance", label: "Appearance", hint: "Dark or light" },
   { key: "settings", label: "Settings", hint: "Clock, countdown badges" },
   { key: "data", label: "Data and storage", hint: "Backup, restore, clear" },
+  { key: "announced", label: "New announcements", hint: "Anime announced this week" },
   { key: "categories", label: "Categories", hint: "Your own groups in the Library" },
   { key: "anilist", label: "AniList", hint: "Sync or import your lists" },
   { key: "help", label: "Help", hint: "Common questions" },
@@ -49,7 +55,7 @@ export default function More() {
   if (page && !current) return <Navigate to="/more" replace />;
   if (!current) return <MoreMenu />;
 
-  const Body = { statistics: Statistics, appearance: Appearance, settings: Settings, data: DataStorage, categories: Categories, anilist: AniListPage, help: Help, about: About }[page];
+  const Body = { statistics: Statistics, appearance: Appearance, settings: Settings, data: DataStorage, categories: Categories, anilist: AniListPage, announced: Announced, help: Help, about: About }[page];
   return (
     <div className="stack narrow">
       <Link to="/more" className="link-btn"><Icon name="back" size={16} /> More</Link>
@@ -96,6 +102,9 @@ function MoreMenu() {
             <span className="grow"><b>Wrapped {new Date().getFullYear()}</b><span className="faint small">Your year in anime and manga</span></span>
           </Link>
         </li>
+      </ul>
+      <ul className="menu-list">
+        {row("announced", "schedule", "New announcements")}
       </ul>
       <ul className="menu-list">
         {row("statistics", "stats", "Statistics")}
@@ -293,6 +302,46 @@ function AniListImport({ onDone }) {
       </form>
       {result && <p className="faint small" role="status">{result}</p>}
     </section>
+  );
+}
+
+// Anime announced on AniList this week. Each stays 7 days, then drops off.
+function Announced() {
+  const { user } = useAuth();
+  const [list, setList] = useState(null);
+  const [excited, setExcited] = useState({});
+  useEffect(() => {
+    loadAnnounced().then(setList).catch(() => setList([]));
+    getExcited().then(setExcited);
+  }, []);
+  if (!list) return <p className="muted">Loading…</p>;
+  if (!list.length) return <p className="empty">No new announcements in the last {ANNOUNCED_DAYS} days.</p>;
+  return (
+    <div className="stack-sm">
+      <p className="muted">Anime newly announced on AniList. Each one stays here for {ANNOUNCED_DAYS} days. Tap Excited to get it on your Schedule.</p>
+      <ul className="list">
+        {list.map(({ item, seenAt }) => {
+          const on = !!excited[`anime:${item.id}`];
+          return (
+            <li key={item.id} className="list-row">
+              <Link to={titlePath(item)} onClick={() => cacheTitle(item)} className="row gap-12 grow">
+                {item.image ? <img src={item.image} alt="" loading="lazy" /> : <span className="thumb-empty" />}
+                <span className="grow">
+                  <b className="ellipsis">{item.title}</b>
+                  <span className="faint small">
+                    {item.date ? releaseLabel(item) : "Release date TBA"}{item.creator ? ` · ${item.creator}` : ""} · {daysLeft(seenAt)} day{daysLeft(seenAt) === 1 ? "" : "s"} left here
+                  </span>
+                </span>
+              </Link>
+              <button className={`status-btn excited${on ? " on" : ""}`} aria-pressed={on}
+                onClick={async () => { await toggleExcited(user, item); setExcited(await getExcited()); }}>
+                {on ? "Excited ✓" : "Excited?"}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 

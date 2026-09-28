@@ -22,6 +22,7 @@ export default function Explore() {
   return (
     <div className="stack">
       {newSeasons.length > 0 && <PosterRow title="🆕 New seasons of shows you watched" items={newSeasons} now={now} />}
+      {data.coming?.length > 0 && <PosterRow title={`📅 ${data.comingTitle}`} items={data.coming} now={now} />}
       {verdictRows.map((r) => (
         <PosterRow key={r.verdict} title={r.title} dot={r.color} items={r.items} now={now} />
       ))}

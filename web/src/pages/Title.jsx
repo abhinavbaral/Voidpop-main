@@ -6,7 +6,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@voidation/shared/backend/AuthContext";
 import {
   statusesFor, getStatus, setStatus, addReview, getMyReview, getExcited, toggleExcited,
-  getEntry, setProgress, noteAiring, getCategories, setEntryCategories,
+  getEntry, setProgress, noteAiring, getCategories, setEntryCategories, doneLabel, fillCompleted,
 } from "@voidation/shared/backend/store";
 import ProgressStepper from "../components/Progress.jsx";
 import { googleCalendarUrl, icsFor } from "@voidation/shared/calendar";
@@ -81,6 +81,7 @@ function TitleBody({ item }) {
   const [cats, setCats] = useState([]);
   const [myCats, setMyCats] = useState([]);
   const refresh = useCallback(async () => {
+    await fillCompleted(item); // completed = all watched, once the count is known
     const entry = await getEntry(item.segment, item.id);
     setProgressState(entry?.progress || 0);
     setMyCats(entry?.cats || []);
@@ -227,7 +228,10 @@ function TitleBody({ item }) {
           </section>
         )}
 
-        {!item.unreleased && (status || progress > 0) && (
+        {status === "completed" && (
+          <section className="panel progress-panel"><b className="done-label big">{doneLabel(item)}</b></section>
+        )}
+        {!item.unreleased && status !== "completed" && (status || progress > 0) && (
           <ProgressStepper item={{ ...item, nextEpisode }} progress={progress} onChange={changeProgress} />
         )}
 

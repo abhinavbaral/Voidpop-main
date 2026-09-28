@@ -6,6 +6,7 @@ import { releaseLabel, formatCountdown } from "@voidation/shared/format";
 import { useSettings } from "@voidation/shared/backend/SettingsContext";
 import { titlePath, cacheTitle } from "../lib/titles.js";
 import { progressLabel, behind, canAddOne } from "./Progress.jsx";
+import { doneLabel } from "@voidation/shared/backend/store";
 
 // `entry` (Library only): shows your progress and, with onPlus, a +1 button.
 // `selecting` (Library's Select mode): a tap selects instead of opening.
@@ -33,10 +34,14 @@ export default function Card({ item, now, entry, onPlus, selecting, selected, on
         <div className="card-sub ellipsis">{item.genre} · {releaseLabel(item)}</div>
         {entry && (
           <div className="card-progress">
-            <span className="ellipsis">
-              {progressLabel(item, entry.progress)}
-              {behind(item, entry.progress) > 0 && <span className="behind"> · {behind(item, entry.progress)} new</span>}
-            </span>
+            {entry.status === "completed" ? (
+              <span className="ellipsis done-label">{doneLabel(item)}</span>
+            ) : (
+              <span className="ellipsis">
+                {progressLabel(item, entry.progress)}
+                {behind(item, entry.progress) > 0 && <span className="behind"> · {behind(item, entry.progress)} new</span>}
+              </span>
+            )}
             {onPlus && !selecting && canAddOne(item, entry.progress || 0) && (
               <button className="plus-btn" aria-label={`Mark next ${item.segment === "manga" ? "chapter read" : "episode watched"}`}
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); onPlus(); }}>+1</button>

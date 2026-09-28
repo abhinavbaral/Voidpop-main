@@ -20,7 +20,7 @@ import { useAuth } from "@voidation/shared/backend/AuthContext";
 import {
   statusesFor, getStatus, setStatus, addReview, getMyReview,
   getExcited, toggleExcited, getEntry, setProgress, noteAiring, totalFor, unitFor, airedFor, maxProgress, checkProgress,
-  getCategories, setEntryCategories,
+  getCategories, setEntryCategories, doneLabel, fillCompleted,
 } from "@voidation/shared/backend/store";
 import { fetchAniListDetail, fetchAniListItem, fetchNextEpisodes } from "@voidation/shared/api/anilist";
 import ReviewCard from "../components/ReviewCard.js";
@@ -110,6 +110,7 @@ function DetailBody({ item, navigation }) {
   const [watch, setWatch] = useState([]);
 
   const refresh = useCallback(async () => {
+    await fillCompleted(item); // completed = all watched, once the count is known
     const entry = await getEntry(item.segment, item.id);
     setProgressState(entry?.progress || 0);
     setMyCats(entry?.cats || []);
@@ -313,7 +314,12 @@ function DetailBody({ item, navigation }) {
             </View>
           )}
 
-          {!item.unreleased && (status || progress > 0) && (
+          {status === "completed" && (
+            <View style={[styles.box, { marginTop: 16 }]}>
+              <Text style={{ color: C.green, fontWeight: "800", fontSize: 15 }}>{doneLabel(item)}</Text>
+            </View>
+          )}
+          {!item.unreleased && status !== "completed" && (status || progress > 0) && (
             <ProgressBox item={{ ...item, nextEpisode }} progress={progress} onChange={changeProgress} styles={styles} C={C} />
           )}
 

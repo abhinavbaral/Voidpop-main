@@ -9,6 +9,7 @@ import { useTheme } from "../context/ThemeContext.js";
 
 const GROUPS = [
   [["statistics", "▥", "Statistics"], ["appearance", "◐", "Appearance"], ["data", "▤", "Data and storage"]],
+  [["announced", "✦", "New announcements"]],
   [["categories", "▦", "Categories"], ["anilist", "⇄", "AniList"]],
   [["settings", "⚙", "Settings"], ["help", "?", "Help"], ["about", "ⓘ", "About"]],
 ];

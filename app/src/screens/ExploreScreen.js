@@ -61,6 +61,7 @@ export default function ExploreScreen({ navigation }) {
         )}
 
         {newSeasons.length > 0 && <PosterRow title="🆕 New seasons of shows you watched" items={newSeasons} onOpen={open} />}
+        {data.coming?.length > 0 && <PosterRow title={`📅 ${data.comingTitle}`} items={data.coming} onOpen={open} />}
         {verdictRows.map((r) => (
           <PosterRow key={r.verdict} title={r.title} dot={r.color} items={r.items} onOpen={open} />
         ))}

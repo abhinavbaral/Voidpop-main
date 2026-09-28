@@ -324,6 +324,18 @@ export async function deleteListEntry(token, { listId, userId, mediaId }) {
   await gql(`mutation ($id: Int) { DeleteMediaListEntry(id: $id) { deleted } }`, { id }, { token });
 }
 
+// Newest anime added to AniList that haven't started yet = new announcements.
+// (AniList gives each new title the next id, so highest id = most recent.)
+export async function fetchNewlyAnnounced(perPage = 50) {
+  const query = `query ($perPage: Int) {
+    Page(perPage: $perPage) {
+      media(type: ANIME, status: NOT_YET_RELEASED, isAdult: false, sort: [ID_DESC]) { ${fieldsFor("anime")} }
+    }
+  }`;
+  const data = await gql(query, { perPage });
+  return data.Page.media.map((m) => normalize(m, "anime"));
+}
+
 // Sequels (next seasons) of many anime at once: { id -> [sequel items] }.
 // Light fields for the sequels (no synopsis): their page fills in when opened.
 export async function fetchSequels(ids) {

@@ -40,7 +40,7 @@
           "widgets": [
             {
               "name": "NextEpisodes",
-              "label": "Voidation · Next episodes",
+              "label": "Voidation \u00b7 Next episodes",
               "description": "Countdowns for up to 30 anime you follow",
               "minWidth": "250dp",
               "minHeight": "180dp",
@@ -55,12 +55,6 @@
         }
       ]
     ],
-    "scheme": "voidation",
-    "extra": {
-      "eas": {
-        "projectId": "60c0d3f0-5f80-4f55-b21e-9d32892e270f"
-      }
-    },
-    "owner": "abhinavbaral"
+    "scheme": "voidation"
   }
 }

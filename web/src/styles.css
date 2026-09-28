@@ -526,3 +526,4 @@ p { margin: 0; }
 .wc-brand span { color: #ee8f2e; }
 .wrapped-row b { background: linear-gradient(90deg,#a855f7,#ee8f2e); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .wc-cols ol { list-style: decimal; } .wc-cols ol li::marker { color: #a855f7; }
+.done-label { color: var(--green); font-weight: 800; } .done-label.big { font-size: 1.1rem; }

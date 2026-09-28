@@ -3,7 +3,7 @@
 
 import { useCallback, useState } from "react";
 import {
-  ScrollView, View, Text, TextInput, TouchableOpacity, Pressable, Switch, StyleSheet, Share, Alert, Linking, Platform,
+  ScrollView, View, Text, TextInput, TouchableOpacity, Pressable, Switch, StyleSheet, Share, Alert, Linking, Platform, Image,
 } from "react-native";
 import { fetchAniListUserList, cacheSize, cacheClear } from "@voidation/shared/api/anilist";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -11,11 +11,15 @@ import { useFocusEffect } from "@react-navigation/native";
 import {
   getUserTier, TIERS, statusesFor, exportData, importData, clearData, storageSize, importAniListEntries,
   getCategories, addCategory, renameCategory, moveCategory, deleteCategory,
+  getExcited, toggleExcited,
 } from "@voidation/shared/backend/store";
 import { useSettings } from "@voidation/shared/backend/SettingsContext";
 import TierBadge from "../components/TierBadge.js";
 import { useTheme } from "../context/ThemeContext.js";
-import { goBackOrHome } from "../lib/nav";
+import { goBackOrHome, openDetail } from "../lib/nav";
+import { loadAnnounced, daysLeft, ANNOUNCED_DAYS } from "@voidation/shared/announced";
+import { useAuth } from "@voidation/shared/backend/AuthContext";
+import { releaseLabel } from "@voidation/shared/format";
 import {
   FREQUENCIES, KEEP, getBackupConfig, setFrequency, chooseFolder, backupNow, restoreFromFile,
 } from "../lib/backup";
@@ -29,14 +33,15 @@ const AUTO_BACKUP = Platform.OS === "android"; // Android's folder picker (SAF)
 const VERSION = "1.0.0";
 const TITLES = {
   statistics: "Statistics", appearance: "Appearance", settings: "Settings",
-  data: "Data and storage", categories: "Categories", anilist: "AniList", help: "Help", about: "About",
+  data: "Data and storage", announced: "New announcements", categories: "Categories", anilist: "AniList", help: "Help", about: "About",
 };
 
 export default function MorePageScreen({ route, navigation }) {
+  const nav = navigation;
   const { C } = useTheme();
   const styles = makeStyles(C);
   const page = route.params?.page;
-  const Body = { statistics: Statistics, appearance: Appearance, settings: Settings, data: DataStorage, categories: Categories, anilist: AniListPage, help: Help, about: About }[page];
+  const Body = { statistics: Statistics, appearance: Appearance, settings: Settings, data: DataStorage, categories: Categories, anilist: AniListPage, announced: Announced, help: Help, about: About }[page];
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -45,7 +50,7 @@ export default function MorePageScreen({ route, navigation }) {
           <Text style={{ color: C.purple, marginBottom: 10 }}>← More</Text>
         </TouchableOpacity>
         <Text style={styles.heading}>{TITLES[page] || "More"}</Text>
-        {Body ? <Body styles={styles} C={C} /> : null}
+        {Body ? <Body styles={styles} C={C} navigation={nav} /> : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -308,6 +313,48 @@ function AniListImport({ styles, C, onDone }) {
       </View>
       {!!result && <Text style={[styles.note, { marginTop: 8 }]}>{result}</Text>}
     </View>
+  );
+}
+
+// Anime announced on AniList this week. Each stays 7 days, then drops off.
+function Announced({ styles, C, navigation }) {
+  const { user } = useAuth();
+  const [list, setList] = useState(null);
+  const [excited, setExcited] = useState({});
+  useFocusEffect(useCallback(() => {
+    loadAnnounced().then(setList).catch(() => setList([]));
+    getExcited().then(setExcited);
+  }, []));
+  if (!list) return <Text style={styles.note}>Loading…</Text>;
+  if (!list.length) return <Text style={styles.note}>No new announcements in the last {ANNOUNCED_DAYS} days.</Text>;
+  return (
+    <>
+      <Text style={styles.note}>Anime newly announced on AniList. Each one stays here for {ANNOUNCED_DAYS} days. Tap Excited to get it on your Schedule.</Text>
+      <View style={[styles.card, { paddingVertical: 6 }]}>
+        {list.map(({ item, seenAt }, i) => {
+          const on = !!excited[`anime:${item.id}`];
+          const left = daysLeft(seenAt);
+          return (
+            <View key={item.id} style={[{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8 }, i > 0 && { borderTopWidth: 1, borderTopColor: C.border }]}>
+              <TouchableOpacity style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 10 }} onPress={() => openDetail(navigation, item)}>
+                {item.image ? <Image source={{ uri: item.image }} style={{ width: 38, height: 54, borderRadius: 6 }} /> : <View style={{ width: 38, height: 54, borderRadius: 6, backgroundColor: C.border }} />}
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
+                  <Text style={styles.note} numberOfLines={1}>
+                    {item.date ? releaseLabel(item) : "Release date TBA"}{item.creator ? ` · ${item.creator}` : ""}
+                  </Text>
+                  <Text style={[styles.note, { fontSize: 10 }]}>{left} day{left === 1 ? "" : "s"} left here</Text>
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={async () => { await toggleExcited(user, item); setExcited(await getExcited()); }}
+                style={{ borderWidth: 1, borderColor: C.orange, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: on ? C.orange : "transparent" }}>
+                <Text style={{ fontSize: 11, fontWeight: "800", color: on ? "#fff" : C.orange }}>{on ? "Excited ✓" : "Excited?"}</Text>
+              </TouchableOpacity>
+            </View>
+          );
+        })}
+      </View>
+    </>
   );
 }
 

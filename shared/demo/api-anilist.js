@@ -167,3 +167,9 @@ export async function fetchSequels(ids) {
   });
   return out;
 }
+
+// New announcements (demo): the catalog's upcoming titles, newest id first.
+export async function fetchNewlyAnnounced() {
+  await wait(200);
+  return CATALOG.anime.filter((i) => i.unreleased).sort((a, b) => b.id - a.id).map(toAppItem);
+}

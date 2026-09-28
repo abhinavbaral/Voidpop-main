@@ -155,6 +155,28 @@ export function airedFor(item) {
   }
   return item.finished ? item.episodes ?? null : null;
 }
+// Completed means everything is watched / read: "✓ All 12 watched".
+export function doneLabel(item) {
+  const total = totalFor(item);
+  const verb = item.segment === "manga" ? "read" : "watched";
+  return total ? `✓ All ${total} ${verb}` : `✓ All ${verb}`;
+}
+
+// A completed title whose episode count wasn't known when you finished it gets
+// its progress filled in once the count is known (e.g. its page was opened).
+export async function fillCompleted(item) {
+  const db = await load();
+  const e = db.library[keyOf(item.segment, item.id)];
+  const total = totalFor(item);
+  if (!e || e.status !== "completed" || !total || (e.progress || 0) >= total) return false;
+  logChange(db, keyOf(item.segment, item.id), total - (e.progress || 0), "complete");
+  e.progress = total;
+  e.item = freshest(e.item, item);
+  entryChanged(keyOf(item.segment, item.id), e); // AniList sync gets the full count too
+  await save();
+  return true;
+}
+
 // How many aired episodes you haven't watched yet (anime only).
 export function behindBy(entry) {
   const aired = airedFor(entry.item);

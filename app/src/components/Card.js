@@ -8,7 +8,7 @@ import { Pressable, Image, Text, View, StyleSheet, Platform } from "react-native
 import { useTheme } from "../context/ThemeContext.js";
 import { releaseLabel, formatCountdown } from "@voidation/shared/format";
 import { useSettings } from "@voidation/shared/backend/SettingsContext";
-import { totalFor, unitFor, behindBy, maxProgress } from "@voidation/shared/backend/store";
+import { totalFor, unitFor, behindBy, maxProgress, doneLabel } from "@voidation/shared/backend/store";
 
 // `columns`: when used in a grid, each cell gets an exact 1/columns width so an
 // incomplete last row doesn't stretch its cards.
@@ -79,10 +79,14 @@ function CardInner({ item, entry, onPlus, onPress, onLongPress, selecting, selec
         </Text>
         {entry && (
           <View style={styles.progressRow}>
-            <Text style={styles.progress} numberOfLines={1}>
-              {unitFor(item.segment)} {entry.progress || 0}{totalFor(item) ? `/${totalFor(item)}` : ""}
-              {behindBy(entry) > 0 && <Text style={{ color: C.orange }}> · {behindBy(entry)} new</Text>}
-            </Text>
+            {entry.status === "completed" ? (
+              <Text style={[styles.progress, { color: C.green }]} numberOfLines={1}>{doneLabel(item)}</Text>
+            ) : (
+              <Text style={styles.progress} numberOfLines={1}>
+                {unitFor(item.segment)} {entry.progress || 0}{totalFor(item) ? `/${totalFor(item)}` : ""}
+                {behindBy(entry) > 0 && <Text style={{ color: C.orange }}> · {behindBy(entry)} new</Text>}
+              </Text>
+            )}
             {onPlus && !selecting && (maxProgress(item) == null || (entry.progress || 0) < maxProgress(item)) && (
               <Pressable onPress={onPlus} hitSlop={8} style={styles.plus}
                 accessibilityLabel={item.segment === "manga" ? "Mark next chapter read" : "Mark next episode watched"}>
