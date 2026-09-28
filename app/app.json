@@ -17,7 +17,11 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0b0f19"
-      }
+      },
+      "blockedPermissions": [
+        "android.permission.READ_CALENDAR",
+        "android.permission.WRITE_CALENDAR"
+      ]
     },
     "ios": {
       "supportsTablet": true,
@@ -29,7 +33,28 @@
         {
           "color": "#a855f7"
         }
+      ],
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "NextEpisodes",
+              "label": "Voidation \u00b7 Next episodes",
+              "description": "Countdowns for up to 30 anime you follow",
+              "minWidth": "250dp",
+              "minHeight": "180dp",
+              "targetCellWidth": 4,
+              "targetCellHeight": 3,
+              "maxResizeHeight": "600dp",
+              "resizeMode": "horizontal|vertical",
+              "updatePeriodMillis": 1800000,
+              "previewImage": "./assets/widget-preview.png"
+            }
+          ]
+        }
       ]
-    ]
+    ],
+    "scheme": "voidation"
   }
 }

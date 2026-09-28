@@ -123,7 +123,30 @@ export function behindBy(entry) {
   return aired == null ? 0 : Math.max(0, aired - (entry.progress || 0));
 }
 
-// Sets progress to n (clamped to 0…total). Starting a title you had planned,
+// The highest progress allowed: anime can't pass what has aired; manga can't
+// pass its chapter count. null = unknown (an ongoing manga: AniList only records
+// the chapter count once a series ends), so any number is accepted.
+export function maxProgress(item) {
+  if (item.unreleased) return 0;
+  if (item.segment === "anime") return airedFor(item) ?? totalFor(item);
+  return totalFor(item);
+}
+
+// For typed input: an error message, or null if n is fine.
+export function checkProgress(item, raw) {
+  const text = String(raw).trim();
+  if (!/^\d+$/.test(text)) return "Enter a whole number.";
+  const n = Number(text);
+  const max = maxProgress(item);
+  if (max == null || n <= max) return null;
+  const unit = item.segment === "manga" ? "chapter" : "episode";
+  if (item.segment === "anime" && item.nextEpisode) {
+    return max === 0 ? "No episodes are out yet." : `Only ${max} ${unit}${max === 1 ? " is" : "s are"} out so far.`;
+  }
+  return `${item.title} has ${max.toLocaleString()} ${unit}${max === 1 ? "" : "s"}.`;
+}
+
+// Sets progress to n (clamped to 0…what's out). Starting a title you had planned,
 // paused or dropped moves it to Watching / Reading. Returns
 // { progress, status, reachedEnd } — reachedEnd means "ask for the verdict".
 export async function setProgress(_user, item, n) {
@@ -131,8 +154,9 @@ export async function setProgress(_user, item, n) {
   const key = keyOf(item.segment, item.id);
   const prev = db.library[key];
   const total = totalFor(item);
+  const max = maxProgress(item);
   let progress = Math.max(0, Math.floor(Number(n) || 0));
-  if (total) progress = Math.min(progress, total);
+  if (max != null) progress = Math.min(progress, max);
   let status = prev?.status || null;
   if (progress > (prev?.progress || 0) && (!status || ["plan", "onhold", "dropped"].includes(status))) status = "watching";
   if (!status) status = "watching";
@@ -306,6 +330,11 @@ export async function addReview(_user, segment, id, { verdict, vibes, comment })
     date: new Date().toISOString(),
   };
   return save();
+}
+
+// every verdict you've given: [{ segment, titleId, verdict, vibes, comment, date }]
+export async function getReviews() {
+  return Object.values((await load()).reviews);
 }
 
 export async function getMyReview(_user, segment, id) {

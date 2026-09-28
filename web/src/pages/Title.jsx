@@ -9,6 +9,7 @@ import {
   getEntry, setProgress, noteAiring,
 } from "@voidation/shared/backend/store";
 import ProgressStepper from "../components/Progress.jsx";
+import { googleCalendarUrl, icsFor } from "@voidation/shared/calendar";
 import { fetchAniListDetail, fetchNextEpisodes, fetchAniListItem } from "@voidation/shared/api/anilist";
 import { releaseLabel, formatCountdown, dayLabel, airTime } from "@voidation/shared/format";
 import { useNow } from "@voidation/shared/hooks/useNow";
@@ -16,6 +17,7 @@ import { useSettings } from "@voidation/shared/backend/SettingsContext";
 import ReviewCard from "../components/ReviewCard.jsx";
 import VerdictModal from "../components/VerdictModal.jsx";
 import ShareCardModal from "../components/ShareCardModal.jsx";
+import CountdownShareModal from "../components/CountdownShareModal.jsx";
 import PosterRow from "../components/PosterRow.jsx";
 import Modal from "../components/Modal.jsx";
 import Icon from "../components/Icon.jsx";
@@ -69,6 +71,7 @@ function TitleBody({ item }) {
   const [isExcited, setIsExcited] = useState(false);
   const [verdictOpen, setVerdictOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [countdownOpen, setCountdownOpen] = useState(false);
   const [zoom, setZoom] = useState(false);
   const [trailer, setTrailer] = useState(null);
   const [related, setRelated] = useState([]);
@@ -194,7 +197,11 @@ function TitleBody({ item }) {
                 <span className="delayed">Delayed · was {dayLabel(delay.from, now)}, {airTime(delay.from, clock24)}</span>
               )}
             </div>
-            <span className="countdown big">{formatCountdown(nextEpisode.airingAt, now)}</span>
+            <div className="next-side">
+              <span className="countdown big">{formatCountdown(nextEpisode.airingAt, now)}</span>
+              <CalendarLinks item={{ ...item, nextEpisode }} />
+              <button className="link-btn small" onClick={() => setCountdownOpen(true)}>Share countdown</button>
+            </div>
           </section>
         )}
 
@@ -230,8 +237,29 @@ function TitleBody({ item }) {
         <button className="icon-btn zoom-close" onClick={() => setZoom(false)} aria-label="Close"><Icon name="close" /></button>
         {item.image && <img src={item.image} alt={`${item.title} poster`} />}
       </Modal>
+      {countdownOpen && <CountdownShareModal open item={item} next={nextEpisode} onClose={() => setCountdownOpen(false)} />}
       {verdictOpen && <VerdictModal open initial={myReview} onSave={saveVerdict} onClose={() => setVerdictOpen(false)} />}
       <ShareCardModal open={shareOpen} item={item} review={myReview} onClose={() => setShareOpen(false)} />
     </article>
+  );
+}
+
+// Weekly calendar event for the remaining episodes: Google Calendar, or an
+// .ics file for Apple Calendar / Outlook. Free, nothing to sign in to.
+function CalendarLinks({ item }) {
+  const download = () => {
+    const blob = new Blob([icsFor(item)], { type: "text/calendar" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${item.title.replace(/[^\w\- ]+/g, "").trim() || "episode"}.ics`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+  return (
+    <div className="calendar-links">
+      <span className="faint small">Add to calendar:</span>
+      <a href={googleCalendarUrl(item)} target="_blank" rel="noreferrer">Google</a>
+      <button className="link-btn" onClick={download}>Apple / Outlook (.ics)</button>
+    </div>
   );
 }

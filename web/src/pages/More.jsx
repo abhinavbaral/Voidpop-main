@@ -13,7 +13,7 @@ import {
   importAniListEntries,
 } from "@voidation/shared/backend/store";
 import { useSettings } from "@voidation/shared/backend/SettingsContext";
-import { fetchAniListUserList } from "@voidation/shared/api/anilist";
+import { fetchAniListUserList, cacheSize, cacheClear } from "@voidation/shared/api/anilist";
 import TierBadge from "../components/TierBadge.jsx";
 import Icon from "../components/Icon.jsx";
 import { useTheme } from "../theme.jsx";
@@ -178,9 +178,10 @@ function Settings() {
 function DataStorage() {
   const { reload } = useSettings();
   const [size, setSize] = useState(null);
+  const [offlineSize, setOfflineSize] = useState(null);
   const [message, setMessage] = useState("");
   const fileInput = useRef(null);
-  const measure = () => storageSize().then(setSize);
+  const measure = () => { storageSize().then(setSize); cacheSize().then(setOfflineSize); };
   useEffect(() => { measure(); }, []);
 
   const download = async () => {
@@ -221,6 +222,16 @@ function DataStorage() {
         </div>
       </section>
       <AniListImport onDone={() => { reload(); measure(); }} />
+      <section className="panel stack-sm">
+        <b>Offline copy</b>
+        <p className="faint small">
+          The latest schedules and titles are saved as you browse, so Voidation still works without internet.
+          Using {offlineSize === null ? "…" : `${(offlineSize / 1024).toFixed(0)} KB`}. Clearing it doesn't touch your library.
+        </p>
+        <button className="btn ghost" onClick={async () => { await cacheClear(); setMessage("Offline copy cleared."); measure(); }}>
+          Clear offline copy
+        </button>
+      </section>
       <section className="panel stack-sm">
         <b>Clear data</b>
         <p className="faint small">Removes every tracked title, verdict and Excited mark from this browser.</p>

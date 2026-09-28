@@ -5,7 +5,7 @@ import { useCallback, useState } from "react";
 import {
   ScrollView, View, Text, TextInput, TouchableOpacity, Pressable, Switch, StyleSheet, Share, Alert, Linking, Platform,
 } from "react-native";
-import { fetchAniListUserList } from "@voidation/shared/api/anilist";
+import { fetchAniListUserList, cacheSize, cacheClear } from "@voidation/shared/api/anilist";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import {
@@ -146,11 +146,13 @@ function Settings({ styles, C }) {
 function DataStorage({ styles, C }) {
   const { reload } = useSettings();
   const [size, setSize] = useState(null);
+  const [offlineSize, setOfflineSize] = useState(null);
   const [cfg, setCfg] = useState(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const measure = useCallback(() => {
     storageSize().then(setSize);
+    cacheSize().then(setOfflineSize);
     if (AUTO_BACKUP) getBackupConfig().then(setCfg);
   }, []);
   useFocusEffect(measure);
@@ -244,6 +246,18 @@ function DataStorage({ styles, C }) {
       </View>
 
       <AniListImport styles={styles} C={C} onDone={() => { reload(); measure(); }} />
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Offline copy</Text>
+        <Text style={styles.note}>
+          The latest schedules and titles are saved as you browse, so Voidation still works without internet.
+          Using {offlineSize === null ? "…" : `${(offlineSize / 1024).toFixed(0)} KB`}. Clearing it doesn't touch your library.
+        </Text>
+        <TouchableOpacity style={[styles.btn, { marginTop: 10, flex: undefined }]}
+          onPress={async () => { await cacheClear(); setMessage("Offline copy cleared."); measure(); }}>
+          <Text style={styles.btnText}>Clear offline copy</Text>
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Clear data</Text>

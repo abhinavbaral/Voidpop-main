@@ -6,4 +6,5 @@ import { setStorage } from "@voidation/shared/backend/storage";
 setStorage({
   getItem: (key) => AsyncStorage.getItem(key),
   setItem: (key, value) => AsyncStorage.setItem(key, value),
+  removeItem: (key) => AsyncStorage.removeItem(key),
 });

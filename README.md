@@ -18,6 +18,13 @@ Android app, built from one codebase. No sign-up and no API keys: open it and us
 - **Import from AniList** by username (public lists, no key); a title in both keeps whichever copy changed last
 - **Library search and sort** (recently updated, A–Z, airing soonest, most to catch up)
 - **Delayed label** when a followed show's next episode moves later, with the original date
+- **Type your progress** (tap the number); you can't go past what's out: aired episodes, or a finished manga's chapter count
+- **Works offline:** the latest AniList answers are kept on the device (size-capped) and used when there's no internet
+- **Season chart:** a season's anime grouped by format, with countdowns and one-tap Plan to Watch
+- **Verdict recommendations:** "Peak like X", "Dive in like X", "One time like X" (Void It gets none)
+- **Add to calendar:** the phone's own event screen (app), Google Calendar or an .ics file (website), weekly for the remaining episodes
+- **Share a countdown** as an image
+- **Android widget** with the next episode of up to 30 shows you follow (needs the APK; not available in Expo Go)
 - **Where to watch / read:** official streaming and reading services for each title (from AniList)
 - **Episode alerts (app):** a notification when an episode airs for anything you follow or are Excited about
 - **Automatic backups (Android, Mihon-style):** pick a folder once; backups run on a schedule (12h / daily / weekly),

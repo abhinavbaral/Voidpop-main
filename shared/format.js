@@ -65,3 +65,17 @@ export function airedAgo(airingAt, now = Date.now()) {
   const d = Math.floor(s / 86400);
   return `aired ${d} day${d > 1 ? "s" : ""} ago`;
 }
+
+// "Wed 1 Oct, 8:30 PM GMT+5:45": a full air time for a share card, with the
+// time zone, since whoever sees the image may live somewhere else.
+export function shareAirTime(airingAt, clock24 = false) {
+  const d = new Date(airingAt * 1000);
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit",
+      hour12: !clock24, timeZoneName: "short",
+    }).format(d);
+  } catch {
+    return d.toString().slice(0, 21);
+  }
+}

@@ -10,7 +10,7 @@ import Skeleton from "./Skeleton.js";
 import { useTheme } from "../context/ThemeContext.js";
 import { useIsWide } from "../lib/layout";
 
-export default function PosterRow({ title, items, loading, onOpen }) {
+export default function PosterRow({ title, items, loading, onOpen, dot }) {
   const { C } = useTheme();
   const styles = makeStyles(C);
   const wide = useIsWide();
@@ -30,7 +30,7 @@ export default function PosterRow({ title, items, loading, onOpen }) {
   return (
     <View style={{ marginTop: wide ? 26 : 18 }}>
       <View style={styles.head}>
-        <Text style={[styles.title, wide && { fontSize: 19 }]}>{title}</Text>
+        <Text style={[styles.title, wide && { fontSize: 19 }]}>{dot ? <Text style={{ color: dot }}>● </Text> : null}{title}</Text>
         {wide && !loading && (
           <View style={{ flexDirection: "row", gap: 8 }}>
             {[["‹", -1, canLeft], ["›", 1, canRight]].map(([glyph, dir, enabled]) => (

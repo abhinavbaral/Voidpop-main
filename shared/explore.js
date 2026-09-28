@@ -3,7 +3,8 @@
 // Recommendations (6 anime, 4 manga). Picks rotate deterministically each day,
 // so both clients agree all day.
 
-import { fetchAniList } from "./api/anilist.js";
+import { fetchAniList, fetchRecommendations } from "./api/anilist.js";
+import { getReviews, getLibrary, getExcited, VERDICTS } from "./backend/store.js";
 
 const daySeed = () =>
   Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0)) / 864e5);
@@ -29,4 +30,39 @@ export async function loadExplore() {
       ...rotate(popM.items, seed * 5).slice(0, 4),
     ],
   };
+}
+
+// Rows built from your verdicts: "Peak like Attack on Titan", "Dive in like
+// Death Note", "One time like …". Void It gets no row: it means you didn't
+// like it, so "more like it" would be the wrong advice. Each row uses one of
+// your titles with that verdict, rotating daily, and skips anything already in
+// your library.
+const ROW_TITLE = { peak: "Peak like", divein: "Dive in like", onetime: "One time like" };
+
+export async function loadVerdictRows() {
+  const [reviews, lib, excited] = await Promise.all([getReviews(), getLibrary(), getExcited()]);
+  const known = new Set([...Object.keys(lib), ...Object.keys(excited)]);
+  const seed = daySeed();
+  const rows = [];
+  for (const verdict of ["peak", "divein", "onetime"]) {
+    const mine = reviews
+      .filter((r) => r.verdict === verdict && lib[`${r.segment}:${r.titleId}`])
+      .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+    if (!mine.length) continue;
+    const pick = mine[seed % mine.length];
+    const source = lib[`${pick.segment}:${pick.titleId}`].item;
+    try {
+      const items = (await fetchRecommendations(pick.segment, pick.titleId))
+        .filter((it) => !known.has(`${it.segment}:${it.id}`))
+        .slice(0, 10);
+      if (items.length) {
+        rows.push({
+          verdict, source, items,
+          title: `${ROW_TITLE[verdict]} ${source.title}`,
+          color: VERDICTS.find((v) => v.key === verdict)?.color,
+        });
+      }
+    } catch { /* offline with nothing saved: skip the row */ }
+  }
+  return rows;
 }

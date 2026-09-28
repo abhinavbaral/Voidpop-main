@@ -2,12 +2,13 @@
 // Sections: Talk of the Week, Don't Miss This (Anime / Manga), and daily
 // Voidation Recommendations (6 anime, 4 manga). Picks rotate each day.
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import PosterRow from "../components/PosterRow.js";
 import Brand from "../components/Brand.js";
-import { loadExplore } from "@voidation/shared/explore";
+import { loadExplore, loadVerdictRows } from "@voidation/shared/explore";
 import { useTheme } from "../context/ThemeContext.js";
 import { openDetail } from "../lib/nav";
 import { useIsWide } from "../lib/layout";
@@ -18,6 +19,10 @@ export default function ExploreScreen({ navigation }) {
   const wide = useIsWide();
   const [data, setData] = useState({});
   const [loading, setLoading] = useState(true);
+  const [verdictRows, setVerdictRows] = useState([]);
+
+  // your verdicts change as you use the app, so these rows refresh on every visit
+  useFocusEffect(useCallback(() => { loadVerdictRows().then(setVerdictRows).catch(() => {}); }, []));
 
   useEffect(() => {
     // same sections, same daily picks as the website
@@ -46,6 +51,9 @@ export default function ExploreScreen({ navigation }) {
         </View>
         )}
 
+        {verdictRows.map((r) => (
+          <PosterRow key={r.verdict} title={r.title} dot={r.color} items={r.items} onOpen={open} />
+        ))}
         <PosterRow title="🔥 Talk of the Week" items={data.talk} loading={loading} onOpen={open} />
         <PosterRow title="🎌 Don't Miss This — Anime" items={data.dontMissAnime} loading={loading} onOpen={open} />
         <PosterRow title="📖 Don't Miss This — Manga" items={data.dontMissManga} loading={loading} onOpen={open} />

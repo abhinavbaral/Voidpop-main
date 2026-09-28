@@ -86,7 +86,10 @@ export default function Schedule() {
 
   return (
     <div className="stack">
-      <h1>Schedule</h1>
+      <div className="row-head">
+        <h1>Schedule</h1>
+        <Link to="/season" className="btn ghost">Season chart →</Link>
+      </div>
       {error && <p className="notice error">Couldn't reach AniList for the latest airing times. Check your connection and reload.</p>}
 
       <section className="panel">

@@ -417,3 +417,27 @@ p { margin: 0; }
 .library-tools select { flex: 0 0 auto; width: auto; }
 .watched-tag { color: var(--green); font-size: .78rem; font-weight: 800; white-space: nowrap; }
 .card-countdown.late { background: color-mix(in srgb, var(--rose) 85%, black); color: #fff; }
+.progress-num.as-text { background: none; border: 0; padding: 0; color: var(--text); cursor: text; text-align: left; font-weight: 800; }
+.progress-num.as-text:hover .edit-hint { opacity: 1; }
+.edit-hint { font-size: .9rem; opacity: .45; color: var(--purple); }
+.progress-input { width: 110px; font-size: 1.2rem; font-weight: 800; }
+.field-error { color: var(--rose); font-size: .8rem; font-weight: 700; }
+.offline-banner {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: 20px; z-index: 60;
+  background: var(--card); color: var(--sub); border: 1px solid var(--amber); border-radius: 999px;
+  padding: 8px 16px; font-size: .82rem; box-shadow: 0 8px 24px rgba(0,0,0,.35); max-width: calc(100% - 32px); text-align: center;
+}
+.offline-banner b { color: var(--amber); }
+@media (max-width: 760px) { .offline-banner { bottom: 76px; } }
+.season-nav { display: flex; align-items: center; gap: 10px; }
+.season-nav b { min-width: 120px; text-align: center; font-size: 1.05rem; }
+.season-cell { display: flex; flex-direction: column; gap: 6px; }
+.season-add { width: 100%; justify-content: center; }
+.season-add.on { background: var(--purple); border-color: var(--purple); color: #fff; }
+.season-nav .icon-btn { font-size: 24px; border: 1px solid var(--border); }
+.verdict-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 10px; vertical-align: 1px; }
+.next-side { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.calendar-links { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: flex-end; font-size: .8rem; }
+.calendar-links a, .calendar-links .link-btn { color: var(--purple); font-weight: 700; font-size: .8rem; }
+.share-countdown { font-size: 2rem; font-weight: 900; color: var(--orange); margin: 10px 0 4px; font-variant-numeric: tabular-nums; }
+.season-add:disabled { opacity: 1; cursor: default; }

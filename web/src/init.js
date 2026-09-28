@@ -9,4 +9,7 @@ setStorage({
   setItem: (key, value) => {
     try { window.localStorage.setItem(key, value); } catch { /* storage full or blocked: keep working in memory */ }
   },
+  removeItem: (key) => {
+    try { window.localStorage.removeItem(key); } catch { /* ignore */ }
+  },
 });

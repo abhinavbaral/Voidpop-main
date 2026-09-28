@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import Card, { CardSkeleton } from "./Card.jsx";
 import Icon from "./Icon.jsx";
 
-export default function PosterRow({ title, items, loading, now }) {
+export default function PosterRow({ title, items, loading, now, dot }) {
   const ref = useRef(null);
   const [edges, setEdges] = useState({ left: false, right: false });
 
@@ -24,7 +24,7 @@ export default function PosterRow({ title, items, loading, now }) {
   return (
     <section className="row-section">
       <div className="row-head">
-        <h2>{title}</h2>
+        <h2>{dot && <span className="verdict-dot" style={{ background: dot }} aria-hidden="true" />}{title}</h2>
         <div className="row-arrows desktop-only">
           <button className="round-btn" onClick={() => page(-1)} disabled={!edges.left} aria-label={`Scroll ${title} left`}><Icon name="left" /></button>
           <button className="round-btn" onClick={() => page(1)} disabled={!edges.right} aria-label={`Scroll ${title} right`}><Icon name="right" /></button>

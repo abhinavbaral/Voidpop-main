@@ -3,9 +3,14 @@
 // filters in the UI can never drift from production.
 import { CATALOG, findItem, toAppItem } from "./catalog.js";
 export { SORTS, SEASONS, ANIME_ORIGINS, MANGA_ORIGINS } from "../api/anilist.js";
+// the demo is always "online"; these keep the same exports as the real module
+export const onNetState = (fn) => { fn({ offline: false, since: null }); return () => {}; };
+export const cacheClear = async () => {};
+export const cacheSize = async () => 0;
 
 const wait = (ms = 250) => new Promise((r) => setTimeout(r, ms));
-const SEASON_OF_MONTH = (m) => ["winter", "spring", "summer", "fall"][Math.floor(((m % 12)) / 3)];
+// AniList's seasons: Winter = Jan–Mar, Spring = Apr–Jun, Summer = Jul–Sep, Fall = Oct–Dec
+const SEASON_OF_MONTH = (m) => ["winter", "spring", "summer", "fall"][Math.floor((m - 1) / 3)];
 
 function sortItems(items, sort) {
   const byDate = (i) => new Date(i.date).getTime();
@@ -30,9 +35,12 @@ export async function fetchAniList(segment, opts = {}) {
   else if (!search) items = items.filter((i) => !i.unreleased || sort === "newest");
   if (segment === "anime" && season) {
     const y = year || new Date().getFullYear();
+    const m = new Date().getMonth() + 1;
+    const isNow = y === new Date().getFullYear() && SEASON_OF_MONTH(m) === season;
     items = items.filter((i) => {
       const [iy, im] = i.date.split("-").map(Number);
-      return iy === y && SEASON_OF_MONTH(im) === season;
+      // demo titles are older than they pretend: the airing ones count as this season
+      return (iy === y && SEASON_OF_MONTH(im) === season) || (isNow && i.nextEpisode);
     });
   }
   items = sortItems(items, sort);
@@ -124,4 +132,16 @@ export async function fetchAniListUserList(userName) {
     ...pickN("anime", 10, 12).map((it, i) => ({ status: statuses[i % 5], progress: i % 5 === 1 ? 4 : 0, updatedAt: now - i * 3600, item: { ...toAppItem(it), partial: true } })),
     ...pickN("manga", 5, 8).map((it, i) => ({ status: statuses[i % 5], progress: i * 10, updatedAt: now - i * 3600, item: { ...toAppItem(it), partial: true } })),
   ];
+}
+
+// Recommendations (demo): other catalog titles sharing a genre with this one.
+export async function fetchRecommendations(segment, id, perPage = 12) {
+  await wait(200);
+  const it = findItem(segment, id);
+  if (!it) return [];
+  return CATALOG[segment]
+    .filter((x) => x.id !== it.id && !x.unreleased && x.genres.some((g) => it.genres.includes(g)))
+    .sort((a, b) => b.popularity - a.popularity)
+    .slice(0, perPage)
+    .map(toAppItem);
 }

@@ -99,7 +99,12 @@ export default function ScheduleScreen({ navigation }) {
         contentContainerStyle={{ paddingBottom: 30 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={C.purple} />}
       >
-        <Text style={styles.title}>Schedule</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>Schedule</Text>
+          <TouchableOpacity onPress={() => navigation.navigate("Season")} style={styles.chip}>
+            <Text style={styles.chipText}>Season chart →</Text>
+          </TouchableOpacity>
+        </View>
         {error && (
           <Text style={styles.error}>Couldn't reach AniList for the latest airing times. Pull down to retry.</Text>
         )}
@@ -192,7 +197,8 @@ export default function ScheduleScreen({ navigation }) {
 
 const makeStyles = (C) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
-  title: { color: C.text, fontSize: 20, fontWeight: "800", paddingHorizontal: 14, paddingTop: 8 },
+  title: { color: C.text, fontSize: 20, fontWeight: "800" },
+  titleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 14, paddingTop: 8 },
   error: { color: C.rose, fontSize: 12, paddingHorizontal: 14, marginTop: 8 },
   section: { color: C.text, fontWeight: "800", fontSize: 15, paddingHorizontal: 14, marginTop: 20, marginBottom: 8 },
   empty: { color: C.faint, fontSize: 13, paddingHorizontal: 14, lineHeight: 19 },

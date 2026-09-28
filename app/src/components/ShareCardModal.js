@@ -55,7 +55,7 @@ export default function ShareCardModal({ visible, item, review, onClose }) {
               </Text>
             )}
             <Text style={styles.brand}>
-              Void<Text style={{ color: C.purple }}>Pop</Text>
+              VOID<Text style={{ color: C.orange }}>ATION</Text>
             </Text>
           </View>
         </View>

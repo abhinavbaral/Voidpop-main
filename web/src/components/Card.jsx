@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { releaseLabel, formatCountdown } from "@voidation/shared/format";
 import { useSettings } from "@voidation/shared/backend/SettingsContext";
 import { titlePath, cacheTitle } from "../lib/titles.js";
-import { progressLabel, behind } from "./Progress.jsx";
+import { progressLabel, behind, canAddOne } from "./Progress.jsx";
 
 // `entry` (Library only): shows your progress and, with onPlus, a +1 button.
 export default function Card({ item, now, entry, onPlus }) {
@@ -33,7 +33,7 @@ export default function Card({ item, now, entry, onPlus }) {
               {progressLabel(item, entry.progress)}
               {behind(item, entry.progress) > 0 && <span className="behind"> · {behind(item, entry.progress)} new</span>}
             </span>
-            {onPlus && (
+            {onPlus && canAddOne(item, entry.progress || 0) && (
               <button className="plus-btn" aria-label={`Mark next ${item.segment === "manga" ? "chapter read" : "episode watched"}`}
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); onPlus(); }}>+1</button>
             )}

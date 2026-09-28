@@ -11,3 +11,4 @@ export function setStorage() {
 
 export const readKey = async (key) => memory.get(key) ?? null;
 export const writeKey = async (key, value) => void memory.set(key, value);
+export const removeKey = async (key) => void memory.delete(key);

@@ -25,9 +25,24 @@ import MorePageScreen from "./src/screens/MorePageScreen.js";
 import DetailScreen from "./src/screens/DetailScreen.js";
 import SearchScreen from "./src/screens/SearchScreen.js";
 import LibraryScreen from "./src/screens/LibraryScreen.js";
+import SeasonScreen from "./src/screens/SeasonScreen.js";
+import OfflineBanner from "./src/components/OfflineBanner.js";
 
 const Stack = createNativeStackNavigator();
 const navRef = createNavigationContainerRef();
+
+// voidation://title/anime/123 and voidation://schedule open the right screen
+// (used by the home-screen widget). The website has its own URLs.
+const linking = Platform.OS === "web" ? undefined : {
+  prefixes: ["voidation://"],
+  config: {
+    screens: {
+      Main: { screens: { Schedule: "schedule", Library: "library", History: "history" } },
+      Detail: "title/:segment/:id",
+      Season: "season",
+    },
+  },
+};
 
 // Backups and episode alerts: run on launch, whenever the app returns to the
 // foreground, and (alerts only) shortly after the library changes.
@@ -37,14 +52,19 @@ function useBackgroundChores() {
     if (Platform.OS === "web") return undefined;
     const backup = require("./src/lib/backup");
     const alerts = require("./src/lib/episodeAlerts");
+    const widget = require("./src/widget");
     const chores = () => {
       if (Platform.OS === "android") backup.maybeAutoBackup();
       alerts.rescheduleEpisodeAlerts();
+      widget.updateWidget();
     };
     chores();
     const appState = AppState.addEventListener("change", (s) => { if (s === "active") chores(); });
     let timer;
-    const stopData = onDataChange(() => { clearTimeout(timer); timer = setTimeout(alerts.rescheduleEpisodeAlerts, 3000); });
+    const stopData = onDataChange(() => {
+      clearTimeout(timer);
+      timer = setTimeout(() => { alerts.rescheduleEpisodeAlerts(); widget.updateWidget(); }, 3000);
+    });
     const stopTap = alerts.onAlertTapped((params) => {
       const go = () => navRef.navigate("Detail", params);
       if (navRef.isReady()) go(); else setTimeout(go, 800);
@@ -104,7 +124,7 @@ function ThemedApp() {
   };
 
   return (
-    <NavigationContainer ref={navRef} theme={navTheme}>
+    <NavigationContainer ref={navRef} theme={navTheme} linking={linking}>
       <StatusBar style={mode === "void" ? "light" : "dark"} />
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Main" component={MainTabs} />
@@ -117,7 +137,9 @@ function ThemedApp() {
         />
         <Stack.Screen name="Search" component={SearchScreen} />
         <Stack.Screen name="MorePage" component={MorePageScreen} />
+        <Stack.Screen name="Season" component={SeasonScreen} />
       </Stack.Navigator>
+      <OfflineBanner />
     </NavigationContainer>
   );
 }

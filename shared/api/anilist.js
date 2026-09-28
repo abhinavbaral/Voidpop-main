@@ -3,6 +3,8 @@
 // upcoming (unreleased) titles, and per-title details (trailer + related seasons).
 
 import { formatDateParts } from "../format.js";
+import { cacheKey, cacheGet, cachePut, markOnline, markOffline, markOfflineNoCopy } from "./cache.js";
+export { onNetState, cacheClear, cacheSize } from "./cache.js";
 
 const URL = "https://graphql.anilist.co";
 
@@ -49,6 +51,7 @@ const MEDIA_FIELDS = `
   description(asHtml: false)
   siteUrl
   status
+  format
 `;
 
 // Creator line: animation studio for anime, mangaka for manga. Requested only
@@ -90,6 +93,7 @@ function normalize(m, segment) {
     url: m.siteUrl,
     unreleased: m.status === "NOT_YET_RELEASED",
     finished: m.status === "FINISHED",
+    format: m.format || null, // TV, TV_SHORT, ONA, MOVIE, OVA, SPECIAL…
     // anime only: total episodes (null while unknown) and the next one to air
     episodes: m.episodes ?? null,
     // manga only: total chapters (null while still publishing)
@@ -100,14 +104,37 @@ function normalize(m, segment) {
   };
 }
 
-async function gql(query, variables) {
-  const res = await fetch(URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({ query, variables }),
-  });
-  const json = await res.json();
+// Online first; when that fails, the last saved answer for the same request
+// (see cache.js). AniList's own errors (user not found, private list…) are
+// real answers and are passed through, not replaced by old data.
+async function gql(query, variables, { save = true } = {}) {
+  const body = JSON.stringify({ query, variables });
+  const k = cacheKey(body);
+  let json;
+  try {
+    const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+    const timer = ctrl && setTimeout(() => ctrl.abort(), 12000);
+    const res = await fetch(URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body,
+      signal: ctrl?.signal,
+    });
+    if (timer) clearTimeout(timer);
+    if (res.status >= 500 || res.status === 429) throw new Error(`AniList ${res.status}`);
+    json = await res.json();
+  } catch (networkError) {
+    const saved = await cacheGet(k);
+    if (saved) {
+      markOffline(saved.at);
+      return saved.data;
+    }
+    markOfflineNoCopy();
+    throw networkError;
+  }
+  markOnline();
   if (json.errors) throw new Error(json.errors[0].message);
+  if (save) cachePut(k, json.data);
   return json.data;
 }
 
@@ -171,7 +198,7 @@ export async function fetchAniListUserList(userName) {
     for (let chunk = 1; chunk <= 20; chunk++) {
       let data;
       try {
-        data = await gql(query, { user: userName.trim(), type: segment === "anime" ? "ANIME" : "MANGA", chunk });
+        data = await gql(query, { user: userName.trim(), type: segment === "anime" ? "ANIME" : "MANGA", chunk }, { save: false });
       } catch (e) {
         const msg = String(e.message || "");
         if (/not found/i.test(msg)) throw new Error(`No AniList user called "${userName.trim()}".`);
@@ -190,6 +217,23 @@ export async function fetchAniListUserList(userName) {
     }
   }
   return out;
+}
+
+// "If you liked this": AniList's community recommendations for one title,
+// best-rated first. Free, no key.
+export async function fetchRecommendations(segment, id, perPage = 12) {
+  const query = `query ($id: Int, $type: MediaType, $perPage: Int) {
+    Media(id: $id, type: $type) {
+      recommendations(sort: [RATING_DESC], perPage: $perPage) {
+        nodes { mediaRecommendation { ${fieldsFor(segment)} } }
+      }
+    }
+  }`;
+  const data = await gql(query, { id: Number(id), type: segment === "anime" ? "ANIME" : "MANGA", perPage });
+  return (data.Media?.recommendations?.nodes || [])
+    .map((n) => n.mediaRecommendation)
+    .filter(Boolean)
+    .map((m) => normalize(m, segment));
 }
 
 // One title by id — used when a Detail page is opened from a URL.
