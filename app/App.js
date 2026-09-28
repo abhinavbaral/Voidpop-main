@@ -9,10 +9,10 @@ import {
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Text, AppState, Platform } from "react-native";
 import { createNavigationContainerRef } from "@react-navigation/native";
-import { onDataChange } from "@voidation/shared/backend/store";
+import { onDataChange, getPending } from "@voidation/shared/backend/store";
 import { AuthProvider } from "@voidation/shared/backend/AuthContext";
 import { SettingsProvider } from "@voidation/shared/backend/SettingsContext";
 import { ThemeProvider, useTheme } from "./src/context/ThemeContext.js";
@@ -83,8 +83,23 @@ const ICONS = {
   More: "•••",
 };
 
+// Pending episodes (aired, not watched) for the Schedule tab badge. Rechecked
+// when your library changes and once a minute.
+function usePendingCount() {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    const check = () => getPending().then((p) => setN(p.total)).catch(() => {});
+    check();
+    const stop = onDataChange(check);
+    const timer = setInterval(check, 60000);
+    return () => { stop(); clearInterval(timer); };
+  }, []);
+  return n;
+}
+
 function MainTabs() {
   const { C } = useTheme();
+  const pending = usePendingCount();
   return (
     <Tabs.Navigator
       screenOptions={({ route }) => ({
@@ -102,7 +117,14 @@ function MainTabs() {
       <Tabs.Screen name="Library" component={LibraryScreen} />
       <Tabs.Screen name="Browse" component={BrowseScreen} />
       <Tabs.Screen name="History" component={HistoryScreen} />
-      <Tabs.Screen name="Schedule" component={ScheduleScreen} />
+      <Tabs.Screen
+        name="Schedule"
+        component={ScheduleScreen}
+        options={{
+          tabBarBadge: pending > 0 ? (pending > 99 ? "99+" : pending) : undefined,
+          tabBarBadgeStyle: { backgroundColor: C.orange, color: "#fff", fontSize: 10 },
+        }}
+      />
       <Tabs.Screen name="More" component={MoreScreen} />
     </Tabs.Navigator>
   );

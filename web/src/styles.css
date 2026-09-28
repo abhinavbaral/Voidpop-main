@@ -441,3 +441,18 @@ p { margin: 0; }
 .calendar-links a, .calendar-links .link-btn { color: var(--purple); font-weight: 700; font-size: .8rem; }
 .share-countdown { font-size: 2rem; font-weight: 900; color: var(--orange); margin: 10px 0 4px; font-variant-numeric: tabular-nums; }
 .season-add:disabled { opacity: 1; cursor: default; }
+.pending-row { display: flex; align-items: center; gap: 10px; }
+.pending-row .next-row { min-width: 0; }
+.pending-total { font-size: .85rem; font-weight: 800; color: var(--green); }
+.pending-total.on { color: var(--orange); }
+.pending-chip {
+  flex: none; font-size: .75rem; font-weight: 800; color: var(--orange);
+  border: 1px solid color-mix(in srgb, var(--orange) 50%, transparent); border-radius: 999px; padding: 3px 9px;
+}
+.plus-btn.big { font-size: .9rem; padding: 6px 12px; border-radius: 10px; }
+.nav-badge {
+  display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; margin-left: 6px;
+  border-radius: 999px; background: var(--orange); color: #fff; font-size: 11px; font-weight: 800; line-height: 1; vertical-align: 2px;
+}
+.tab-icon { position: relative; display: inline-flex; }
+.tab-icon .nav-badge { position: absolute; top: -6px; right: -12px; margin: 0; }

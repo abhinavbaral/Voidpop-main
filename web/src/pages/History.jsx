@@ -36,7 +36,7 @@ export default function History() {
 
   // marking episode 7 watched means you've watched 1–7
   const markWatched = async (s) => {
-    const r = await setProgress(user, s.item, Math.max(progress[s.item.id] || 0, s.episode));
+    const r = await setProgress(user, s.item, Math.max(progress[s.item.id] || 0, s.episode), "history");
     if (r.reachedEnd) setFinishing(s.item);
     readProgress();
   };

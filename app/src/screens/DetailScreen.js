@@ -155,8 +155,8 @@ function DetailBody({ item, navigation }) {
     setStatusState(key);
   };
 
-  const changeProgress = async (n) => {
-    const r = await setProgress(user, item, n);
+  const changeProgress = async (n, source = "plus") => {
+    const r = await setProgress(user, item, n, source);
     setProgressState(r.progress);
     setStatusState(r.status);
     if (r.reachedEnd) setModalOpen(true); // last episode: ask for the verdict
@@ -374,7 +374,7 @@ function ProgressBox({ item, progress, onChange, styles, C }) {
     const err = checkProgress(item, draft);
     if (err) return setError(err);
     setEditing(false);
-    if (Number(draft) !== progress) onChange(Number(draft));
+    if (Number(draft) !== progress) onChange(Number(draft), "typed");
   };
 
   return (

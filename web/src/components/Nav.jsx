@@ -6,6 +6,23 @@ import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import Brand from "./Brand.jsx";
 import Icon from "./Icon.jsx";
 import { useTheme } from "../theme.jsx";
+import { getPending, onDataChange } from "@voidation/shared/backend/store";
+
+// Pending episodes (aired, not watched) for the Schedule badge. Rechecked when
+// your library changes and once a minute, so Sunday's episodes appear by themselves.
+function usePendingCount() {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    const check = () => getPending().then((p) => setN(p.total)).catch(() => {});
+    check();
+    const stop = onDataChange(check);
+    const timer = setInterval(check, 60000);
+    return () => { stop(); clearInterval(timer); };
+  }, []);
+  return n;
+}
+
+const Badge = ({ n }) => (n > 0 ? <span className="nav-badge" aria-label={`${n} pending`}>{n > 99 ? "99+" : n}</span> : null);
 
 const SECTIONS = [
   { to: "/", label: "Explore", icon: "explore", end: true },
@@ -43,6 +60,7 @@ export function TopNav() {
     navigate(q.trim() ? `/search?q=${encodeURIComponent(q.trim())}` : "/search");
   };
 
+  const pending = usePendingCount();
   return (
     <header className="topnav">
       <div className="topnav-inner">
@@ -50,7 +68,9 @@ export function TopNav() {
 
         <nav className="topnav-links" aria-label="Sections">
           {SECTIONS.map((s) => (
-            <NavLink key={s.to} to={s.to} end={s.end} className="topnav-link">{s.label}</NavLink>
+            <NavLink key={s.to} to={s.to} end={s.end} className="topnav-link">
+              {s.label}{s.to === "/schedule" && <Badge n={pending} />}
+            </NavLink>
           ))}
         </nav>
 
@@ -69,11 +89,12 @@ export function TopNav() {
 }
 
 export function BottomTabs() {
+  const pending = usePendingCount();
   return (
     <nav className="bottom-tabs" aria-label="Sections">
       {SECTIONS.map((s) => (
         <NavLink key={s.to} to={s.to} end={s.end} className="bottom-tab">
-          <Icon name={s.icon} size={20} />
+          <span className="tab-icon"><Icon name={s.icon} size={20} />{s.to === "/schedule" && <Badge n={pending} />}</span>
           <span>{s.label}</span>
         </NavLink>
       ))}

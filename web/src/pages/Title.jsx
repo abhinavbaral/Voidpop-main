@@ -119,8 +119,8 @@ function TitleBody({ item }) {
     setStatusState(key);
   };
 
-  const changeProgress = async (n) => {
-    const r = await setProgress(user, item, n);
+  const changeProgress = async (n, source = "plus") => {
+    const r = await setProgress(user, item, n, source);
     setProgressState(r.progress);
     setStatusState(r.status);
     if (r.reachedEnd) setVerdictOpen(true); // last episode: ask for the verdict

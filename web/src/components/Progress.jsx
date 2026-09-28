@@ -36,7 +36,7 @@ export default function ProgressStepper({ item, progress, onChange }) {
     const err = checkProgress(item, draft);
     if (err) { setError(err); return; }
     setEditing(false);
-    if (Number(draft) !== progress) onChange(Number(draft));
+    if (Number(draft) !== progress) onChange(Number(draft), "typed");
   };
 
   return (

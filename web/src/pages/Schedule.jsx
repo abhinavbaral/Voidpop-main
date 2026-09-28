@@ -12,6 +12,7 @@ import { useNow } from "@voidation/shared/hooks/useNow";
 import { useSettings } from "@voidation/shared/backend/SettingsContext";
 import { titlePath, cacheTitle } from "../lib/titles.js";
 import { useDocumentTitle } from "../lib/useDocumentTitle.js";
+import PendingPanel from "../components/PendingPanel.jsx";
 
 // statuses that mean "I still care when the next episode comes out"
 const FOLLOWING = new Set(["watching", "plan", "onhold"]);
@@ -28,6 +29,7 @@ export default function Schedule() {
   const [onlyMine, setOnlyMine] = useState(false);
   const [error, setError] = useState(false);
   const [tracked, setTracked] = useState(new Set());
+  const [fetched, setFetched] = useState(0); // bumps after fresh air times are saved
 
   useEffect(() => {
     let alive = true;
@@ -41,6 +43,7 @@ export default function Schedule() {
         if (!alive) return;
         // compare with the saved times to spot delays, then read the entries back
         await noteAiring(fresh);
+        setFetched((n) => n + 1);
         const saved = await getLibrary(user);
         setMine(
           following
@@ -91,6 +94,8 @@ export default function Schedule() {
         <Link to="/season" className="btn ghost">Season chart →</Link>
       </div>
       {error && <p className="notice error">Couldn't reach AniList for the latest airing times. Check your connection and reload.</p>}
+
+      <PendingPanel now={now} refreshKey={fetched} />
 
       <section className="panel">
         <h2>⏳ Your next episodes</h2>

@@ -17,6 +17,7 @@ import { useNow } from "@voidation/shared/hooks/useNow";
 import { useSettings } from "@voidation/shared/backend/SettingsContext";
 import { useTheme } from "../context/ThemeContext.js";
 import { openDetail } from "../lib/nav";
+import PendingPanel from "../components/PendingPanel.js";
 
 const FOLLOWING = new Set(["watching", "plan", "onhold"]);
 
@@ -34,6 +35,7 @@ export default function ScheduleScreen({ navigation }) {
   const [onlyMine, setOnlyMine] = useState(false);
   const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [fetched, setFetched] = useState(0); // bumps after fresh air times are saved
 
   const load = useCallback(async () => {
     setError(false);
@@ -48,6 +50,7 @@ export default function ScheduleScreen({ navigation }) {
     ]);
     // compare with the saved times to spot delays, then read the entries back
     await noteAiring(fresh);
+    setFetched((n) => n + 1);
     const saved = await getLibrary(user);
     setMine(
       following
@@ -108,6 +111,8 @@ export default function ScheduleScreen({ navigation }) {
         {error && (
           <Text style={styles.error}>Couldn't reach AniList for the latest airing times. Pull down to retry.</Text>
         )}
+
+        <PendingPanel now={now} refreshKey={fetched} onOpen={(it) => openDetail(navigation, it)} />
 
         <Text style={styles.section}>⏳ Your next episodes</Text>
         {mine === null ? (

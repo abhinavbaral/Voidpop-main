@@ -6,7 +6,10 @@
 //   library  {"segment:id" -> { status, progress, item snapshot, updatedAt, delay? }}
 //   reviews  {"segment:id" -> { verdict, vibes, comment, date }}
 //   excited  {"segment:id" -> { item, at }}
-//   settings { clock24, posterBadges }
+//   settings { clock24, posterBadges, notifyEpisodes }
+//   log      [[time ms, "segment:id", change, source], …] every progress change
+//            (source: plus / typed / history / complete). Powers Wrapped later;
+//            imports are never logged, so they don't count as "watched this year".
 //
 // Functions still take `user` as their first argument, so screens written for
 // the account version didn't have to change. It is always the local user.
@@ -16,7 +19,7 @@ import { readKey, writeKey } from "./storage.js";
 const DB_KEY = "voidation:db:v1";
 // notifyEpisodes only matters in the app (the website can't schedule alerts)
 export const DEFAULT_SETTINGS = { clock24: false, posterBadges: true, notifyEpisodes: true };
-const EMPTY = () => ({ library: {}, reviews: {}, excited: {}, settings: { ...DEFAULT_SETTINGS } });
+const EMPTY = () => ({ library: {}, reviews: {}, excited: {}, log: [], settings: { ...DEFAULT_SETTINGS } });
 
 let cache = null;
 let writing = Promise.resolve();
@@ -26,7 +29,7 @@ async function load() {
   try {
     const raw = await readKey(DB_KEY);
     const saved = raw ? JSON.parse(raw) : {};
-    cache = { ...EMPTY(), ...saved, settings: { ...DEFAULT_SETTINGS, ...(saved.settings || {}) } };
+    cache = { ...EMPTY(), ...saved, log: Array.isArray(saved.log) ? saved.log : [], settings: { ...DEFAULT_SETTINGS, ...(saved.settings || {}) } };
   } catch {
     cache = EMPTY(); // corrupt or unreadable storage: start clean rather than crash
   }
@@ -50,6 +53,15 @@ function save() {
 }
 
 const keyOf = (segment, id) => `${segment}:${id}`;
+
+function logChange(db, key, change, source) {
+  if (change) db.log.push([Date.now(), key, change, source]);
+}
+
+// The watch log (read-only copy), oldest first.
+export async function getLog() {
+  return [...(await load()).log];
+}
 
 /* ---------- tracking ---------- */
 
@@ -83,11 +95,13 @@ export async function setStatus(_user, segment, item, status) {
   }
   const prev = db.library[key];
   const total = totalFor({ ...item, segment });
+  // finishing a title fills its progress, the way AniList does
+  const progress = status === "completed" && total ? total : prev?.progress || 0;
+  logChange(db, key, progress - (prev?.progress || 0), "complete");
   db.library[key] = {
     ...prev,
     status,
-    // finishing a title fills its progress, the way AniList does
-    progress: status === "completed" && total ? total : prev?.progress || 0,
+    progress,
     item: freshest(prev?.item, { ...item, segment }),
     updatedAt: new Date().toISOString(),
   };
@@ -114,7 +128,12 @@ export const totalFor = (item) => (item.segment === "manga" ? item.chapters : it
 // Episodes out so far: everything before the next one to air, or all of them once finished.
 export function airedFor(item) {
   if (item.segment !== "anime") return null;
-  if (item.nextEpisode) return item.nextEpisode.episode - 1;
+  if (item.nextEpisode) {
+    // a saved "next episode" whose time has passed is out, even before we
+    // get fresh data (offline, or the app hasn't checked yet)
+    const out = item.nextEpisode.airingAt <= Date.now() / 1000;
+    return item.nextEpisode.episode - (out ? 0 : 1);
+  }
   return item.finished ? item.episodes ?? null : null;
 }
 // How many aired episodes you haven't watched yet (anime only).
@@ -149,7 +168,7 @@ export function checkProgress(item, raw) {
 // Sets progress to n (clamped to 0…what's out). Starting a title you had planned,
 // paused or dropped moves it to Watching / Reading. Returns
 // { progress, status, reachedEnd } — reachedEnd means "ask for the verdict".
-export async function setProgress(_user, item, n) {
+export async function setProgress(_user, item, n, source = "plus") {
   const db = await load();
   const key = keyOf(item.segment, item.id);
   const prev = db.library[key];
@@ -160,6 +179,7 @@ export async function setProgress(_user, item, n) {
   let status = prev?.status || null;
   if (progress > (prev?.progress || 0) && (!status || ["plan", "onhold", "dropped"].includes(status))) status = "watching";
   if (!status) status = "watching";
+  logChange(db, key, progress - (prev?.progress || 0), source);
   db.library[key] = {
     ...prev,
     status,
@@ -189,6 +209,23 @@ export function sortEntries(list, sort) {
   } else if (sort === "behind") s.sort((a, b) => behindBy(b) - behindBy(a));
   else s.sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
   return s;
+}
+
+/* ---------- pending: aired but not watched yet ---------- */
+
+// Your Watching anime that are airing now or that you're behind on, with how
+// many aired episodes you haven't watched. Sunday's episodes add to it; each
+// +1 takes one off. { total, items: [{ entry, pending }] }, most pending first,
+// then soonest next episode.
+export async function getPending() {
+  const entries = Object.values((await load()).library)
+    .filter((e) => e.item.segment === "anime" && e.status === "watching");
+  const items = entries
+    .map((e) => ({ entry: e, pending: behindBy(e) }))
+    .filter(({ entry, pending }) => pending > 0 || (entry.item.nextEpisode && !entry.item.finished))
+    .sort((a, b) => b.pending - a.pending
+      || (a.entry.item.nextEpisode?.airingAt ?? Infinity) - (b.entry.item.nextEpisode?.airingAt ?? Infinity));
+  return { total: items.reduce((n, x) => n + x.pending, 0), items };
 }
 
 /* ---------- delays: "Episode 8 moved from Wed to next Wed" ---------- */
@@ -394,6 +431,7 @@ export async function importData(json) {
   if (data?.app !== "voidation" || typeof data.library !== "object") return "That file isn't a Voidation backup.";
   cache = {
     library: data.library || {}, reviews: data.reviews || {}, excited: data.excited || {},
+    log: Array.isArray(data.log) ? data.log : [],
     settings: { ...DEFAULT_SETTINGS, ...(data.settings || {}) },
   };
   await save();
