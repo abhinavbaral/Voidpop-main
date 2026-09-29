@@ -40,7 +40,7 @@
           "widgets": [
             {
               "name": "NextEpisodes",
-              "label": "Voidation \u00b7 Next episodes",
+              "label": "Voidation · Next episodes",
               "description": "Countdowns for up to 30 anime you follow",
               "minWidth": "250dp",
               "minHeight": "180dp",
@@ -57,11 +57,22 @@
     ],
     "scheme": "voidation",
     "runtimeVersion": {
-      "policy": "fingerprint"
+      "policy": "appVersion"
     },
     "updates": {
+      "url": "https://u.expo.dev/60c0d3f0-5f80-4f55-b21e-9d32892e270f",
       "checkAutomatically": "ON_LOAD",
       "fallbackToCacheTimeout": 0
-    }
+    },
+    "owner": "abhinavbaral",
+    "extra": {
+      "eas": {
+        "projectId": "60c0d3f0-5f80-4f55-b21e-9d32892e270f"
+      }
+    },
+    "platforms": [
+      "android",
+      "ios"
+    ]
   }
 }
