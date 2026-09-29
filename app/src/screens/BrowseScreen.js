@@ -147,6 +147,11 @@ export default function BrowseScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <View style={styles.header}>
+        {navigation.canGoBack() && (
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.filterBtn} accessibilityLabel="Back">
+            <Text style={styles.filterBtnText}>‹</Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity onPress={() => setSidebarOpen(true)} style={styles.filterBtn}>
           <Text style={styles.filterBtnText}>☰  Filters</Text>
         </TouchableOpacity>

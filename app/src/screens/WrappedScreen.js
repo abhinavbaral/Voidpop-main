@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import { View, Text, Image, Pressable, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { computeWrapped, wrappedSlides, wrappedYears } from "@voidation/shared/wrapped";
+import { loadWrapped, wrappedSlides, wrappedYears, defaultWrapped } from "@voidation/shared/wrapped";
 import { shareCardImage } from "../lib/shareCard";
 import { notify } from "../lib/notify";
 import { goBackOrHome } from "../lib/nav";
@@ -14,13 +14,13 @@ const ORANGE = "#ee8f2e";
 const PURPLE = "#a855f7";
 
 export default function WrappedScreen({ navigation }) {
-  const [years, setYears] = useState([new Date().getFullYear()]);
-  const [year, setYear] = useState(new Date().getFullYear());
+  const [years, setYears] = useState(["all"]);
+  const [year, setYear] = useState(null); // "all" or a year number
   const [w, setW] = useState(null);
   const [i, setI] = useState(0);
 
-  useEffect(() => { wrappedYears().then(setYears); }, []);
-  useEffect(() => { setW(null); setI(0); computeWrapped(year).then(setW); }, [year]);
+  useEffect(() => { wrappedYears().then(setYears); defaultWrapped().then(setYear); }, []);
+  useEffect(() => { if (year === null) return; setW(null); setI(0); loadWrapped(year).then(setW); }, [year]);
   const slides = w ? wrappedSlides(w) : [];
   const last = slides.length - 1;
   const go = (d) => setI((x) => Math.max(0, Math.min(last, x + d)));
@@ -32,14 +32,16 @@ export default function WrappedScreen({ navigation }) {
         <View style={styles.bars}>
           {slides.map((_, k) => <View key={k} style={[styles.bar, k <= i && { backgroundColor: "#fff" }]} />)}
         </View>
-        {years.length > 1 && (
-          <TouchableOpacity onPress={() => setYear(years[(years.indexOf(year) + 1) % years.length])} style={styles.yearBtn}>
-            <Text style={{ color: "#fff", fontWeight: "800" }}>{year} ▾</Text>
-          </TouchableOpacity>
-        )}
         <TouchableOpacity onPress={() => goBackOrHome(navigation)} hitSlop={12} accessibilityLabel="Close">
           <Text style={{ color: "#fff", fontSize: 22 }}>✕</Text>
         </TouchableOpacity>
+      </View>
+      <View style={styles.years}>
+        {years.map((y) => (
+          <TouchableOpacity key={y} onPress={() => setYear(y)} style={[styles.yearBtn, y === year && { backgroundColor: "#fff" }]}>
+            <Text style={{ color: y === year ? "#0b0f19" : "#cbd5e1", fontWeight: "800", fontSize: 12 }}>{y === "all" ? "All time" : y}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
       {!w ? <ActivityIndicator color="#fff" style={{ marginTop: 80 }} /> : slide.kind === "summary" ? (
         <Summary w={w} onBack={() => go(-1)} onRestart={() => setI(0)} />
@@ -68,13 +70,13 @@ function Slide({ s }) {
       {s.kind === "list" ? (
         <>
           {!!s.image && <Image source={{ uri: s.image }} style={styles.hero} />}
-          {s.items.map(({ item, count }, n) => (
+          {s.items.map(({ item, count, note }, n) => (
             <View key={item.id} style={styles.listRow}>
               <Text style={styles.rank}>{n + 1}</Text>
               {item.image ? <Image source={{ uri: item.image }} style={styles.thumb} /> : null}
               <View style={{ flex: 1 }}>
                 <Text style={styles.listTitle} numberOfLines={1}>{item.title}</Text>
-                <Text style={styles.listSub}>{count} {s.unit}</Text>
+                <Text style={styles.listSub}>{count ? `${count} ${s.unit}` : s.unit === "chapters" ? "Finished" : "Completed"}{note ? ` · ${note}` : ""}</Text>
               </View>
             </View>
           ))}
@@ -107,13 +109,13 @@ function Summary({ w, onBack, onRestart }) {
     setBusy(true);
     try { await shareCardImage(ref); } catch { notify("Oops", "Could not create the image."); } finally { setBusy(false); }
   };
-  const timeLabel = !w.episodes ? "Titles finished" : w.minutes < 90 ? "Minutes" : "Hours";
-  const timeValue = !w.episodes ? w.completed : w.minutes < 90 ? Math.round(w.minutes) : w.hours.toLocaleString();
+  const timeLabel = w.allTime || !w.episodes ? "Completed & finished" : w.minutes < 90 ? "Minutes" : "Hours";
+  const timeValue = w.allTime || !w.episodes ? w.completed.toLocaleString() : w.minutes < 90 ? Math.round(w.minutes) : w.hours.toLocaleString();
   return (
     <ScrollView contentContainerStyle={[styles.slide, { alignItems: "center" }]}>
       <View ref={ref} collapsable={false} style={styles.card}>
         <View style={styles.cardHero}>
-          <Text style={styles.cardYear}>{w.year}</Text>
+          <Text style={[styles.cardYear, w.allTime && { fontSize: 38 }]}>{w.label}</Text>
           {hero?.image ? <Image source={{ uri: hero.image }} style={styles.cardPoster} /> : null}
         </View>
         <View style={{ padding: 18, gap: 16 }}>
@@ -160,7 +162,8 @@ const styles = StyleSheet.create({
   top: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingTop: 10 },
   bars: { flex: 1, flexDirection: "row", gap: 4 },
   bar: { flex: 1, height: 3, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.25)" },
-  yearBtn: { borderWidth: 1, borderColor: "rgba(255,255,255,0.3)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  years: { flexDirection: "row", gap: 6, paddingHorizontal: 16, paddingTop: 10 },
+  yearBtn: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5, backgroundColor: "rgba(255,255,255,0.1)" },
   slide: { flexGrow: 1, justifyContent: "center", padding: 24, paddingBottom: 60 },
   eyebrow: { color: ORANGE, fontSize: 13, fontWeight: "800", letterSpacing: 2 },
   big: { color: "#f3f4f6", fontSize: 46, fontWeight: "900", lineHeight: 50 },

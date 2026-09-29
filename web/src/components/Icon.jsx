@@ -3,6 +3,7 @@ const PATHS = {
   explore: "M12 3l2.4 5.6L20 11l-5.6 2.4L12 19l-2.4-5.6L4 11l5.6-2.4z",
   browse: "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z",
   schedule: "M12 3a9 9 0 1 1 0 18a9 9 0 0 1 0-18zM12 7v5l3 2",
+  calendar: "M4 6h16v14H4zM4 10h16M8 3v4M16 3v4",
   history: "M4 12a8 8 0 1 0 2.3-5.6M4 4v4h4M12 8v4l-3 2",
   more: "M5 11a1 1 0 1 1 0 2a1 1 0 0 1 0-2zM12 11a1 1 0 1 1 0 2a1 1 0 0 1 0-2zM19 11a1 1 0 1 1 0 2a1 1 0 0 1 0-2z",
   stats: "M4 20V10M10 20V4M16 20v-7M22 20H2",

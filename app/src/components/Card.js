@@ -59,6 +59,7 @@ function CardInner({ item, entry, onPlus, onPress, onLongPress, selecting, selec
             <Text style={{ color: C.faint, fontSize: 12 }}>No image</Text>
           </View>
         )}
+        {!!item.awardYear && <Text style={styles.award}>🏆 {item.awardYear}</Text>}
         {selecting && (
           <View style={[styles.tick, selected && { backgroundColor: C.purple, borderColor: C.purple }]}>
             <Text style={{ color: "#fff", fontWeight: "900", fontSize: 12 }}>{selected ? "✓" : ""}</Text>
@@ -118,6 +119,7 @@ const makeStyles = (C) => StyleSheet.create({
   title: { color: C.text, fontWeight: "700", fontSize: 13 },
   creator: { color: C.orange, fontSize: 11, fontWeight: "600", marginTop: 3 },
   sub: { color: C.sub, fontSize: 11, marginTop: 2 },
+  award: { position: "absolute", top: 6, left: 6, backgroundColor: "#f59e0b", color: "#1a1205", fontWeight: "900", fontSize: 11, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, overflow: "hidden" },
   tick: {
     position: "absolute", top: 6, left: 6, width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: "#fff",
     backgroundColor: "rgba(11,15,25,0.8)", alignItems: "center", justifyContent: "center",

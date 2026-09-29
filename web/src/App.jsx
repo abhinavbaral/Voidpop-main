@@ -13,9 +13,11 @@ import History from "./pages/History.jsx";
 import Season from "./pages/Season.jsx";
 import AuthAniList from "./pages/AuthAniList.jsx";
 import Wrapped from "./pages/Wrapped.jsx";
+import Upcoming from "./pages/Upcoming.jsx";
 import More from "./pages/More.jsx";
 import NotFound from "./pages/NotFound.jsx";
 import OfflineBanner from "./components/OfflineBanner.jsx";
+import RankUp from "./components/RankUp.jsx";
 
 export default function App() {
   const { pathname } = useLocation();
@@ -38,6 +40,7 @@ export default function App() {
           <Route path="/season" element={<Season />} />
           <Route path="/auth/anilist" element={<AuthAniList />} />
           <Route path="/wrapped" element={<Wrapped />} />
+          <Route path="/upcoming" element={<Upcoming />} />
           <Route path="/more" element={<More />} />
           <Route path="/more/:page" element={<More />} />
           <Route path="/profile" element={<Navigate to="/more" replace />} />
@@ -45,6 +48,7 @@ export default function App() {
         </Routes>
       </main>
       <OfflineBanner />
+      <RankUp />
       <BottomTabs />
     </>
   );

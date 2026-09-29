@@ -1,7 +1,7 @@
 // Voidation mobile app (Android + iOS). The website lives in /web; both share
 // their logic through @voidation/shared. No accounts: your library lives on the phone.
 import "./src/backend/init.js"; // must run first: plugs in AsyncStorage
-// Tabs: Explore / Library / Browse / History / Schedule / More.
+// Tabs: Explore / Library / Upcoming / History / Schedule / More. (Browse opens from Explore.)
 
 import {
   NavigationContainer, DarkTheme, DefaultTheme,
@@ -18,6 +18,7 @@ import { SettingsProvider } from "@voidation/shared/backend/SettingsContext";
 import { ThemeProvider, useTheme } from "./src/context/ThemeContext.js";
 import ExploreScreen from "./src/screens/ExploreScreen.js";
 import BrowseScreen from "./src/screens/BrowseScreen.js";
+import UpcomingScreen from "./src/screens/UpcomingScreen.js";
 import ScheduleScreen from "./src/screens/ScheduleScreen.js";
 import HistoryScreen from "./src/screens/HistoryScreen.js";
 import MoreScreen from "./src/screens/MoreScreen.js";
@@ -28,6 +29,7 @@ import LibraryScreen from "./src/screens/LibraryScreen.js";
 import SeasonScreen from "./src/screens/SeasonScreen.js";
 import WrappedScreen from "./src/screens/WrappedScreen.js";
 import OfflineBanner from "./src/components/OfflineBanner.js";
+import RankUp from "./src/components/RankUp.js";
 
 const Stack = createNativeStackNavigator();
 const navRef = createNavigationContainerRef();
@@ -82,7 +84,7 @@ const Tabs = createBottomTabNavigator();
 const ICONS = {
   Explore: "✦",
   Library: "▤",
-  Browse: "▦",
+  Upcoming: "▣",
   History: "↺",
   Schedule: "◷",
   More: "•••",
@@ -120,7 +122,7 @@ function MainTabs() {
     >
       <Tabs.Screen name="Explore" component={ExploreScreen} />
       <Tabs.Screen name="Library" component={LibraryScreen} />
-      <Tabs.Screen name="Browse" component={BrowseScreen} />
+      <Tabs.Screen name="Upcoming" component={UpcomingScreen} />
       <Tabs.Screen name="History" component={HistoryScreen} />
       <Tabs.Screen
         name="Schedule"
@@ -136,12 +138,12 @@ function MainTabs() {
 }
 
 function ThemedApp() {
-  const { C, mode } = useTheme();
+  const { C, dark } = useTheme();
   useBackgroundChores();
   const navTheme = {
-    ...(mode === "void" ? DarkTheme : DefaultTheme),
+    ...(dark ? DarkTheme : DefaultTheme),
     colors: {
-      ...(mode === "void" ? DarkTheme.colors : DefaultTheme.colors),
+      ...(dark ? DarkTheme.colors : DefaultTheme.colors),
       background: C.bg,
       card: C.bg,
       border: C.border,
@@ -152,7 +154,7 @@ function ThemedApp() {
 
   return (
     <NavigationContainer ref={navRef} theme={navTheme} linking={linking}>
-      <StatusBar style={mode === "void" ? "light" : "dark"} />
+      <StatusBar style={dark ? "light" : "dark"} />
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Main" component={MainTabs} />
         {/* getId: opening a different title pushes a new screen instead of
@@ -165,9 +167,11 @@ function ThemedApp() {
         <Stack.Screen name="Search" component={SearchScreen} />
         <Stack.Screen name="MorePage" component={MorePageScreen} />
         <Stack.Screen name="Season" component={SeasonScreen} />
+        <Stack.Screen name="Browse" component={BrowseScreen} />
         <Stack.Screen name="Wrapped" component={WrappedScreen} options={{ animation: "fade" }} />
       </Stack.Navigator>
       <OfflineBanner />
+      <RankUp />
     </NavigationContainer>
   );
 }

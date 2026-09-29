@@ -26,11 +26,13 @@ function sortItems(items, sort) {
 export async function fetchAniList(segment, opts = {}) {
   const {
     page = 1, sort = "popular", search = "", origin = "",
-    season = "", year = null, unreleasedOnly = false, perPage = 24, genre = "",
+    season = "", year = null, unreleasedOnly = false, perPage = 24, genre = "", tag = "",
   } = opts;
   await wait();
   let items = CATALOG[segment] || [];
   if (genre) items = items.filter((i) => i.genres.includes(genre));
+  // the demo has no tags: Isekai → Fantasy/Adventure, Shounen → Action
+  if (tag) items = items.filter((i) => i.genres.some((g) => ({ Isekai: ["Fantasy", "Adventure"], Shounen: ["Action"] }[tag] || [tag]).includes(g)));
   if (search) items = items.filter((i) => i.title.toLowerCase().includes(search.toLowerCase()));
   if (origin) items = items.filter((i) => i.country === origin);
   if (unreleasedOnly) items = items.filter((i) => i.unreleased);
@@ -172,4 +174,40 @@ export async function fetchSequels(ids) {
 export async function fetchNewlyAnnounced() {
   await wait(200);
   return CATALOG.anime.filter((i) => i.unreleased).sort((a, b) => b.id - a.id).map(toAppItem);
+}
+
+// Earlier seasons (demo): related catalog titles released before this one.
+export async function fetchEarlierSeasons(id) {
+  await wait(150);
+  const it = findItem("anime", id);
+  return (it?.related || [])
+    .map((rid) => findItem("anime", rid))
+    .filter((r) => r && new Date(r.date) < new Date(it.date))
+    .map(toAppItem);
+}
+
+// Anime of the Year (demo): the most popular finished catalog anime per year.
+export async function fetchAnimeOfTheYear(years) {
+  await wait(200);
+  return years.map((y) => {
+    const best = CATALOG.anime.filter((i) => !i.unreleased && i.date.startsWith(String(y))).sort((a, b) => b.popularity - a.popularity)[0];
+    return best ? { ...toAppItem(best), awardYear: y } : null;
+  }).filter(Boolean);
+}
+
+// Premieres (demo): catalog anime starting in the range; the demo's upcoming
+// titles are spread over the coming weeks so the calendar has something in it.
+export async function fetchPremieres(from, to, { sort = "START_DATE" } = {}) {
+  await wait(200);
+  const num = (d) => Number(d.replaceAll("-", ""));
+  const at = (days) => { const d = new Date(Date.now() + days * 864e5); return { date: d.toISOString().slice(0, 10), dateLabel: d.toDateString().slice(4) }; };
+  let up = 0, air = 0;
+  const items = CATALOG.anime.map((i) => {
+    // upcoming titles: one every 3 days from tomorrow on
+    if (i.unreleased) return { ...toAppItem(i), ...at(1 + 3 * up++) };
+    // shows airing now: pretend they premiered over the last few weeks
+    if (i.nextEpisode) return { ...toAppItem(i), ...at(-2 - 4 * air++) };
+    return toAppItem(i);
+  }).filter((i) => i.date && num(i.date) > from && num(i.date) < to);
+  return items.sort((a, b) => (sort === "START_DATE_DESC" ? -1 : 1) * a.date.localeCompare(b.date));
 }

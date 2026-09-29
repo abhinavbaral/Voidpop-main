@@ -11,7 +11,7 @@ import {
 } from "@voidation/shared/backend/store";
 import { fetchNextEpisodes } from "@voidation/shared/api/anilist";
 import { useNow } from "@voidation/shared/hooks/useNow";
-import Card from "../components/Card.jsx";
+import LibraryCard from "../components/LibraryCard.jsx";
 import VerdictModal from "../components/VerdictModal.jsx";
 import { useDocumentTitle } from "../lib/useDocumentTitle.js";
 
@@ -124,10 +124,9 @@ export default function Library() {
         ))}
       </div>
       {entries === null ? <p className="muted">Loading…</p> : shown.length ? (
-        <div className="grid">
+        <div className="lib-grid">
           {shown.map((e) => (
-            <Card key={`${e.item.segment}-${e.item.id}`} item={e.item} now={now} entry={e}
-              onPlus={e.status === "watching" ? () => plus(e) : undefined}
+            <LibraryCard key={`${e.item.segment}-${e.item.id}`} entry={e}
               selecting={selecting} selected={selected.has(keyOf(e))} onToggle={() => toggle(e)} />
           ))}
         </div>

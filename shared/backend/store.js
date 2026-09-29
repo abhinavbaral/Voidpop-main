@@ -21,7 +21,7 @@ import { readKey, writeKey } from "./storage.js";
 const DB_KEY = "voidation:db:v1";
 // notifyEpisodes only matters in the app (the website can't schedule alerts)
 export const DEFAULT_SETTINGS = { clock24: false, posterBadges: true, notifyEpisodes: true };
-const EMPTY = () => ({ library: {}, reviews: {}, excited: {}, log: [], categories: [], settings: { ...DEFAULT_SETTINGS } });
+const EMPTY = () => ({ library: {}, reviews: {}, excited: {}, log: [], categories: [], meta: {}, settings: { ...DEFAULT_SETTINGS } });
 
 let cache = null;
 let writing = Promise.resolve();
@@ -91,6 +91,13 @@ export function statusesFor(segment) {
   ];
 }
 
+// Not out yet: you can only plan it (and mark Excited). Watching, Completed,
+// On Hold, Dropped, progress and verdicts open once it starts airing.
+export function statusesAllowed(item) {
+  const all = statusesFor(item.segment);
+  return item.unreleased ? all.filter((s) => s.key === "plan") : all;
+}
+
 export async function getLibrary() {
   const db = await load();
   return { ...db.library };
@@ -155,6 +162,17 @@ export function airedFor(item) {
   }
   return item.finished ? item.episodes ?? null : null;
 }
+// Library badge: episodes (or chapters) that are out and you haven't watched.
+// 24-episode show, 23 out, watched 3 → 20. Watched all 23 → 0 (no badge).
+// Completed → 0. Ongoing manga (no known chapter count) → null (no badge).
+export function leftToWatch(entry) {
+  if (entry.status === "completed") return 0;
+  const item = entry.item;
+  const out = item.segment === "anime" ? airedFor(item) ?? totalFor(item) : totalFor(item);
+  if (out == null) return null;
+  return Math.max(0, out - (entry.progress || 0));
+}
+
 // Completed means everything is watched / read: "✓ All 12 watched".
 export function doneLabel(item) {
   const total = totalFor(item);
@@ -312,7 +330,8 @@ export async function bulkSetStatus(keys, status) {
   const db = await load();
   for (const k of keys) {
     const e = db.library[k];
-    if (e) await setStatus(null, e.item.segment, e.item, status);
+    // a title that isn't out yet can only be planned
+    if (e && (status === "plan" || !e.item.unreleased)) await setStatus(null, e.item.segment, e.item, status);
   }
 }
 export async function bulkCategory(keys, catId, add) {
@@ -332,6 +351,64 @@ export async function bulkRemove(keys) {
     const e = db.library[k];
     if (e) await setStatus(null, e.item.segment, e.item, null);
   }
+}
+
+/* ---------- your shows: next episode + pending, in one list ---------- */
+
+const FOLLOWING = new Set(["watching", "plan", "onhold"]);
+
+// Every anime you follow (Watching, Plan to Watch, On Hold) that has an episode
+// coming, or aired episodes you haven't watched (Watching only). Soonest first;
+// shows with nothing scheduled but episodes to catch up on go last.
+//   fresh: { id -> item } from fetchNextEpisodes (newer air times than the saved copy)
+export function yourShows(lib, fresh = {}, now = Date.now()) {
+  const nowS = now / 1000;
+  return Object.values(lib)
+    .filter((e) => e.item.segment === "anime" && FOLLOWING.has(e.status))
+    .map((e) => {
+      const item = { ...e.item, ...(fresh[e.item.id] || {}) };
+      const entry = { ...e, item };
+      const next = item.nextEpisode && item.nextEpisode.airingAt > nowS ? item.nextEpisode : null;
+      return {
+        entry, item, next,
+        pending: e.status === "watching" ? behindBy(entry) : 0,
+        delay: e.delay && e.delay.episode === item.nextEpisode?.episode ? e.delay : null,
+      };
+    })
+    .filter((x) => x.next || x.pending > 0)
+    .sort((a, b) => (a.next?.airingAt ?? Infinity) - (b.next?.airingAt ?? Infinity) || b.pending - a.pending);
+}
+
+/* ---------- Spotlight: a reward for 600+ completed anime ---------- */
+// One of your categories becomes the top row of Explore during the third week
+// of every month (days 15–21).
+
+export const SPOTLIGHT_MIN = 600;
+export const spotlightWeek = (date = new Date()) => date.getDate() >= 15 && date.getDate() <= 21;
+
+export async function getSpotlight() {
+  const db = await load();
+  const anime = Object.values(db.library).filter((e) => e.item.segment === "anime" && e.status === "completed").length;
+  const catId = db.meta?.spotlight || null;
+  const cat = db.categories.find((c) => c.id === catId) || null;
+  return { unlocked: anime >= SPOTLIGHT_MIN, animeCompleted: anime, needed: Math.max(0, SPOTLIGHT_MIN - anime), cat };
+}
+
+export async function setSpotlight(catId) {
+  const db = await load();
+  db.meta = { ...(db.meta || {}), spotlight: catId || null };
+  await save();
+}
+
+// The Explore row, or null when it isn't showing (locked, not set, empty, or not the third week).
+export async function loadSpotlightRow(date = new Date()) {
+  const sp = await getSpotlight();
+  if (!sp.unlocked || !sp.cat || !spotlightWeek(date)) return null;
+  const items = Object.values((await load()).library)
+    .filter((e) => (e.cats || []).includes(sp.cat.id))
+    .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""))
+    .map((e) => e.item);
+  return items.length ? { title: sp.cat.name, items } : null;
 }
 
 /* ---------- pending: aired but not watched yet ---------- */
@@ -374,8 +451,8 @@ export async function noteAiring(fresh) {
       delete e.delay; // that episode aired; the next one is on its own schedule
       changed = true;
     }
-    if (JSON.stringify(before) !== JSON.stringify(now) || e.item.finished !== f.finished) {
-      e.item = { ...e.item, nextEpisode: now, finished: f.finished, episodes: f.episodes ?? e.item.episodes };
+    if (JSON.stringify(before) !== JSON.stringify(now) || e.item.finished !== f.finished || !!e.item.unreleased !== !!f.unreleased) {
+      e.item = { ...e.item, nextEpisode: now, finished: f.finished, unreleased: f.unreleased, episodes: f.episodes ?? e.item.episodes };
       changed = true;
     }
   });
@@ -463,6 +540,11 @@ export async function getStats() {
     tracking: entries.length,
     episodesWatched: sum("anime"),
     chaptersRead: sum("manga"),
+    // Statistics (Mihon-style): totals count every known episode/chapter of
+    // your entries (a title without a known length counts what you've marked)
+    episodesTotal: entries.filter((e) => e.item.segment !== "manga").reduce((n, e) => n + Math.max(totalFor(e.item) || 0, e.progress || 0), 0),
+    chaptersTotal: entries.filter((e) => e.item.segment === "manga").reduce((n, e) => n + Math.max(totalFor(e.item) || 0, e.progress || 0), 0),
+    minutesWatched: entries.filter((e) => e.item.segment !== "manga").reduce((n, e) => n + (e.progress || 0) * (e.item.duration || 24), 0),
     inLibrary: { anime: entries.filter((e) => e.item.segment !== "manga").length, manga: entries.filter((e) => e.item.segment === "manga").length },
     byStatus,
     verdicts: Object.keys((await load()).reviews).length,
@@ -481,14 +563,23 @@ export const inLibraryList = (entry, list) =>
 
 /* ---------- tiers ---------- */
 
+// Ranks, by anime Completed + manga Finished. The gaps start
+// at 60 and grow, so each rank takes longer than the last.
 export const TIERS = [
-  { key: "rookie", label: "Rookie", min: 0, color: "#9ca3af" },
-  { key: "explorer", label: "Explorer", min: 25, color: "#22d3ee" },
-  { key: "collector", label: "Collector", min: 55, color: "#10b981" },
-  { key: "critic", label: "Critic", min: 100, color: "#f59e0b" },
-  { key: "elite", label: "Elite", min: 360, color: "#f43f5e" },
-  { key: "legend", label: "Legend", min: 999, color: "#a243a6" },
-  { key: "addicted", label: "Addicted", min: 9999, color: "#a855f7" },
+  { key: "rookie", label: "Rookie", min: 0, color: "#9ca3af",
+    title: "You are a Rookie", message: "Every Legend started here. Complete anime and finish manga to climb the ranks." },
+  { key: "explorer", label: "Explorer", min: 60, color: "#22d3ee",
+    title: "You are an Explorer", message: "60 anime completed and manga finished. You know your way around now." },
+  { key: "collector", label: "Collector", min: 130, color: "#10b981",
+    title: "You are a Collector", message: "130 anime completed and manga finished. That's a proper collection." },
+  { key: "critic", label: "Critic", min: 210, color: "#f59e0b",
+    title: "You are a Critic", message: "210 anime completed and manga finished. Your verdicts carry weight now." },
+  { key: "elite", label: "Elite", min: 300, color: "#f43f5e",
+    title: "You are an Elite", message: "300 anime completed and manga finished. Very few get this far." },
+  { key: "legend", label: "Legend", min: 400, color: "#e879f9",
+    title: "You are a Legend", message: "400 anime completed and manga finished. People will ask you what to watch." },
+  { key: "addicted", label: "Addicted", min: 520, color: "#a855f7",
+    title: "You have become an Addict", message: "520 anime completed and manga finished. Seriously: take a break, drink some water, go outside." },
 ];
 
 export const tierFor = (n) => [...TIERS].reverse().find((t) => n >= t.min) || TIERS[0];
@@ -496,6 +587,29 @@ export const tierFor = (n) => [...TIERS].reverse().find((t) => n >= t.min) || TI
 export async function getUserTier() {
   const stats = await getStats();
   return { tier: tierFor(stats.totalCompleted), stats };
+}
+
+// Rank-up celebrations: the highest rank you've already been shown. A new,
+// higher rank → celebrate once. Dropping a rank (removing titles) never
+// celebrates again when you climb back.
+export async function checkRankUp() {
+  const db = await load();
+  const { tier } = await getUserTier();
+  const seenIndex = TIERS.findIndex((t) => t.key === db.meta?.tierSeen);
+  const nowIndex = TIERS.findIndex((t) => t.key === tier.key);
+  return nowIndex > seenIndex ? tier : null;
+}
+// "Your badge" page: replay a rank's celebration on demand.
+const celebrateListeners = new Set();
+export function onCelebrate(fn) { celebrateListeners.add(fn); return () => celebrateListeners.delete(fn); }
+export function celebrate(tier) { celebrateListeners.forEach((fn) => { try { fn(tier); } catch { /* ignore */ } }); }
+
+export async function markRankSeen(key) {
+  const db = await load();
+  const seenIndex = TIERS.findIndex((t) => t.key === db.meta?.tierSeen);
+  if (TIERS.findIndex((t) => t.key === key) <= seenIndex) return;
+  db.meta = { ...(db.meta || {}), tierSeen: key };
+  await save();
 }
 
 /* ---------- your verdicts & vibes ---------- */
@@ -585,10 +699,32 @@ export async function importData(json) {
     library: data.library || {}, reviews: data.reviews || {}, excited: data.excited || {},
     log: Array.isArray(data.log) ? data.log : [],
     categories: Array.isArray(data.categories) ? data.categories : [],
+    meta: data.meta && typeof data.meta === "object" ? data.meta : {},
     settings: { ...DEFAULT_SETTINGS, ...(data.settings || {}) },
   };
   await save();
   return null;
+}
+
+// Export → Library list: every title as a spreadsheet-friendly CSV
+// (Type, Title, Status, Progress, Total, Verdict, Categories, AniList link).
+export async function exportLibraryCsv() {
+  const db = await load();
+  const cell = (v) => {
+    const s = v == null ? "" : String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const catName = Object.fromEntries(db.categories.map((c) => [c.id, c.name]));
+  const rows = Object.entries(db.library)
+    .sort((a, b) => a[1].item.title.localeCompare(b[1].item.title))
+    .map(([key, e]) => {
+      const seg = e.item.segment;
+      const label = statusesFor(seg).find((s) => s.key === e.status)?.label || e.status;
+      const verdict = VERDICTS.find((v) => v.key === db.reviews[key]?.verdict)?.label || "";
+      return [seg === "manga" ? "Manga" : "Anime", e.item.title, label, e.progress || 0, totalFor(e.item) ?? "",
+        verdict, (e.cats || []).map((c) => catName[c]).filter(Boolean).join("; "), e.item.url || ""].map(cell).join(",");
+    });
+  return ["Type,Title,Status,Progress,Total,Verdict,Categories,AniList", ...rows].join("\n") + "\n";
 }
 
 // Size of everything Voidation has saved, in bytes (Data & storage).

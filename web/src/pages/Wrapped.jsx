@@ -3,7 +3,7 @@
 // Everything comes from your own watch log (shared/wrapped.js).
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { computeWrapped, wrappedSlides, wrappedYears } from "@voidation/shared/wrapped";
+import { loadWrapped, wrappedSlides, wrappedYears, defaultWrapped } from "@voidation/shared/wrapped";
 import { useDocumentTitle } from "../lib/useDocumentTitle.js";
 
 const BACKGROUNDS = [
@@ -15,14 +15,14 @@ const BACKGROUNDS = [
 
 export default function Wrapped() {
   const navigate = useNavigate();
-  const [years, setYears] = useState([new Date().getFullYear()]);
-  const [year, setYear] = useState(new Date().getFullYear());
+  const [years, setYears] = useState(["all"]);
+  const [year, setYear] = useState(null); // "all" or a year number
   const [w, setW] = useState(null);
   const [i, setI] = useState(0);
-  useDocumentTitle(`Wrapped ${year}`);
+  useDocumentTitle(year === "all" ? "Wrapped · All time" : `Wrapped ${year || ""}`);
 
-  useEffect(() => { wrappedYears().then(setYears); }, []);
-  useEffect(() => { setW(null); setI(0); computeWrapped(year).then(setW); }, [year]);
+  useEffect(() => { wrappedYears().then(setYears); defaultWrapped().then(setYear); }, []);
+  useEffect(() => { if (year === null) return; setW(null); setI(0); loadWrapped(year).then(setW); }, [year]);
   const slides = w ? wrappedSlides(w) : [];
   const last = slides.length - 1;
   const go = (d) => setI((x) => Math.max(0, Math.min(last, x + d)));
@@ -45,11 +45,12 @@ export default function Wrapped() {
           {slides.map((_, k) => <span key={k} className={k <= i ? "on" : ""} />)}
         </div>
         <div className="row gap-8">
-          {years.length > 1 && (
-            <select className="mini-dark" value={year} onChange={(e) => setYear(Number(e.target.value))} aria-label="Year">
-              {years.map((y) => <option key={y} value={y}>{y}</option>)}
-            </select>
-          )}
+          <div className="wrapped-years" role="tablist" aria-label="Which Wrapped">
+            {years.map((y) => (
+              <button key={y} role="tab" aria-selected={y === year} className={y === year ? "on" : ""}
+                onClick={() => setYear(y)}>{y === "all" ? "All time" : y}</button>
+            ))}
+          </div>
           <button className="wrapped-close" onClick={() => navigate("/more")} aria-label="Close">✕</button>
         </div>
       </div>
@@ -78,11 +79,11 @@ function Slide({ s }) {
         <>
           {s.image && <img className="ws-hero" src={s.image} alt="" />}
           <ol className="ws-list">
-            {s.items.map(({ item, count }, n) => (
+            {s.items.map(({ item, count, note }, n) => (
               <li key={item.id}>
                 <span className="ws-rank">{n + 1}</span>
                 {item.image && <img src={item.image} alt="" />}
-                <span className="grow"><b>{item.title}</b><span>{count} {s.unit}</span></span>
+                <span className="grow"><b>{item.title}</b><span>{count ? `${count} ${s.unit}` : s.unit === "chapters" ? "Finished" : "Completed"}{note ? ` · ${note}` : ""}</span></span>
               </li>
             ))}
           </ol>
@@ -117,9 +118,9 @@ function Summary({ w, onBack, onRestart }) {
       const { default: html2canvas } = await import("html2canvas");
       const canvas = await html2canvas(ref.current, { useCORS: true, backgroundColor: null, scale: Math.min(window.devicePixelRatio || 1, 3) });
       const blob = await new Promise((res, rej) => canvas.toBlob((b) => (b ? res(b) : rej(new Error("toBlob"))), "image/png"));
-      const file = new File([blob], `voidation-wrapped-${w.year}.png`, { type: "image/png" });
+      const file = new File([blob], `voidation-wrapped-${w.allTime ? "all-time" : w.year}.png`, { type: "image/png" });
       if (navigator.canShare?.({ files: [file] })) {
-        try { await navigator.share({ files: [file], title: `My Voidation Wrapped ${w.year}` }); setStatus(""); return; }
+        try { await navigator.share({ files: [file], title: `My Voidation Wrapped · ${w.label}` }); setStatus(""); return; }
         catch (e) { if (e?.name === "AbortError") { setStatus(""); return; } }
       }
       const url = URL.createObjectURL(blob);
@@ -136,7 +137,7 @@ function Summary({ w, onBack, onRestart }) {
     <div className="ws summary">
       <div className="wrapped-card" ref={ref}>
         <div className="wc-hero">
-          <span className="wc-year">{w.year}</span>
+          <span className={`wc-year${w.allTime ? " small" : ""}`}>{w.label}</span>
           {hero?.image && <img src={hero.image} alt="" crossOrigin="anonymous" />}
         </div>
         <div className="wc-body">
@@ -153,8 +154,8 @@ function Summary({ w, onBack, onRestart }) {
           <div className="wc-cols">
             <div><small>{w.episodes ? "Episodes watched" : "Chapters read"}</small><b>{(w.episodes || w.chapters).toLocaleString()}</b></div>
             <div>
-              <small>{!w.episodes ? "Titles finished" : w.minutes < 90 ? "Minutes" : "Hours"}</small>
-              <b>{!w.episodes ? w.completed : w.minutes < 90 ? Math.round(w.minutes) : w.hours.toLocaleString()}</b>
+              <small>{w.allTime || !w.episodes ? "Completed & finished" : w.minutes < 90 ? "Minutes" : "Hours"}</small>
+              <b>{w.allTime || !w.episodes ? w.completed.toLocaleString() : w.minutes < 90 ? Math.round(w.minutes) : w.hours.toLocaleString()}</b>
             </div>
           </div>
           <div className="wc-brand">VOID<span>ATION</span> · WRAPPED</div>

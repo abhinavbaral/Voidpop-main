@@ -21,6 +21,7 @@ export default function Card({ item, now, entry, onPlus, selecting, selected, on
       {selecting && <span className="select-tick" aria-hidden="true">{selected ? "✓" : ""}</span>}
       <div className="card-poster">
         {item.image ? <img src={item.image} alt="" loading="lazy" /> : <span>No image</span>}
+        {item.awardYear && <span className="award-ribbon">🏆 {item.awardYear}</span>}
         {next && (
           <span className={`card-countdown${entry?.delay ? " late" : ""}`} title={`Episode ${next.episode}`}>
             {entry?.delay ? "Delayed · " : ""}Ep {next.episode} · {formatCountdown(next.airingAt, now)}

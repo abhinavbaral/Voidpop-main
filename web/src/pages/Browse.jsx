@@ -12,7 +12,8 @@ const ORIGINS = { anime: ANIME_ORIGINS, manga: MANGA_ORIGINS };
 const THIS_YEAR = new Date().getFullYear();
 const YEARS = Array.from({ length: 10 }, (_, i) => String(THIS_YEAR - i));
 
-export default function Browse() {
+// embedded: shown as the last section of Explore (Browse now lives there)
+export default function Browse({ embedded = false }) {
   const [params, setParams] = useSearchParams();
   const segment = SEGMENTS.includes(params.get("type")) ? params.get("type") : "anime";
   const origin = params.get("origin") || "";
@@ -20,7 +21,7 @@ export default function Browse() {
   const season = segment === "anime" ? params.get("season") || "" : "";
   const year = params.get("year") || String(THIS_YEAR);
   const genre = params.get("genre") || "";
-  useDocumentTitle(`Browse ${SEGMENT_LABEL[segment]}`);
+  useDocumentTitle(embedded ? null : `Browse ${SEGMENT_LABEL[segment]}`);
   const now = useNow(30000);
 
   const set = (patch) => {
@@ -82,9 +83,9 @@ export default function Browse() {
   }, [hasMore, page, load]);
 
   return (
-    <div className="stack">
+    <div className={embedded ? "stack browse-embedded" : "stack"} id={embedded ? "browse" : undefined}>
       <div className="browse-head">
-        <h1>Browse</h1>
+        {embedded ? <h2>🔎 Browse everything</h2> : <h1>Browse</h1>}
         <div className="seg-tabs" role="tablist" aria-label="Type">
           {SEGMENTS.map((s) => (
             <button key={s} role="tab" aria-selected={s === segment} className={`seg-tab${s === segment ? " on" : ""}`}

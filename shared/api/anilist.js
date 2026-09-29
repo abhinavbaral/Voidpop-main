@@ -87,6 +87,8 @@ function normalize(m, segment) {
     id: m.id,
     segment,
     title: m.title.english || m.title.romaji,
+    // the Japanese (romaji) title, when it's different: "Re:Zero kara Hajimeru Isekai Seikatsu"
+    altTitle: m.title.english && m.title.romaji && m.title.romaji !== m.title.english ? m.title.romaji : null,
     image: m.coverImage?.extraLarge || m.coverImage?.large,
     banner: m.bannerImage || null,
     // zero-pad: "2013-4-7" is not ISO, so new Date() returns Invalid Date
@@ -201,7 +203,7 @@ async function request(body, k, save, token = null) {
 export async function fetchAniList(segment, opts = {}) {
   const {
     page = 1, sort = "popular", search = "", origin = "",
-    season = "", year = null, unreleasedOnly = false, perPage = 24, genre = "",
+    season = "", year = null, unreleasedOnly = false, perPage = 24, genre = "", tag = "",
   } = opts;
 
   const args = ["type: $type", "isAdult: false", "sort: $sort"];
@@ -216,6 +218,7 @@ export async function fetchAniList(segment, opts = {}) {
   if (origin) { varDefs.push("$country: CountryCode"); args.push("countryOfOrigin: $country"); variables.country = origin; }
   if (unreleasedOnly) { args.push("status: NOT_YET_RELEASED"); }
   if (genre) { varDefs.push("$genre: String"); args.push("genre: $genre"); variables.genre = genre; }
+  if (tag) { varDefs.push("$tag: String"); args.push("tag: $tag"); variables.tag = tag; }
   if (segment === "anime" && season) {
     varDefs.push("$season: MediaSeason", "$seasonYear: Int");
     args.push("season: $season", "seasonYear: $seasonYear");
@@ -334,6 +337,70 @@ export async function fetchNewlyAnnounced(perPage = 50) {
   }`;
   const data = await gql(query, { perPage });
   return data.Page.media.map((m) => normalize(m, "anime"));
+}
+
+// Earlier seasons of an anime: follows AniList's PREQUEL links back
+// (S3 → S2 → S1). Only TV / TV short / ONA seasons are returned; movies and
+// specials in between are walked through but not returned.
+const SEASON_FORMATS = new Set(["TV", "TV_SHORT", "ONA"]);
+export async function fetchEarlierSeasons(id) {
+  const query = `query ($id: Int) {
+    Media(id: $id, type: ANIME) {
+      relations { edges { relationType node { type ${LIST_FIELDS} studios(isMain: true) { nodes { name } } } } }
+    }
+  }`;
+  const out = [];
+  const seen = new Set([Number(id)]);
+  let frontier = [Number(id)];
+  for (let depth = 0; depth < 8 && frontier.length; depth++) {
+    const nextFrontier = [];
+    for (const mid of frontier) {
+      const data = await gql(query, { id: mid });
+      (data.Media?.relations?.edges || [])
+        .filter((e) => e.relationType === "PREQUEL" && e.node.type === "ANIME" && !seen.has(e.node.id))
+        .forEach((e) => {
+          seen.add(e.node.id);
+          nextFrontier.push(e.node.id);
+          if (SEASON_FORMATS.has(e.node.format)) out.push({ ...normalize(e.node, "anime"), partial: true });
+        });
+    }
+    frontier = nextFrontier;
+  }
+  return out;
+}
+
+// Anime of the Year: the best-rated anime of each year (among ones enough
+// people watched), all years in ONE request using GraphQL aliases.
+export async function fetchAnimeOfTheYear(years) {
+  const light = `${LIST_FIELDS} studios(isMain: true) { nodes { name } } averageScore`;
+  const query = `query {
+    ${years.map((y) => `y${y}: Page(perPage: 1) { media(type: ANIME, seasonYear: ${Number(y)}, isAdult: false, popularity_greater: 30000, format_in: [TV, MOVIE, ONA], sort: [SCORE_DESC]) { ${light} } }`).join(" ")}
+  }`;
+  const data = await gql(query, {});
+  return years
+    .map((y) => {
+      const m = data[`y${y}`]?.media?.[0];
+      return m ? { ...normalize(m, "anime"), partial: true, awardYear: y } : null;
+    })
+    .filter(Boolean);
+}
+
+// Anime starting between two dates (YYYYMMDD numbers), for the Upcoming calendar
+// and "Latest premieres". sort: START_DATE or START_DATE_DESC.
+export async function fetchPremieres(from, to, { sort = "START_DATE", status = null, pages = 3 } = {}) {
+  const query = `query ($page: Int, $from: FuzzyDateInt, $to: FuzzyDateInt, $sort: [MediaSort]${status ? ", $status: MediaStatus" : ""}) {
+    Page(page: $page, perPage: 25) {
+      pageInfo { hasNextPage }
+      media(type: ANIME, isAdult: false, startDate_greater: $from, startDate_lesser: $to, sort: $sort${status ? ", status: $status" : ""}) { ${fieldsFor("anime")} }
+    }
+  }`;
+  const out = [];
+  for (let page = 1; page <= pages; page++) {
+    const data = await gql(query, { page, from, to, sort: [sort], ...(status ? { status } : {}) });
+    out.push(...data.Page.media.map((m) => normalize(m, "anime")));
+    if (!data.Page.pageInfo.hasNextPage) break;
+  }
+  return out;
 }
 
 // Sequels (next seasons) of many anime at once: { id -> [sequel items] }.

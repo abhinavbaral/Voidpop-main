@@ -55,6 +55,13 @@
         }
       ]
     ],
-    "scheme": "voidation"
+    "scheme": "voidation",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    }
   }
 }

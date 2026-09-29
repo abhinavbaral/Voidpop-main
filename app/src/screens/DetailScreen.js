@@ -11,6 +11,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import TrailerPlayer from "../components/TrailerPlayer";
 import WhereToWatch from "../components/WhereToWatch";
 import { addToCalendar } from "../lib/calendar";
+import { completeEarlierSeasons, undoEarlierSeasons } from "@voidation/shared/seasons";
 import { getCachedItem, cacheItem, openDetail, goBackOrHome } from "../lib/nav";
 import { releaseLabel, formatCountdown, dayLabel, airTime } from "@voidation/shared/format";
 import { useNow } from "@voidation/shared/hooks/useNow";
@@ -18,7 +19,7 @@ import { useSettings } from "@voidation/shared/backend/SettingsContext";
 import { useIsWide } from "../lib/layout";
 import { useAuth } from "@voidation/shared/backend/AuthContext";
 import {
-  statusesFor, getStatus, setStatus, addReview, getMyReview,
+  statusesFor, statusesAllowed, getStatus, setStatus, addReview, getMyReview,
   getExcited, toggleExcited, getEntry, setProgress, noteAiring, totalFor, unitFor, airedFor, maxProgress, checkProgress,
   getCategories, setEntryCategories, doneLabel, fillCompleted,
 } from "@voidation/shared/backend/store";
@@ -99,6 +100,10 @@ function DetailBody({ item, navigation }) {
   const [isExcited, setIsExcited] = useState(false);
   const [progress, setProgressState] = useState(0);
   const [delay, setDelay] = useState(null);
+  // "not out yet" can change while you look: refreshed from AniList below
+  const [unreleased, setUnreleased] = useState(!!item.unreleased);
+  const [autoMarked, setAutoMarked] = useState([]); // earlier seasons marked Completed for you
+  const markEarlier = (s) => completeEarlierSeasons(item, s).then((added) => added.length && setAutoMarked(added)).catch(() => {});
   const [cats, setCats] = useState([]);
   const [myCats, setMyCats] = useState([]);
   const [shareOpen, setShareOpen] = useState(false);
@@ -118,10 +123,8 @@ function DetailBody({ item, navigation }) {
     setDelay(entry?.delay?.episode === entry?.item.nextEpisode?.episode ? entry?.delay : null);
     setStatusState(await getStatus(user, item.segment, item.id));
     setMyReview(await getMyReview(user, item.segment, item.id));
-    if (item.unreleased) {
-      const ex = await getExcited(user);
-      setIsExcited(!!ex[`${item.segment}:${item.id}`]);
-    }
+    const ex = await getExcited(user);
+    setIsExcited(!!ex[`${item.segment}:${item.id}`]);
   }, [user, item]);
 
   useEffect(() => {
@@ -140,6 +143,7 @@ function DetailBody({ item, navigation }) {
         .then(async (fresh) => {
           if (!alive || !fresh[item.id]) return;
           setNextEpisode(fresh[item.id].nextEpisode);
+          setUnreleased(!!fresh[item.id].unreleased);
           if (await noteAiring(fresh)) refresh();
         })
         .catch(() => {});
@@ -154,16 +158,18 @@ function DetailBody({ item, navigation }) {
       return;
     }
     if (key === "completed") {
-      setModalOpen(true);
+      if (!unreleased) setModalOpen(true); // no verdict for something that isn't out
       return;
     }
     await setStatus(user, item.segment, item, key);
     setStatusState(key);
+    markEarlier(key);
   };
 
   const changeProgress = async (n, source = "plus") => {
     const r = await setProgress(user, item, n, source);
     setProgressState(r.progress);
+    if (r.status !== status) markEarlier(r.status); // +1 on something new starts it
     setStatusState(r.status);
     if (r.reachedEnd) setModalOpen(true); // last episode: ask for the verdict
   };
@@ -173,6 +179,7 @@ function DetailBody({ item, navigation }) {
     await addReview(user, item.segment, item.id, { verdict, vibes, comment });
     setModalOpen(false);
     refresh();
+    markEarlier("completed");
   };
 
   const creator = item.creator;
@@ -181,7 +188,7 @@ function DetailBody({ item, navigation }) {
   const statusButtons = (
     <>
       <View style={styles.statusRow}>
-        {statusesFor(item.segment).map((s) => {
+        {statusesAllowed({ ...item, unreleased }).map((s) => {
           const active = status === s.key;
           return (
             <TouchableOpacity
@@ -193,7 +200,7 @@ function DetailBody({ item, navigation }) {
             </TouchableOpacity>
           );
         })}
-        {item.unreleased && (
+        {(unreleased || isExcited) && (
           <TouchableOpacity
             onPress={async () => setIsExcited(await toggleExcited(user, item))}
             style={[styles.statusBtn, isExcited && { backgroundColor: C.orange, borderColor: C.orange }]}
@@ -203,12 +210,26 @@ function DetailBody({ item, navigation }) {
             </Text>
           </TouchableOpacity>
         )}
-        {status === "completed" && (
+        {status === "completed" && !unreleased && (
           <TouchableOpacity onPress={() => setModalOpen(true)} style={styles.statusBtn}>
             <Text style={styles.statusText}>{myReview ? "Edit review" : "Review it"}</Text>
           </TouchableOpacity>
         )}
       </View>
+      {autoMarked.length > 0 && (
+        <View style={styles.autoMarked}>
+          <Text style={{ color: C.text, fontSize: 12, flex: 1 }}>
+            Also marked as Completed: <Text style={{ fontWeight: "800" }}>{autoMarked.map((s) => s.title).join(", ")}</Text>
+          </Text>
+          <Text style={{ color: C.purple, fontWeight: "800" }} onPress={async () => { await undoEarlierSeasons(autoMarked); setAutoMarked([]); }}>Undo</Text>
+          <Text style={{ color: C.faint, fontWeight: "800" }} onPress={() => setAutoMarked([])}>✕</Text>
+        </View>
+      )}
+      {unreleased && (
+        <Text style={{ color: C.faint, fontSize: 11, marginTop: 8 }}>
+          Not out yet: plan it or mark Excited. Tracking, progress and your verdict open once it starts.
+        </Text>
+      )}
       {!!status && cats.length > 0 && (
         <View style={[styles.statusRow, { marginTop: 10 }]}>
           {cats.map((c) => {
@@ -319,7 +340,7 @@ function DetailBody({ item, navigation }) {
               <Text style={{ color: C.green, fontWeight: "800", fontSize: 15 }}>{doneLabel(item)}</Text>
             </View>
           )}
-          {!item.unreleased && status !== "completed" && (status || progress > 0) && (
+          {!unreleased && status !== "completed" && (status || progress > 0) && (
             <ProgressBox item={{ ...item, nextEpisode }} progress={progress} onChange={changeProgress} styles={styles} C={C} />
           )}
 
@@ -468,6 +489,10 @@ function ProgressBox({ item, progress, onChange, styles, C }) {
 }
 
 const makeStyles = (C) => StyleSheet.create({
+  autoMarked: {
+    flexDirection: "row", alignItems: "center", gap: 12, marginTop: 10, padding: 10, borderRadius: 10,
+    borderWidth: 1, borderColor: C.green, backgroundColor: C.card,
+  },
   catChip: { paddingHorizontal: 10, height: 28, borderRadius: 999, borderWidth: 1, borderColor: C.border, justifyContent: "center" },
   progressBox: { flexDirection: "row", alignItems: "center", gap: 8 },
   progressInput: {

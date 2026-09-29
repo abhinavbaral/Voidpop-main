@@ -27,20 +27,18 @@ const Badge = ({ n }) => (n > 0 ? <span className="nav-badge" aria-label={`${n} 
 const SECTIONS = [
   { to: "/", label: "Explore", icon: "explore", end: true },
   { to: "/library", label: "Library", icon: "library" },
-  { to: "/browse", label: "Browse", icon: "browse" },
+  { to: "/upcoming", label: "Upcoming", icon: "calendar" },
   { to: "/history", label: "History", icon: "history" },
   { to: "/schedule", label: "Schedule", icon: "schedule" },
   { to: "/more", label: "More", icon: "more" },
 ];
 
 function ThemeToggle() {
-  const { mode, setMode } = useTheme();
-  const next = mode === "void" ? "pop" : "void";
+  const { dark, setPref } = useTheme();
   return (
-    <button className="icon-btn" onClick={() => setMode(next)}
-      aria-label={`Switch to ${next === "pop" ? "Pop (light)" : "Void (dark)"} theme`}
-      title={next === "pop" ? "Pop theme" : "Void theme"}>
-      <Icon name={mode === "void" ? "sun" : "moon"} />
+    <button className="icon-btn" onClick={() => setPref(dark ? "light" : "dark")}
+      aria-label={`Switch to ${dark ? "light" : "dark"} theme`} title={dark ? "Light theme" : "Dark theme"}>
+      <Icon name={dark ? "sun" : "moon"} />
     </button>
   );
 }

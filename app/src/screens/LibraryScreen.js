@@ -18,7 +18,7 @@ import OptionsSheet from "../components/OptionsSheet.js";
 import VerdictModal from "../components/VerdictModal.js";
 import { fetchNextEpisodes } from "@voidation/shared/api/anilist";
 import Chips from "../components/Chips.js";
-import Card from "../components/Card.js";
+import LibraryCard from "../components/LibraryCard.js";
 import { useTheme } from "../context/ThemeContext.js";
 import { useGridColumns } from "../lib/layout";
 import { openDetail } from "../lib/nav";
@@ -170,10 +170,8 @@ export default function LibraryScreen({ navigation }) {
         numColumns={cols}
         contentContainerStyle={{ padding: 6, paddingBottom: 30 }}
         renderItem={({ item: entry }) => (
-          <Card
-            item={entry.item}
+          <LibraryCard
             entry={entry}
-            onPlus={entry.status === "watching" ? () => plus(entry) : undefined}
             columns={cols}
             selecting={selecting}
             selected={selecting && selected.has(keyOf(entry))}

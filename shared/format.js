@@ -66,6 +66,12 @@ export function airedAgo(airingAt, now = Date.now()) {
   return `aired ${d} day${d > 1 ? "s" : ""} ago`;
 }
 
+// The big countdown boxes: { d, h, m, s } until airingAt (all 0 once it's out).
+export function countdownParts(airingAt, now = Date.now()) {
+  const left = Math.max(0, Math.floor(airingAt - now / 1000));
+  return { d: Math.floor(left / 86400), h: Math.floor((left % 86400) / 3600), m: Math.floor((left % 3600) / 60), s: left % 60, out: left === 0 };
+}
+
 // "Wed 1 Oct, 8:30 PM GMT+5:45": a full air time for a share card, with the
 // time zone, since whoever sees the image may live somewhere else.
 export function shareAirTime(airingAt, clock24 = false) {
@@ -78,4 +84,13 @@ export function shareAirTime(airingAt, clock24 = false) {
   } catch {
     return d.toString().slice(0, 21);
   }
+}
+
+// "5d 3h" / "3h 20m" / "45m": total time watched, for Statistics
+export function durationLabel(minutes) {
+  const m = Math.round(minutes || 0);
+  const d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60), r = m % 60;
+  if (d) return `${d}d ${h}h`;
+  if (h) return `${h}h ${r}m`;
+  return `${r}m`;
 }

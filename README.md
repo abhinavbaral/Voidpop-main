@@ -110,3 +110,25 @@ them back. Each place Voidation runs needs its own AniList app (one redirect URL
 Client ids aren't secret (the sign-in happens on AniList's own page), but keep
 `.env` files out of git anyway. Expo Go uses a different return address, shown
 on the More → AniList page, so test sign-in on the website or the APK.
+
+## Updating the app without a new build (EAS Update)
+
+Build the APK once; after that, most changes reach phones as an update in a
+minute or two, with no build queue and no reinstall.
+
+One-time setup (from `app/`):
+
+    npx eas-cli update:configure
+    npx eas-cli build -p android --profile preview
+
+Install that APK. From then on, after changing code (from `app/`):
+
+    npx eas-cli update --channel preview --message "what changed"
+
+Open Voidation, close it completely, open it again: the update is in.
+
+A new APK is only needed when a native library is added or changed (a new
+`expo-*` or `react-native-*` package, or app.json plugins/permissions). The
+runtime version is a "fingerprint" of the native code, so an update is never
+sent to an APK that can't run it; if a new build is needed, the update simply
+won't appear until you install the new APK.

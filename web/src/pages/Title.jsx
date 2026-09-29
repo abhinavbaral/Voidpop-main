@@ -5,10 +5,11 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@voidation/shared/backend/AuthContext";
 import {
-  statusesFor, getStatus, setStatus, addReview, getMyReview, getExcited, toggleExcited,
+  statusesFor, statusesAllowed, getStatus, setStatus, addReview, getMyReview, getExcited, toggleExcited,
   getEntry, setProgress, noteAiring, getCategories, setEntryCategories, doneLabel, fillCompleted,
 } from "@voidation/shared/backend/store";
 import ProgressStepper from "../components/Progress.jsx";
+import { completeEarlierSeasons, undoEarlierSeasons } from "@voidation/shared/seasons";
 import { googleCalendarUrl, icsFor } from "@voidation/shared/calendar";
 import { fetchAniListDetail, fetchNextEpisodes, fetchAniListItem } from "@voidation/shared/api/anilist";
 import { releaseLabel, formatCountdown, dayLabel, airTime } from "@voidation/shared/format";
@@ -78,6 +79,10 @@ function TitleBody({ item }) {
   const [watch, setWatch] = useState([]);
   const [progress, setProgressState] = useState(0);
   const [delay, setDelay] = useState(null);
+  // "not out yet" can change while you look: refreshed from AniList below
+  const [unreleased, setUnreleased] = useState(!!item.unreleased);
+  const [autoMarked, setAutoMarked] = useState([]); // earlier seasons marked Completed for you
+  const markEarlier = (s) => completeEarlierSeasons(item, s).then((added) => added.length && setAutoMarked(added)).catch(() => {});
   const [cats, setCats] = useState([]);
   const [myCats, setMyCats] = useState([]);
   const refresh = useCallback(async () => {
@@ -89,7 +94,7 @@ function TitleBody({ item }) {
     setDelay(entry?.delay?.episode === (entry?.item.nextEpisode?.episode) ? entry.delay : null);
     setStatusState(await getStatus(user, item.segment, item.id));
     setMyReview(await getMyReview(user, item.segment, item.id));
-    if (item.unreleased) setIsExcited(!!(await getExcited(user))[`${item.segment}:${item.id}`]);
+    setIsExcited(!!(await getExcited(user))[`${item.segment}:${item.id}`]);
   }, [user, item]);
   useEffect(() => { refresh().catch(() => {}); }, [refresh]);
 
@@ -107,6 +112,7 @@ function TitleBody({ item }) {
         .then(async (fresh) => {
           if (!alive || !fresh[item.id]) return;
           setNextEpisode(fresh[item.id].nextEpisode);
+          setUnreleased(!!fresh[item.id].unreleased);
           if (await noteAiring(fresh)) refresh();
         })
         .catch(() => {});
@@ -119,14 +125,16 @@ function TitleBody({ item }) {
       await setStatus(user, item.segment, item, null);
       return setStatusState(null);
     }
-    if (key === "completed") return setVerdictOpen(true);
+    if (key === "completed") return unreleased ? undefined : setVerdictOpen(true);
     await setStatus(user, item.segment, item, key);
     setStatusState(key);
+    markEarlier(key);
   };
 
   const changeProgress = async (n, source = "plus") => {
     const r = await setProgress(user, item, n, source);
     setProgressState(r.progress);
+    if (r.status !== status) markEarlier(r.status); // +1 on something new starts it
     setStatusState(r.status);
     if (r.reachedEnd) setVerdictOpen(true); // last episode: ask for the verdict
   };
@@ -137,6 +145,7 @@ function TitleBody({ item }) {
     setStatusState("completed");
     setVerdictOpen(false);
     refresh();
+    markEarlier("completed");
   };
 
   return (
@@ -171,21 +180,31 @@ function TitleBody({ item }) {
             </div>
 
             <div className="status-row" role="group" aria-label="Track this title">
-              {statusesFor(item.segment).map((s) => (
+              {statusesAllowed({ ...item, unreleased }).map((s) => (
                 <button key={s.key} className={`status-btn${status === s.key ? " on" : ""}`} aria-pressed={status === s.key} onClick={() => pick(s.key)}>
                   {s.label}
                 </button>
               ))}
-              {item.unreleased && (
+              {(unreleased || isExcited) && (
                 <button className={`status-btn excited${isExcited ? " on" : ""}`} aria-pressed={isExcited}
                   onClick={async () => setIsExcited(await toggleExcited(user, item))}>
                   {isExcited ? "Excited ✓" : "Excited?"}
                 </button>
               )}
-              {status === "completed" && (
+              {status === "completed" && !unreleased && (
                 <button className="status-btn" onClick={() => setVerdictOpen(true)}>{myReview ? "Edit review" : "Review it"}</button>
               )}
             </div>
+            {autoMarked.length > 0 && (
+              <div className="auto-marked" role="status">
+                <span>Also marked as Completed: <b>{autoMarked.map((s) => s.title).join(", ")}</b></span>
+                <button className="link-btn" onClick={async () => { await undoEarlierSeasons(autoMarked); setAutoMarked([]); }}>Undo</button>
+                <button className="link-btn" aria-label="Dismiss" onClick={() => setAutoMarked([])}>✕</button>
+              </div>
+            )}
+            {unreleased && (
+              <p className="faint small">Not out yet: plan it or mark Excited. Tracking, progress and your verdict open once it starts.</p>
+            )}
 
             {status && cats.length > 0 && (
               <div className="chips cat-chips" role="group" aria-label="Categories">
@@ -231,7 +250,7 @@ function TitleBody({ item }) {
         {status === "completed" && (
           <section className="panel progress-panel"><b className="done-label big">{doneLabel(item)}</b></section>
         )}
-        {!item.unreleased && status !== "completed" && (status || progress > 0) && (
+        {!unreleased && status !== "completed" && (status || progress > 0) && (
           <ProgressStepper item={{ ...item, nextEpisode }} progress={progress} onChange={changeProgress} />
         )}
 

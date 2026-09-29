@@ -17,7 +17,7 @@ import { useNow } from "@voidation/shared/hooks/useNow";
 import { useSettings } from "@voidation/shared/backend/SettingsContext";
 import { useTheme } from "../context/ThemeContext.js";
 import { openDetail } from "../lib/nav";
-import PendingPanel from "../components/PendingPanel.js";
+import YourShows from "../components/YourShows.js";
 import FilterChips from "../components/FilterChips.js";
 import { applyFilters } from "@voidation/shared/filters";
 
@@ -34,7 +34,8 @@ export default function ScheduleScreen({ navigation }) {
   const [upcoming, setUpcoming] = useState([]);
   const [excited, setExcited] = useState({});
   const [tracked, setTracked] = useState(new Set());
-  const [onlyMine, setOnlyMine] = useState(false);
+  // the Schedule tab's two views: your shows' countdowns, or everything out this week
+  const [view, setView] = useState("mine");
   const [filters, setFilters] = useState({ genre: "", studio: "" });
   const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -83,7 +84,6 @@ export default function ScheduleScreen({ navigation }) {
     const groups = [];
     (week || [])
       .filter((s) => secondsUntil(s.airingAt, now) > -3600)
-      .filter((s) => !onlyMine || tracked.has(s.item.id))
       .filter((s) => applyFilters([s.item], filters).length)
       .forEach((s) => {
         const label = dayLabel(s.airingAt, now);
@@ -92,7 +92,7 @@ export default function ScheduleScreen({ navigation }) {
         else groups.push({ label, items: [s] });
       });
     return groups;
-  }, [week, onlyMine, tracked, filters, Math.floor(now / 60000)]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [week, tracked, filters, Math.floor(now / 60000)]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const open = (item) => openDetail(navigation, item);
   const onExcite = async (item) => {
@@ -116,53 +116,32 @@ export default function ScheduleScreen({ navigation }) {
           <Text style={styles.error}>Couldn't reach AniList for the latest airing times. Pull down to retry.</Text>
         )}
 
-        <PendingPanel now={now} refreshKey={fetched} onOpen={(it) => openDetail(navigation, it)} />
+        <View style={styles.viewTabs}>
+          {[["mine", "Your watch"], ["week", "Out this week"]].map(([k, label]) => (
+            <TouchableOpacity key={k} onPress={() => setView(k)} style={[styles.viewTab, view === k && styles.viewTabOn]}>
+              <Text style={[styles.viewTabText, view === k && { color: "#fff" }]}>{label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
-        <Text style={styles.section}>⏳ Your next episodes</Text>
-        {mine === null ? (
-          <Text style={styles.empty}>Loading…</Text>
-        ) : !mine.length ? (
-          <Text style={styles.empty}>
-            Nothing you follow is airing right now. Mark an airing anime as Watching or Plan to Watch and its
-            countdown shows up here.
-          </Text>
-        ) : (
-          mine.map(({ item, delay }) => {
-            const next = item.nextEpisode;
-            const soon = secondsUntil(next.airingAt, now) < 86400;
-            return (
-              <TouchableOpacity key={item.id} style={styles.row} onPress={() => open(item)}>
-                {item.image ? <Image source={{ uri: item.image }} style={styles.thumb} /> : <View style={styles.thumb} />}
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.rowTitle} numberOfLines={2}>{item.title}</Text>
-                  <Text style={styles.rowSub}>
-                    Episode {next.episode}{item.episodes ? ` of ${item.episodes}` : ""} · {dayLabel(next.airingAt, now)}, {airTime(next.airingAt, clock24)}
-                  </Text>
-                  {delay && (
-                    <Text style={styles.delayed}>Delayed · was {dayLabel(delay.from, now)}, {airTime(delay.from, clock24)}</Text>
-                  )}
-                </View>
-                <Text style={[styles.countdown, soon && styles.soon]}>{formatCountdown(next.airingAt, now)}</Text>
-              </TouchableOpacity>
-            );
-          })
+        {view === "mine" && (
+          <YourShows
+            now={now}
+            refreshKey={fetched}
+            onOpen={(it) => openDetail(navigation, it)}
+            emptyText="Nothing you follow is airing right now. Mark an airing anime as Watching or Plan to Watch and its countdown shows up here, or see everything in Out this week."
+          />
         )}
+        {view === "week" && (<>
 
         <View style={styles.weekHead}>
-          <Text style={[styles.section, { marginTop: 0, marginBottom: 0, paddingHorizontal: 0 }]}>📅 This week</Text>
-          <View style={{ flexDirection: "row", gap: 6 }}>
-            {[[false, "All"], [true, "Mine"]].map(([v, label]) => (
-              <TouchableOpacity key={label} onPress={() => setOnlyMine(v)} style={[styles.chip, onlyMine === v && styles.chipOn]}>
-                <Text style={[styles.chipText, onlyMine === v && { color: "#fff" }]}>{label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <Text style={[styles.section, { marginTop: 0, marginBottom: 0, paddingHorizontal: 0 }]}>📅 Out this week</Text>
         </View>
         <FilterChips items={(week || []).map((s) => s.item)} value={filters} onChange={setFilters} style={{ paddingHorizontal: 14, marginTop: 6 }} />
         {week === null ? (
           <Text style={styles.empty}>Loading…</Text>
         ) : !days.length ? (
-          <Text style={styles.empty}>{filters.genre || filters.studio ? "Nothing this week matches these filters." : onlyMine ? "None of your shows air this week." : "No episodes found for this week."}</Text>
+          <Text style={styles.empty}>{filters.genre || filters.studio ? "Nothing this week matches these filters." : "No episodes found for this week."}</Text>
         ) : (
           days.map((g) => (
             <View key={g.label}>
@@ -200,6 +179,7 @@ export default function ScheduleScreen({ navigation }) {
             </View>
           );
         })}
+        </>)}
       </ScrollView>
     </SafeAreaView>
   );
@@ -224,6 +204,13 @@ const makeStyles = (C) => StyleSheet.create({
   soon: { color: C.orange },
   delayed: { color: C.rose, fontSize: 11, fontWeight: "800", marginTop: 2 },
   countdownSm: { color: C.purple, fontWeight: "800", fontSize: 12, fontVariant: ["tabular-nums"] },
+  viewTabs: {
+    flexDirection: "row", gap: 4, marginHorizontal: 14, marginTop: 12, padding: 4,
+    backgroundColor: C.card, borderRadius: 12, borderWidth: 1, borderColor: C.border,
+  },
+  viewTab: { flex: 1, borderRadius: 9, paddingVertical: 9, alignItems: "center" },
+  viewTabOn: { backgroundColor: C.purple },
+  viewTabText: { color: C.text, fontWeight: "800", fontSize: 14 },
   weekHead: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingHorizontal: 14, marginTop: 22, marginBottom: 4,

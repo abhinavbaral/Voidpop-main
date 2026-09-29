@@ -1,7 +1,7 @@
 // MORE — a menu, like the "More" tab in reader apps:
 //   /more             menu + a one-line summary of your library
 //   /more/statistics  in library, completed, rank (tier), per-status trackers
-//   /more/appearance  Void (dark) / Light
+//   /more/settings    theme (System / Light / Dark, Pure black), clock, badges
 //   /more/settings    24-hour clock, countdown badges on posters
 //   /more/data        backup, restore, storage used, clear data
 //   /more/help        common questions
@@ -13,8 +13,12 @@ import {
   importAniListEntries,
   getCategories, addCategory, renameCategory, moveCategory, deleteCategory,
   getExcited, toggleExcited,
+  celebrate,
+  getSpotlight, setSpotlight, SPOTLIGHT_MIN,
+  exportLibraryCsv,
 } from "@voidation/shared/backend/store";
 import { useSettings } from "@voidation/shared/backend/SettingsContext";
+import { durationLabel } from "@voidation/shared/format";
 import { fetchAniListUserList, cacheSize, cacheClear } from "@voidation/shared/api/anilist";
 import TierBadge from "../components/TierBadge.jsx";
 import Icon from "../components/Icon.jsx";
@@ -30,10 +34,10 @@ import { titlePath, cacheTitle } from "../lib/titles.js";
 const VERSION = "1.0.0";
 
 const PAGES = [
-  { key: "statistics", label: "Statistics", hint: "Library, completed, rank" },
-  { key: "appearance", label: "Appearance", hint: "Dark or light" },
-  { key: "settings", label: "Settings", hint: "Clock, countdown badges" },
+  { key: "statistics", label: "Statistics", hint: "Overview, anime, chapters" },
+  { key: "settings", label: "Settings", hint: "Theme, clock, countdown badges" },
   { key: "data", label: "Data and storage", hint: "Backup, restore, clear" },
+  { key: "badge", label: "Your badge", hint: "Your rank and every badge" },
   { key: "announced", label: "New announcements", hint: "Anime announced this week" },
   { key: "categories", label: "Categories", hint: "Your own groups in the Library" },
   { key: "anilist", label: "AniList", hint: "Sync or import your lists" },
@@ -52,10 +56,11 @@ export default function More() {
   const { page } = useParams();
   const current = PAGES.find((p) => p.key === page);
   useDocumentTitle(current ? current.label : "More");
+  if (page === "appearance") return <Navigate to="/more/settings" replace />; // Appearance now lives in Settings
   if (page && !current) return <Navigate to="/more" replace />;
   if (!current) return <MoreMenu />;
 
-  const Body = { statistics: Statistics, appearance: Appearance, settings: Settings, data: DataStorage, categories: Categories, anilist: AniListPage, announced: Announced, help: Help, about: About }[page];
+  const Body = { statistics: Statistics, settings: Settings, data: DataStorage, categories: Categories, anilist: AniListPage, announced: Announced, badge: BadgePage, help: Help, about: About }[page];
   return (
     <div className="stack narrow">
       <Link to="/more" className="link-btn"><Icon name="back" size={16} /> More</Link>
@@ -95,11 +100,12 @@ function MoreMenu() {
           </label>
         </li>
       </ul>
+      <YourBadgeRow />
       <ul className="menu-list">
         <li>
           <Link to="/wrapped" className="menu-row wrapped-row">
             <Icon name="stats" size={22} className="menu-icon" />
-            <span className="grow"><b>Wrapped {new Date().getFullYear()}</b><span className="faint small">Your year in anime and manga</span></span>
+            <span className="grow"><b>Wrapped</b><span className="faint small">All time, or year by year</span></span>
           </Link>
         </li>
       </ul>
@@ -108,7 +114,6 @@ function MoreMenu() {
       </ul>
       <ul className="menu-list">
         {row("statistics", "stats", "Statistics")}
-        {row("appearance", "palette", "Appearance")}
         {row("data", "storage", "Data and storage")}
       </ul>
       <ul className="menu-list">
@@ -124,58 +129,61 @@ function MoreMenu() {
   );
 }
 
+// Statistics, laid out like Mihon's: Overview, Anime, Chapters, then trackers.
 function Statistics() {
   const [data] = useStats();
   if (!data) return <p className="muted">Loading…</p>;
-  const { tier, stats } = data;
-  const next = TIERS.find((t) => t.min > stats.totalCompleted);
-  return (
-    <>
-      <div className="stats">
-        {[["In library", stats.tracking], ["Completed", stats.totalCompleted], ["Episodes watched", stats.episodesWatched],
-          ["Chapters read", stats.chaptersRead], ["Verdicts", stats.verdicts], ["Excited", stats.excited]].map(([l, n]) => (
-          <div key={l} className="stat"><b>{n}</b><span>{l}</span></div>
-        ))}
+  const { stats } = data;
+  const fmt = (n) => (n || 0).toLocaleString();
+  const block = (title, cells) => (
+    <section className="stat-block">
+      <h2 className="stat-title">{title}</h2>
+      <div className="stat-cells">
+        {cells.map(([n, label]) => <div key={label} className="stat-cell"><b>{n}</b><span>{label}</span></div>)}
       </div>
-      <section className="panel stack-sm">
-        <h2 className="row gap-8">Rank <TierBadge tier={tier} large /></h2>
-        <p className="muted">
-          {next ? <>{next.min - stats.totalCompleted} more completed to reach <b style={{ color: next.color }}>{next.label}</b>.</> : "Top rank reached."}
-        </p>
-        <div className="tier-ladder">
-          {TIERS.map((t) => (
-            <span key={t.key} className={`tier-step${t.key === tier.key ? " on" : ""}`} style={{ borderColor: t.color, color: t.color }}>
-              {t.label} <small>{t.min}+</small>
-            </span>
+    </section>
+  );
+  return (
+    <div className="stack-sm">
+      {block("Overview", [[fmt(stats.tracking), "In library"], [fmt(stats.totalCompleted), "Completed & finished"], [durationLabel(stats.minutesWatched), "Time watched"]])}
+      {block("Anime", [[fmt(stats.episodesTotal), "Total"], [fmt(stats.episodesWatched), "Watched"], [fmt(stats.inLibrary.anime), "Entries"]])}
+      {block("Chapters", [[fmt(stats.chaptersTotal), "Total"], [fmt(stats.chaptersRead), "Read"], [fmt(stats.inLibrary.manga), "Entries"]])}
+      <section className="stat-block">
+        <h2 className="stat-title">Trackers</h2>
+        <div className="two-col">
+          {["anime", "manga"].map((seg) => (
+            <div key={seg}>
+              <b className="small">{seg === "anime" ? "Anime" : "Manga"}</b>
+              <ul className="tracker-list">
+                {statusesFor(seg).map((st) => (
+                  <li key={st.key}><span>{st.label}</span><b>{stats.byStatus[seg][st.key] || 0}</b></li>
+                ))}
+              </ul>
+            </div>
           ))}
         </div>
       </section>
-      <div className="two-col">
-        {["anime", "manga"].map((seg) => (
-          <section key={seg} className="panel">
-            <h2>{seg === "anime" ? "Anime" : "Manga"} trackers <span className="faint small">{stats.inLibrary[seg]} total</span></h2>
-            <ul className="tracker-list">
-              {statusesFor(seg).map((s) => (
-                <li key={s.key}><span>{s.label}</span><b>{stats.byStatus[seg][s.key] || 0}</b></li>
-              ))}
-            </ul>
-          </section>
-        ))}
-      </div>
-    </>
+      <p className="faint small">Totals count every episode/chapter of the titles in your library; a title with no known length counts what you've marked. Time watched uses each show's episode length.</p>
+    </div>
   );
 }
 
-function Appearance() {
-  const { mode, setMode } = useTheme();
+// Theme, like Mihon: System / Light / Dark, plus Pure black for dark.
+function ThemeSettings() {
+  const { pref, setPref, pureBlack, setPureBlack, dark } = useTheme();
   return (
-    <div className="theme-switch" role="radiogroup" aria-label="Appearance">
-      {[["void", "Void", "Dark"], ["pop", "Light", "Light"]].map(([k, label, hint]) => (
-        <button key={k} role="radio" aria-checked={mode === k} className={`list-btn${mode === k ? " on" : ""}`} onClick={() => setMode(k)}>
-          <b>{label}</b><span className="small">{hint}</span>
-        </button>
-      ))}
-    </div>
+    <section className="panel stack-sm">
+      <b>Theme</b>
+      <div className="seg-tabs theme-seg" role="radiogroup" aria-label="Theme">
+        {[["system", "System"], ["light", "Light"], ["dark", "Dark"]].map(([k, label]) => (
+          <button key={k} role="radio" aria-checked={pref === k} className={`seg-tab${pref === k ? " on" : ""}`} onClick={() => setPref(k)}>
+            {pref === k ? "✓ " : ""}{label}
+          </button>
+        ))}
+      </div>
+      <Toggle label="Pure black dark mode" hint={dark ? "A fully black background (saves battery on OLED screens)" : "Used when the theme is dark"}
+        checked={pureBlack} onChange={setPureBlack} />
+    </section>
   );
 }
 
@@ -191,15 +199,20 @@ function Toggle({ label, hint, checked, onChange }) {
 function Settings() {
   const { settings, update } = useSettings();
   return (
+    <>
+    <ThemeSettings />
     <section className="panel stack-sm">
       <Toggle label="24-hour clock" hint="Airing times as 16:30 instead of 4:30 PM"
         checked={settings.clock24} onChange={(v) => update("clock24", v)} />
       <Toggle label="Countdown badges on posters" hint={'Shows "Ep 7 · 3h 30m" on airing anime'}
         checked={settings.posterBadges} onChange={(v) => update("posterBadges", v)} />
     </section>
+    </>
   );
 }
 
+// Data and storage, laid out like Mihon's: Create / Restore backup, storage
+// usage, offline copy, export. (Automatic backups to a folder are in the app.)
 function DataStorage() {
   const { reload } = useSettings();
   const [size, setSize] = useState(null);
@@ -208,16 +221,19 @@ function DataStorage() {
   const fileInput = useRef(null);
   const measure = () => { storageSize().then(setSize); cacheSize().then(setOfflineSize); };
   useEffect(() => { measure(); }, []);
+  const kb = (n) => (n === null ? "…" : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(2)} MB`);
 
-  const download = async () => {
-    const blob = new Blob([await exportData()], { type: "application/json" });
+  const save = (name, text, type) => {
+    const blob = new Blob([text], { type });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `voidation-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = name;
     a.click();
     URL.revokeObjectURL(a.href);
-    setMessage("Backup downloaded.");
   };
+  const today = () => new Date().toISOString().slice(0, 10);
+  const download = async () => { save(`voidation-backup-${today()}.json`, await exportData(), "application/json"); setMessage("Backup downloaded."); };
+  const exportList = async () => { save(`voidation-library-${today()}.csv`, await exportLibraryCsv(), "text/csv"); setMessage("Library list downloaded."); };
   const restore = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -232,37 +248,43 @@ function DataStorage() {
     setMessage("Library cleared. Your settings were kept.");
     measure();
   };
+  const share = offlineSize ? Math.min(100, (offlineSize / 1_500_000) * 100) : 0;
 
   return (
-    <>
-      <p className="muted">
-        No account, no sign-in: everything is saved in this browser only. Clearing site data erases it, so download a
-        backup now and then. Using {size === null ? "…" : `${(size / 1024).toFixed(1)} KB`}.
-      </p>
-      <section className="panel stack-sm">
-        <div className="row gap-8 wrap">
-          <button className="btn primary" onClick={download}>Download backup</button>
-          <button className="btn ghost" onClick={() => fileInput.current?.click()}>Restore from backup</button>
-          <input ref={fileInput} type="file" accept="application/json,.json" onChange={restore} hidden />
-        </div>
-      </section>
-      <section className="panel stack-sm">
-        <b>Offline copy</b>
-        <p className="faint small">
-          The latest schedules and titles are saved as you browse, so Voidation still works without internet.
-          Using {offlineSize === null ? "…" : `${(offlineSize / 1024).toFixed(0)} KB`}. Clearing it doesn't touch your library.
-        </p>
-        <button className="btn ghost" onClick={async () => { await cacheClear(); setMessage("Offline copy cleared."); measure(); }}>
-          Clear offline copy
-        </button>
-      </section>
-      <section className="panel stack-sm">
-        <b>Clear data</b>
-        <p className="faint small">Removes every tracked title, verdict and Excited mark from this browser.</p>
-        <button className="btn danger" onClick={clear}>Clear library</button>
-      </section>
+    <div className="ds">
+      <h2 className="ds-section">Backup and restore</h2>
+      <div className="ds-seg">
+        <button onClick={download}>Create backup</button>
+        <button onClick={() => fileInput.current?.click()}>Restore backup</button>
+        <input ref={fileInput} type="file" accept="application/json,.json" onChange={restore} hidden />
+      </div>
+      <div className="ds-row static">
+        <b>Automatic backup frequency</b>
+        <span>In the Android app (to a folder on your phone)</span>
+      </div>
+      <p className="ds-info"><span aria-hidden="true">ⓘ</span>You should keep copies of backups in other places as well. Backups hold your whole library, verdicts and watch log. On the website everything lives in this browser, so clearing site data erases it.</p>
+
+      <h2 className="ds-section">Storage usage</h2>
+      <div className="ds-row static">
+        <b>In this browser</b>
+        <div className="ds-bar" aria-hidden="true"><span style={{ width: `${Math.max(2, share)}%` }} /></div>
+        <span>Library: {kb(size)} · Offline copy: {kb(offlineSize)} of 1.5 MB</span>
+      </div>
+      <button className="ds-row" onClick={async () => { await cacheClear(); setMessage("Offline copy cleared."); measure(); }}>
+        <b>Clear offline copy</b><span>Used: {kb(offlineSize)}. Your library isn't touched.</span>
+      </button>
+
+      <h2 className="ds-section">Export</h2>
+      <button className="ds-row" onClick={exportList}>
+        <b>Library list</b><span>Every title as a spreadsheet (CSV): status, progress, verdict, categories</span>
+      </button>
+
+      <h2 className="ds-section">Danger zone</h2>
+      <button className="ds-row danger" onClick={clear}>
+        <b>Clear library</b><span>Removes every tracked title, verdict and Excited mark from this browser</span>
+      </button>
       {message && <p className="faint small" role="status">{message}</p>}
-    </>
+    </div>
   );
 }
 
@@ -302,6 +324,76 @@ function AniListImport({ onDone }) {
       </form>
       {result && <p className="faint small" role="status">{result}</p>}
     </section>
+  );
+}
+
+// More menu: your current badge at a glance.
+function YourBadgeRow() {
+  const [data] = useStats();
+  if (!data) return null;
+  const { tier, stats } = data;
+  const next = TIERS.find((t) => t.min > stats.totalCompleted);
+  return (
+    <Link to="/more/badge" className="badge-row" style={{ "--tier": tier.color }}>
+      <span className="mini-medal"><span>{tier.key === "addicted" ? "☕" : "★"}</span></span>
+      <span className="grow">
+        <small className="faint">Your badge</small>
+        <b style={{ color: tier.color }}>{tier.label}</b>
+        <span className="faint small">
+          {next ? `${next.min - stats.totalCompleted} more to ${next.label}` : "Top rank. Take a break!"} · {stats.anime} completed, {stats.manga} finished
+        </span>
+      </span>
+      <span className="faint">›</span>
+    </Link>
+  );
+}
+
+// Your rank, progress to the next, and every badge (locked ones greyed out).
+function BadgePage() {
+  const [data] = useStats();
+  if (!data) return <p className="muted">Loading…</p>;
+  const { tier, stats } = data;
+  const n = stats.totalCompleted;
+  const next = TIERS.find((t) => t.min > n);
+  const pct = next ? Math.round(((n - tier.min) / (next.min - tier.min)) * 100) : 100;
+  return (
+    <div className="stack-sm">
+      <section className="panel badge-hero" style={{ "--tier": tier.color }}>
+        <div className="medal static" aria-hidden="true">
+          <div className="medal-ring" />
+          <div className="medal-face">
+            <span className="medal-star">{tier.key === "addicted" ? "☕" : "★"}</span>
+            <b>{tier.label}</b>
+            <small>{tier.min}+ titles</small>
+          </div>
+        </div>
+        <h2>{tier.title}</h2>
+        <p className="muted">{stats.anime} anime completed · {stats.manga} manga finished</p>
+        {next ? (
+          <>
+            <div className="progress-bar wide" aria-hidden="true"><span style={{ width: `${pct}%`, background: tier.color }} /></div>
+            <p className="faint small">{next.min - n} more to <b style={{ color: next.color }}>{next.label}</b> ({n} of {next.min})</p>
+          </>
+        ) : <p className="faint small">You've reached the top rank. Maybe take a break.</p>}
+      </section>
+      <ul className="badge-list">
+        {TIERS.map((t) => {
+          const earned = n >= t.min;
+          return (
+            <li key={t.key} className={earned ? "earned" : "locked"} style={{ "--tier": t.color }}>
+              <button disabled={!earned} onClick={() => celebrate(t)} title={earned ? "Replay the celebration" : undefined}>
+                <span className="mini-medal"><span>{earned ? (t.key === "addicted" ? "☕" : "★") : "🔒"}</span></span>
+                <span className="grow">
+                  <b>{t.label}</b>
+                  <span className="faint small">{t.min === 0 ? "Where everyone starts" : `${t.min} anime completed + manga finished`}</span>
+                </span>
+                <span className="faint small">{earned ? "Earned ▸" : `${t.min - n} to go`}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 
@@ -352,7 +444,8 @@ function Categories() {
   const [name, setName] = useState("");
   const [editing, setEditing] = useState(null); // { id, name }
   const [message, setMessage] = useState("");
-  const refresh = () => getCategories().then(setCats);
+  const [spot, setSpot] = useState(null);
+  const refresh = () => { getCategories().then(setCats); getSpotlight().then(setSpot); };
   useEffect(() => { refresh(); }, []);
 
   const add = async (e) => {
@@ -376,6 +469,23 @@ function Categories() {
         <button className="btn primary" disabled={!name.trim()}>Add</button>
       </form>
       {message && <p className="field-error">{message}</p>}
+      {spot && (
+        <section className={`panel stack-sm spotlight-panel${spot.unlocked ? "" : " locked"}`}>
+          <b>⭐ Spotlight {spot.unlocked ? "" : "🔒"}</b>
+          {spot.unlocked ? (
+            <p className="faint small">
+              Pick one category below to be the top row of Explore during the third week of every month (days 15–21).
+              {spot.cat ? <> Now: <b>{spot.cat.name}</b>. </> : " None picked yet. "}
+              {spot.cat && <button className="link-btn" onClick={async () => { await setSpotlight(null); refresh(); }}>Turn off</button>}
+            </p>
+          ) : (
+            <p className="faint small">
+              A reward for serious watchers: complete {SPOTLIGHT_MIN} anime and one of your categories can be the top
+              row of Explore during the third week of every month. {spot.needed} to go ({spot.animeCompleted} completed).
+            </p>
+          )}
+        </section>
+      )}
       {cats.length === 0 ? <p className="empty">No categories yet.</p> : (
         <ul className="menu-list">
           {cats.map((c, i) => (
@@ -388,7 +498,10 @@ function Categories() {
                 </form>
               ) : (
                 <>
-                  <b className="grow">{c.name}</b>
+                  <b className="grow">{c.name}{spot?.cat?.id === c.id && <span className="spot-tag">⭐ Spotlight</span>}</b>
+                  {spot?.unlocked && spot?.cat?.id !== c.id && (
+                    <button className="link-btn" onClick={async () => { await setSpotlight(c.id); refresh(); }}>Spotlight</button>
+                  )}
                   <button className="icon-btn" aria-label={`Move ${c.name} up`} disabled={i === 0} onClick={async () => { await moveCategory(c.id, -1); refresh(); }}>↑</button>
                   <button className="icon-btn" aria-label={`Move ${c.name} down`} disabled={i === cats.length - 1} onClick={async () => { await moveCategory(c.id, 1); refresh(); }}>↓</button>
                   <button className="link-btn" onClick={() => setEditing({ id: c.id, name: c.name })}>Rename</button>

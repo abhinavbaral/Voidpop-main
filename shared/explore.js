@@ -1,9 +1,9 @@
 // Explore (home) sections — the same picks on the app and the website.
-// Talk of the Week, Don't Miss This (Anime / Manga), and daily Voidation
-// Recommendations (6 anime, 4 manga). Picks rotate deterministically each day,
-// so both clients agree all day.
+// Talk of the Week, Don't Miss This (Anime / Manga), Isekai Heaven, Shonen
+// Feast, Voidation Angles (6 anime, 4 manga), and Anime of the Year. Picks are
+// the same all day; pulling to refresh shuffles everything except Anime of the Year.
 
-import { fetchAniList, fetchRecommendations, fetchSequels } from "./api/anilist.js";
+import { fetchAniList, fetchAnimeOfTheYear, fetchRecommendations, fetchSequels } from "./api/anilist.js";
 import { readKey, writeKey } from "./backend/storage.js";
 import { seasonOf, shiftSeason, seasonTitle } from "./season.js";
 import { getReviews, getLibrary, getExcited, VERDICTS } from "./backend/store.js";
@@ -17,9 +17,12 @@ const rotate = (arr, by) =>
 // Explore is for finding NEW things: anything already in your library (any
 // status) or marked Excited is left out of the rows, except Talk of the Week. Pools are fetched larger
 // than the rows so they stay full after that.
-export async function loadExplorePools() {
-  const get = (segment, sort, page) =>
-    fetchAniList(segment, { sort, perPage: 25, page }).then((r) => r.items).catch(() => []);
+// shuffle: a pull-to-refresh asks for different pages, so the rows change.
+// Without it (first load of the day) the picks are the same all day.
+export async function loadExplorePools({ shuffle = false } = {}) {
+  const page = (max) => (shuffle ? 1 + Math.floor(Math.random() * max) : 1);
+  const get = (segment, sort, p, extra = {}) =>
+    fetchAniList(segment, { sort, perPage: 25, page: p, ...extra }).then((r) => r.items).catch(() => []);
   // "Coming soon": this season and the next (Summer 2026 → Summer + Fall 2026;
   // Fall 2026 → Fall 2026 + Winter 2027), titles that haven't started yet
   const now = seasonOf();
@@ -27,17 +30,39 @@ export async function loadExplorePools() {
   const coming = (s) =>
     fetchAniList("anime", { season: s.season, year: s.year, unreleasedOnly: true, sort: "popular", perPage: 25 })
       .then((r) => r.items).catch(() => []);
-  const [trA, trM, popA1, popA2, popM1, popM2, comingNow, comingNext] = await Promise.all([
-    get("anime", "trending", 1), get("manga", "trending", 1),
-    get("anime", "popular", 1), get("anime", "popular", 2),
-    get("manga", "popular", 1), get("manga", "popular", 2),
+  const popPage = page(4);
+  const [trA, trM, popA1, popA2, popM1, popM2, comingNow, comingNext, isekai, shonen] = await Promise.all([
+    get("anime", "trending", page(2)), get("manga", "trending", page(2)),
+    get("anime", "popular", popPage), get("anime", "popular", popPage + 1),
+    get("manga", "popular", popPage), get("manga", "popular", popPage + 1),
     coming(now), coming(next),
+    get("anime", "popular", page(4), { tag: "Isekai" }),
+    get("anime", "popular", page(6), { tag: "Shounen" }),
   ]);
   return {
     trA, trM, popA: [...popA1, ...popA2], popM: [...popM1, ...popM2],
     coming: [...comingNow, ...comingNext],
     comingTitle: `Coming in ${seasonTitle(now)} & ${seasonTitle(next)}`,
+    isekai, shonen,
   };
+}
+
+// Anime of the Year for the last ten years: fixed picks (they don't change on
+// refresh), saved on the device and rechecked every few days.
+const AOTY_KEY = "voidation:aoty:v1";
+export async function loadAnimeOfTheYear() {
+  const thisYear = new Date().getFullYear();
+  const years = Array.from({ length: 10 }, (_, i) => thisYear - i);
+  let saved = null;
+  try { saved = JSON.parse((await readKey(AOTY_KEY)) || "null"); } catch { saved = null; }
+  if (saved && saved.items?.length && Date.now() - saved.at < 3 * 864e5 && saved.year === thisYear) return saved.items;
+  try {
+    const items = await fetchAnimeOfTheYear(years);
+    if (items.length) await writeKey(AOTY_KEY, JSON.stringify({ at: Date.now(), year: thisYear, items }));
+    return items;
+  } catch {
+    return saved?.items || [];
+  }
 }
 
 export async function knownKeys() {
@@ -45,8 +70,8 @@ export async function knownKeys() {
   return new Set([...Object.keys(lib), ...Object.keys(excited)]);
 }
 
-export function buildExplore(pools, known = new Set()) {
-  const seed = daySeed();
+// seed: the day (same picks all day), or a random number after a refresh.
+export function buildExplore(pools, known = new Set(), seed = daySeed()) {
   const fresh = (items) => items.filter((it) => !known.has(`${it.segment}:${it.id}`));
   const popA = fresh(pools.popA);
   const popM = fresh(pools.popM);
@@ -54,7 +79,8 @@ export function buildExplore(pools, known = new Set()) {
   const dontMissManga = rotate(popM, seed).slice(0, 10);
   // Voidation picks never repeat what "Don't miss this" already shows
   const shown = new Set([...dontMissAnime, ...dontMissManga].map((it) => `${it.segment}:${it.id}`));
-  const notShown = (items) => items.filter((it) => !shown.has(`${it.segment}:${it.id}`));
+  // prefer titles no other row shows; if that leaves nothing, allow repeats
+  const notShown = (items) => { const left = items.filter((it) => !shown.has(`${it.segment}:${it.id}`)); return left.length ? left : items; };
   // soonest premiere first; titles without a date yet go last, most popular first
   const seenComing = new Set();
   const coming = fresh(pools.coming || [])
@@ -68,6 +94,8 @@ export function buildExplore(pools, known = new Set()) {
     talk: [...pools.trA.slice(0, 7), ...pools.trM.slice(0, 5)],
     dontMissAnime,
     dontMissManga,
+    isekai: rotate(fresh(pools.isekai || []), seed * 7).slice(0, 12),
+    shonen: rotate(fresh(pools.shonen || []), seed * 11).slice(0, 12),
     voidpicks: [
       ...rotate(notShown(popA), seed * 3).slice(0, 6),
       ...rotate(notShown(popM), seed * 5).slice(0, 4),
@@ -147,18 +175,35 @@ export async function loadNewSeasons() {
 
   const now = Date.now();
   const rank = (it) => (!it.unreleased && !it.finished ? 0 : it.unreleased ? 1 : 2);
+  const isNew = (it) => it.unreleased || !it.finished || (it.date && now - new Date(it.date).getTime() < YEAR_MS);
+  const candidates = [];
   const seen = new Set();
-  const out = [];
   sources.forEach((src) => {
     (saved[src.id]?.items || []).forEach((it) => {
       const key = `anime:${it.id}`;
-      if (known.has(key) || seen.has(key)) return;
-      const recent = it.date && now - new Date(it.date).getTime() < YEAR_MS;
-      if (!(it.unreleased || !it.finished || recent)) return; // an old sequel isn't "new"
+      if (known.has(key) || seen.has(key) || !isNew(it)) return; // an old sequel isn't "new"
       seen.add(key);
-      out.push({ ...it, sequelOf: src.title });
+      candidates.push({ ...it, sequelOf: src.title });
     });
   });
+
+  // Already on Season 3? Then Season 2 isn't news. Follow each candidate's own
+  // sequels (checked once a day, like the rest) and drop it if any later season
+  // is already in your library.
+  const unknown = candidates.filter((c) => !saved[c.id] || Date.now() - saved[c.id].at > SEQ_TTL).map((c) => c.id);
+  if (unknown.length) {
+    try {
+      const fresh = await fetchSequels(unknown);
+      Object.entries(fresh).forEach(([id, items]) => { saved[id] = { at: Date.now(), items }; });
+      await writeKey(SEQ_KEY, JSON.stringify(saved));
+    } catch { /* offline: judge by what's saved */ }
+  }
+  const laterSeasonKnown = (id, depth = 0, visited = new Set()) => {
+    if (depth > 6 || visited.has(id)) return false;
+    visited.add(id);
+    return (saved[id]?.items || []).some((next) => known.has(`anime:${next.id}`) || laterSeasonKnown(next.id, depth + 1, visited));
+  };
+  const out = candidates.filter((c) => !laterSeasonKnown(c.id));
   return out
     .sort((a, b) => rank(a) - rank(b) || (b.date || "").localeCompare(a.date || ""))
     .slice(0, 20);
