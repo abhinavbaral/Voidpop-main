@@ -9,19 +9,18 @@ import { fetchAniListUserList, cacheSize, cacheClear } from "@voidation/shared/a
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import {
-  getUserTier, TIERS, statusesFor, exportData, importData, clearData, storageSize, importAniListEntries,
+  getUserTier, TIERS, statusesFor, exportData, clearData, storageSize, importAniListEntries,
   getCategories, addCategory, renameCategory, moveCategory, deleteCategory,
   getExcited, toggleExcited, celebrate, getCategoryAccess, CATEGORY_MIN, exportLibraryCsv,
 } from "@voidation/shared/backend/store";
 import { useSettings } from "@voidation/shared/backend/SettingsContext";
-import TierBadge from "../components/TierBadge.js";
 import { useTheme } from "../context/ThemeContext.js";
 import { goBackOrHome, openDetail } from "../lib/nav";
 import { loadAnnounced, daysLeft, ANNOUNCED_DAYS } from "@voidation/shared/announced";
 import { useAuth } from "@voidation/shared/backend/AuthContext";
 import { releaseLabel, durationLabel } from "@voidation/shared/format";
 import {
-  FREQUENCIES, KEEP, getBackupConfig, setFrequency, chooseFolder, backupNow, restoreFromFile,
+  FREQUENCIES, getBackupConfig, setFrequency, chooseFolder, backupNow, restoreFromFile,
 } from "../lib/backup";
 import { ensurePermission, rescheduleEpisodeAlerts } from "../lib/episodeAlerts";
 import AniListSync from "../components/AniListSync.js";

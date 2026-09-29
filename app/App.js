@@ -10,7 +10,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
-import { Text, AppState, Platform } from "react-native";
+import { AppState, Platform } from "react-native";
 import { createNavigationContainerRef } from "@react-navigation/native";
 import { onDataChange, getPending } from "@voidation/shared/backend/store";
 import { AuthProvider } from "@voidation/shared/backend/AuthContext";

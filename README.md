@@ -64,6 +64,15 @@ npm run web:demo   # website offline on a sample library (for presentations)
 npm run app:demo   # same for the app
 ```
 
+## Checks before you commit
+
+```
+npm run check        # lint + tests (fast)
+npm run check:app    # full Android bundle (slower)
+```
+
+How the code is organised: see [ARCHITECTURE.md](ARCHITECTURE.md).
+
 ## Where your data lives
 
 There are no accounts. The library is one JSON document on your device: `localStorage`

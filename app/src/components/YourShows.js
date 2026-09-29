@@ -40,7 +40,7 @@ export default function YourShows({ now, layout = "stack", title = "Your shows",
       if (await noteAiring(f)) readLib();
     })();
     return () => { alive = false; };
-  }, [user, readLib, refreshKey]));
+  }, [user, readLib, refreshKey])); // eslint-disable-line react-hooks/exhaustive-deps -- refreshKey: parent asks for a re-fetch
   useEffect(() => onDataChange(readLib), [readLib]);
 
   if (!lib) return null;

@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@voidation/shared/backend/AuthContext";
 import {
-  statusesFor, statusesAllowed, getStatus, setStatus, addReview, getMyReview, getExcited, toggleExcited,
+  statusesAllowed, getStatus, setStatus, addReview, getMyReview, getExcited, toggleExcited,
   getEntry, setProgress, noteAiring, getCategories, categoriesUnlocked, setEntryCategories, doneLabel, fillCompleted,
 } from "@voidation/shared/backend/store";
 import ProgressStepper from "../components/Progress.jsx";
@@ -118,7 +118,7 @@ function TitleBody({ item }) {
         .catch(() => {});
     }
     return () => { alive = false; };
-  }, [item]);
+  }, [item]); // eslint-disable-line react-hooks/exhaustive-deps -- runs once per title; refresh is recreated each render
 
   const pick = async (key) => {
     if (key === status) {

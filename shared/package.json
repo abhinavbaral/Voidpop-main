@@ -2,6 +2,7 @@
   "name": "@voidation/shared",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "Logic shared by the Voidation app and website: on-device data layer, AniList client, tiers, countdowns, demo data.",
   "exports": {
     "./*": "./*.js"
@@ -11,5 +12,8 @@
   },
   "dependencies": {
     "fflate": "^0.8.3"
+  },
+  "scripts": {
+    "test": "node --test \"test/*.test.js\""
   }
 }

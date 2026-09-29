@@ -52,7 +52,7 @@ const stripHtml = (s) => (s || "").replace(/<[^>]+>/g, "").trim();
 const MEDIA_FIELDS = `
   id
   title { english romaji }
-  coverImage { large extraLarge }
+  coverImage { large extraLarge color }
   bannerImage
   startDate { year month day }
   genres
@@ -94,6 +94,7 @@ function normalize(m, segment) {
     // the Japanese (romaji) title, when it's different: "Re:Zero kara Hajimeru Isekai Seikatsu"
     altTitle: m.title.english && m.title.romaji && m.title.romaji !== m.title.english ? m.title.romaji : null,
     image: m.coverImage?.extraLarge || m.coverImage?.large,
+    color: m.coverImage?.color || null, // the cover's main colour (tints its page)
     banner: m.bannerImage || null,
     // zero-pad: "2013-4-7" is not ISO, so new Date() returns Invalid Date
     // (shows up as "NaN" years) — "2013-04-07" parses everywhere.
@@ -252,7 +253,7 @@ export async function fetchAniList(segment, opts = {}) {
 // Light fields only (a big list can be 1,000+ titles); a title's synopsis and
 // creator load the first time its page is opened (item.partial).
 const LIST_FIELDS = `
-  id title { english romaji } coverImage { large extraLarge } bannerImage
+  id title { english romaji } coverImage { large extraLarge color } bannerImage
   startDate { year month day } genres siteUrl status format duration
   episodes chapters nextAiringEpisode { episode airingAt }
 `;

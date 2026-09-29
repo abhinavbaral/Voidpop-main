@@ -13,6 +13,17 @@
     "web": "npm run dev -w web",
     "web:demo": "npm run demo -w web",
     "build:web": "npm run build -w web",
-    "build:web:demo": "npm run build:demo -w web"
+    "build:web:demo": "npm run build:demo -w web",
+    "lint": "eslint --no-error-on-unmatched-pattern app/App.js app/index.js app/src shared web/src",
+    "test": "npm test -w shared",
+    "check:app": "cd app && npx expo export --platform android --output-dir ../.check-bundle && cd .. && rm -rf .check-bundle",
+    "check": "npm run lint && npm test"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "globals": "^15.15.0"
   }
 }

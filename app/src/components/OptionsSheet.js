@@ -1,5 +1,5 @@
 // A simple bottom sheet with a list of choices (Android's Alert only fits 3 buttons).
-import { Modal, View, Text, Pressable, ScrollView, StyleSheet } from "react-native";
+import { Modal, Text, Pressable, ScrollView, StyleSheet } from "react-native";
 import { useTheme } from "../context/ThemeContext.js";
 
 export default function OptionsSheet({ visible, title, options, onPick, onClose }) {

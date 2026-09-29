@@ -11,7 +11,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useAuth } from "@voidation/shared/backend/AuthContext";
 import {
   getLibrary, statusesFor, LIBRARY_LISTS as LISTS, inLibraryList as inList,
-  setProgress, setStatus, addReview, noteAiring, LIBRARY_SORTS, sortEntries,
+  setStatus, addReview, noteAiring, LIBRARY_SORTS, sortEntries,
   getCategories, categoriesUnlocked, bulkSetStatus, bulkCategory, bulkRemove,
 } from "@voidation/shared/backend/store";
 import OptionsSheet from "../components/OptionsSheet.js";
@@ -68,11 +68,6 @@ export default function LibraryScreen({ navigation }) {
   });
   const bulk = async (fn) => { const keys = [...(selected || [])]; setSheet(null); setSelected(null); await fn(keys); reload(); };
 
-  const plus = async (e) => {
-    const r = await setProgress(user, e.item, (e.progress || 0) + 1);
-    if (r.reachedEnd) setFinishing(e.item);
-    reload();
-  };
   const finish = async ({ verdict, vibes, moods, comment }) => {
     await setStatus(user, finishing.segment, finishing, "completed");
     await addReview(user, finishing.segment, finishing.id, { verdict, vibes, moods, comment });

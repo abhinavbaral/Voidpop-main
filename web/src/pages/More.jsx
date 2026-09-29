@@ -20,7 +20,6 @@ import {
 import { useSettings } from "@voidation/shared/backend/SettingsContext";
 import { durationLabel } from "@voidation/shared/format";
 import { fetchAniListUserList, cacheSize, cacheClear } from "@voidation/shared/api/anilist";
-import TierBadge from "../components/TierBadge.jsx";
 import Icon from "../components/Icon.jsx";
 import { useTheme } from "../theme.jsx";
 import { useDocumentTitle } from "../lib/useDocumentTitle.js";

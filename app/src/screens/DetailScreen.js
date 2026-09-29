@@ -2,7 +2,7 @@
 // synopsis, next-episode countdown, tracking buttons, your verdict,
 // seasons/related entries. NO numerical ratings anywhere.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ScrollView, View, Text, TextInput, Image, TouchableOpacity, Linking,
   FlatList, StyleSheet, Modal, Pressable, ActivityIndicator,
@@ -24,11 +24,12 @@ import { useSettings } from "@voidation/shared/backend/SettingsContext";
 import { useIsWide } from "../lib/layout";
 import { useAuth } from "@voidation/shared/backend/AuthContext";
 import {
-  statusesFor, statusesAllowed, getStatus, setStatus, addReview, getMyReview,
+  statusesAllowed, getStatus, setStatus, addReview, getMyReview,
   getExcited, toggleExcited, getEntry, setProgress, noteAiring, totalFor, unitFor, airedFor, maxProgress, checkProgress,
   getCategories, categoriesUnlocked, setEntryCategories, doneLabel, fillCompleted,
 } from "@voidation/shared/backend/store";
 import { fetchAniListDetail, fetchAniListItem, fetchNextEpisodes } from "@voidation/shared/api/anilist";
+import { readableAccent, withAlpha } from "@voidation/shared/color";
 import ReviewCard from "../components/ReviewCard.js";
 import VerdictModal from "../components/VerdictModal.js";
 import ShareCardModal from "../components/ShareCardModal.js";
@@ -36,6 +37,7 @@ import CountdownShareModal from "../components/CountdownShareModal.js";
 import Card from "../components/Card.js";
 import { useTheme } from "../context/ThemeContext.js";
 import Icon from "../components/Icon.js";
+import AnimatedBanner from "../components/AnimatedBanner.js";
 
 const SEGMENTS = ["anime", "manga"];
 const CREATOR_LABEL = { manga: "Mangaka", anime: "Studio" };
@@ -93,7 +95,11 @@ export default function DetailScreen({ route, navigation }) {
 }
 
 function DetailBody({ item, navigation }) {
-  const { C } = useTheme();
+  const theme = useTheme();
+  // the page takes the cover's colour as its accent (buttons, links, progress),
+  // adjusted so it stays readable on either theme
+  const accent = readableAccent(item.color, theme.C.purple);
+  const C = useMemo(() => ({ ...theme.C, purple: accent }), [theme.C, accent]);
   const styles = makeStyles(C);
   const { user } = useAuth();
 
@@ -159,7 +165,7 @@ function DetailBody({ item, navigation }) {
         .catch(() => {});
     }
     return () => { alive = false; };
-  }, [item]);
+  }, [item]); // eslint-disable-line react-hooks/exhaustive-deps -- runs once per title; refresh is recreated each render
 
   const pick = async (key) => {
     if (key === status) {
@@ -273,9 +279,15 @@ function DetailBody({ item, navigation }) {
           <TrailerPlayer videoId={trailer} style={styles.trailer} />
         ) : item.banner ? (
           <Image source={{ uri: item.banner }} style={styles.banner} />
-        ) : null}
+        ) : (
+          <AnimatedBanner accent={accent} dark={theme.dark} height={wide ? 220 : 170} />
+        )}
 
         <View style={{ padding: wide ? 24 : 16 }}>
+          {/* a soft wash of the cover colour behind the header, fading out */}
+          {!!item.color && [0.22, 0.14, 0.07].map((a, i) => (
+            <View key={i} pointerEvents="none" style={[styles.wash, { top: i * 110, backgroundColor: withAlpha(accent, (theme.dark ? 1 : 0.7) * a) }]} />
+          ))}
           <TouchableOpacity onPress={() => goBackOrHome(navigation)}>
             <Text style={{ color: C.purple, marginBottom: 10 }}>← Back</Text>
           </TouchableOpacity>
@@ -526,6 +538,7 @@ const makeStyles = (C) => StyleSheet.create({
   // a still banner is capped so it doesn't swallow the first screen on desktop
   trailer: { width: "100%", aspectRatio: 16 / 9, maxHeight: 460, backgroundColor: "#000" },
   banner: { width: "100%", aspectRatio: 16 / 9, maxHeight: 260, backgroundColor: "#000" },
+  wash: { position: "absolute", left: 0, right: 0, height: 110 },
   poster: { width: 120, aspectRatio: 2 / 3, borderRadius: 12, backgroundColor: C.card },
   noImg: { alignItems: "center", justifyContent: "center" },
   posterWide: { width: 220, borderRadius: 14 },

@@ -1,0 +1,26 @@
+# Runs on every push and pull request: lint, the shared-logic tests, and a
+# full Android bundle of the app (catches broken imports before a build).
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Tests
+        run: npm test
+      - name: Bundle the Android app
+        run: npm run check:app

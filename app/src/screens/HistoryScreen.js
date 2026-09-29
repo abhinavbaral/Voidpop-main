@@ -11,8 +11,7 @@ import { fetchRecentEpisodes } from "@voidation/shared/api/anilist";
 import { getLibrary, getExcited, setProgress, setStatus, addReview } from "@voidation/shared/backend/store";
 import { useAuth } from "@voidation/shared/backend/AuthContext";
 import VerdictModal from "../components/VerdictModal.js";
-import { useSettings } from "@voidation/shared/backend/SettingsContext";
-import { dayLabel, airTime, airedAgo } from "@voidation/shared/format";
+import { dayLabel, airedAgo } from "@voidation/shared/format";
 import { useNow } from "@voidation/shared/hooks/useNow";
 import { useTheme } from "../context/ThemeContext.js";
 import { openDetail } from "../lib/nav";
@@ -23,7 +22,6 @@ const DAYS = 14;
 export default function HistoryScreen({ navigation }) {
   const { C } = useTheme();
   const styles = makeStyles(C);
-  const { clock24 } = useSettings().settings;
   const now = useNow(60000);
   const [episodes, setEpisodes] = useState(null);
   const [labels, setLabels] = useState({});

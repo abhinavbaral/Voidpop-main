@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@voidation/shared/backend/AuthContext";
 import {
-  getLibrary, statusesFor, LIBRARY_LISTS, inLibraryList, setProgress, noteAiring, addReview, setStatus, LIBRARY_SORTS, sortEntries,
+  getLibrary, statusesFor, LIBRARY_LISTS, inLibraryList, noteAiring, addReview, setStatus, LIBRARY_SORTS, sortEntries,
   getCategories, categoriesUnlocked, bulkSetStatus, bulkCategory, bulkRemove,
 } from "@voidation/shared/backend/store";
 import { fetchNextEpisodes } from "@voidation/shared/api/anilist";
@@ -18,7 +18,7 @@ import { useDocumentTitle } from "../lib/useDocumentTitle.js";
 export default function Library() {
   useDocumentTitle("Library");
   const { user } = useAuth();
-  const now = useNow(30000);
+  useNow(30000); // re-render every 30 s so countdown badges on the cards stay current
   const [entries, setEntries] = useState(null);
   const [list, setList] = useState("watch");
   const [tab, setTab] = useState("watching");
@@ -70,11 +70,6 @@ export default function Library() {
   const stopSelecting = () => { setSelecting(false); setSelected(new Set()); };
   const bulk = async (fn) => { await fn([...selected]); stopSelecting(); reload(); };
 
-  const plus = async (e) => {
-    const r = await setProgress(user, e.item, (e.progress || 0) + 1);
-    if (r.reachedEnd) setFinishing(e.item);
-    reload();
-  };
   const finish = async ({ verdict, vibes, moods, comment }) => {
     await setStatus(user, finishing.segment, finishing, "completed");
     await addReview(user, finishing.segment, finishing.id, { verdict, vibes, moods, comment });
