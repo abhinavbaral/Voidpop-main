@@ -26,7 +26,7 @@ export default function VerdictModal({ visible, initial, onSave, onClose }) {
         <View style={styles.sheet}>
           <ScrollView showsVerticalScrollIndicator={false}>
             <Text style={styles.title}>How was it?</Text>
-            <Text style={styles.sub}>Your verdict — no boring numbers.</Text>
+            <Text style={styles.sub}>Your Void Verdict</Text>
 
             <View style={styles.grid}>
               {VERDICTS.map((v) => {

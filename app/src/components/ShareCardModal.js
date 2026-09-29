@@ -41,7 +41,7 @@ export default function ShareCardModal({ visible, item, review, onClose }) {
               )}
               <View style={{ flex: 1, justifyContent: "center" }}>
                 <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
-                <Text style={styles.user}>My verdict</Text>
+                <Text style={styles.user}>My Void Verdict</Text>
                 {verdict && (
                   <View style={[styles.chip, { backgroundColor: verdict.color }]}>
                     <Text style={styles.chipText}>{verdict.label}</Text>

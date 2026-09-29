@@ -143,7 +143,7 @@ function Summary({ w, onBack, onRestart }) {
               <Text style={styles.cardNum}>{timeValue}</Text>
             </View>
           </View>
-          <Text style={styles.brand}>VOID<Text style={{ color: ORANGE }}>ATION</Text> · WRAPPED</Text>
+          <Text style={styles.brand}>VOID<Text style={{ color: ORANGE }}>ATION</Text> · REWIND</Text>
         </View>
       </View>
       <View style={{ flexDirection: "row", gap: 10, marginTop: 18 }}>

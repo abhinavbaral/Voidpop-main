@@ -1,7 +1,7 @@
 // Voidation mobile app (Android + iOS). The website lives in /web; both share
 // their logic through @voidation/shared. No accounts: your library lives on the phone.
 import "./src/backend/init.js"; // must run first: plugs in AsyncStorage
-// Tabs: Explore / Library / Upcoming / History / Schedule / More. (Browse opens from Explore.)
+// Tabs: Explore / Library / History / Schedule / More. (Browse opens from Explore.)
 
 import {
   NavigationContainer, DarkTheme, DefaultTheme,
@@ -18,7 +18,6 @@ import { SettingsProvider } from "@voidation/shared/backend/SettingsContext";
 import { ThemeProvider, useTheme } from "./src/context/ThemeContext.js";
 import ExploreScreen from "./src/screens/ExploreScreen.js";
 import BrowseScreen from "./src/screens/BrowseScreen.js";
-import UpcomingScreen from "./src/screens/UpcomingScreen.js";
 import ScheduleScreen from "./src/screens/ScheduleScreen.js";
 import HistoryScreen from "./src/screens/HistoryScreen.js";
 import MoreScreen from "./src/screens/MoreScreen.js";
@@ -59,7 +58,9 @@ function useBackgroundChores() {
     const widget = require("./src/widget");
     require("./src/lib/backgroundWork").registerBackgroundWork();
     const sync = require("@voidation/shared/sync/anilist");
+    const { promoteExcitedNow } = require("@voidation/shared/excited");
     const chores = () => {
+      promoteExcitedNow(); // Excited anime that came out → Watching
       sync.syncNow({ reason: "open" });
       if (Platform.OS === "android") backup.maybeAutoBackup();
       alerts.rescheduleEpisodeAlerts();
@@ -84,7 +85,6 @@ const Tabs = createBottomTabNavigator();
 const ICONS = {
   Explore: "✦",
   Library: "▤",
-  Upcoming: "▣",
   History: "↺",
   Schedule: "◷",
   More: "•••",
@@ -122,7 +122,6 @@ function MainTabs() {
     >
       <Tabs.Screen name="Explore" component={ExploreScreen} />
       <Tabs.Screen name="Library" component={LibraryScreen} />
-      <Tabs.Screen name="Upcoming" component={UpcomingScreen} />
       <Tabs.Screen name="History" component={HistoryScreen} />
       <Tabs.Screen
         name="Schedule"

@@ -16,6 +16,7 @@ export const TASK = "voidation-background";
 
 async function runAll() {
   const jobs = [
+    () => require("@voidation/shared/excited").promoteExcitedNow(), // Excited anime that came out → Watching
     () => (Platform.OS === "android" ? require("./backup").maybeAutoBackup() : null),
     () => require("./episodeAlerts").rescheduleEpisodeAlerts(),
     () => require("../widget").updateWidget(),

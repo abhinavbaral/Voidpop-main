@@ -1,20 +1,20 @@
 // MORE — laid out like the "More" tab in reader apps: the logo on top, quick
-// toggles, then menu rows that open Statistics, Appearance, Data and storage,
-// Settings, Help and About (MorePageScreen).
+// toggles, then menu rows that open Statistics, Data and storage, Appearance
+// and Others, Help and About (MorePageScreen). Categories shows at 500+ completed.
 
 import { ScrollView, View, Text, Image, Pressable, Switch, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSettings } from "@voidation/shared/backend/SettingsContext";
 import { useCallback, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
-import { getUserTier, TIERS } from "@voidation/shared/backend/store";
+import { getUserTier, TIERS, categoriesUnlocked } from "@voidation/shared/backend/store";
 import { useTheme } from "../context/ThemeContext.js";
 
 const GROUPS = [
   [["statistics", "▥", "Statistics"], ["data", "▤", "Data and storage"]],
   [["announced", "✦", "New announcements"]],
   [["categories", "▦", "Categories"], ["anilist", "⇄", "AniList"]],
-  [["settings", "⚙", "Settings"], ["help", "?", "Help"], ["about", "ⓘ", "About"]],
+  [["settings", "⚙", "Appearance and Others"], ["help", "?", "Help"], ["about", "ⓘ", "About"]],
 ];
 
 export default function MoreScreen({ navigation }) {
@@ -22,7 +22,11 @@ export default function MoreScreen({ navigation }) {
   const styles = makeStyles(C);
   const { settings, update } = useSettings();
   const [rank, setRank] = useState(null);
-  useFocusEffect(useCallback(() => { getUserTier().then(setRank).catch(() => {}); }, []));
+  const [catsOpen, setCatsOpen] = useState(false); // Categories unlock at 500 completed anime
+  useFocusEffect(useCallback(() => {
+    getUserTier().then(setRank).catch(() => {});
+    categoriesUnlocked().then(setCatsOpen).catch(() => {});
+  }, []));
   const next = rank && TIERS.find((t) => t.min > rank.stats.totalCompleted);
 
   const toggle = (icon, label, hint, key) => (
@@ -71,14 +75,14 @@ export default function MoreScreen({ navigation }) {
           <Pressable style={({ pressed }) => [styles.row, pressed && { backgroundColor: C.card }]} onPress={() => navigation.navigate("Wrapped")}>
             <Text style={[styles.icon, { color: C.orange }]}>★</Text>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.label, { color: C.orange }]}>Wrapped</Text>
+              <Text style={[styles.label, { color: C.orange }]}>Voidation Rewind</Text>
               <Text style={styles.hint}>All time, or year by year</Text>
             </View>
           </Pressable>
         </View>
         {GROUPS.map((group, i) => (
           <View key={i} style={styles.group}>
-            {group.map(([page, icon, label]) => (
+            {group.filter(([page]) => page !== "categories" || catsOpen).map(([page, icon, label]) => (
               <Pressable
                 key={page}
                 style={({ pressed }) => [styles.row, pressed && { backgroundColor: C.card }]}

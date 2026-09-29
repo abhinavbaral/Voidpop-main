@@ -2,6 +2,8 @@
 // Supports: countryOfOrigin toggles, seasons, trending, airing schedule,
 // upcoming (unreleased) titles, and per-title details (trailer + related seasons).
 
+import { CRUNCHYROLL_AOTY } from "../awards.js";
+import { readingLinks } from "../readLinks.js";
 import { formatDateParts } from "../format.js";
 import { cacheKey, cacheGet, cachePut, isDeviceOnline, noteSavedShown } from "./cache.js";
 export { onNetState, cacheClear, cacheSize, setDeviceOnline } from "./cache.js";
@@ -371,18 +373,24 @@ export async function fetchEarlierSeasons(id) {
 
 // Anime of the Year: the best-rated anime of each year (among ones enough
 // people watched), all years in ONE request using GraphQL aliases.
-export async function fetchAnimeOfTheYear(years) {
+export async function fetchAnimeOfTheYear() {
   const light = `${LIST_FIELDS} studios(isMain: true) { nodes { name } } averageScore`;
-  const query = `query {
-    ${years.map((y) => `y${y}: Page(perPage: 1) { media(type: ANIME, seasonYear: ${Number(y)}, isAdult: false, popularity_greater: 30000, format_in: [TV, MOVIE, ONA], sort: [SCORE_DESC]) { ${light} } }`).join(" ")}
-  }`;
-  const data = await gql(query, {});
-  return years
-    .map((y) => {
-      const m = data[`y${y}`]?.media?.[0];
-      return m ? { ...normalize(m, "anime"), partial: true, awardYear: y } : null;
-    })
-    .filter(Boolean);
+  const pick = (w, m) => (m ? { ...normalize(m, "anime"), partial: true, awardYear: w.year, award: "Crunchyroll Anime Awards" } : null);
+  const one = async (w) => {
+    const q = w.id
+      ? `query { Media(id: ${Number(w.id)}, type: ANIME) { ${light} } }`
+      : `query ($s: String) { Media(search: $s, type: ANIME) { ${light} } }`;
+    try { return pick(w, (await gql(q, w.id ? {} : { s: w.search })).Media); } catch { return null; }
+  };
+  const byId = CRUNCHYROLL_AOTY.filter((w) => w.id);
+  let found = {};
+  try {
+    // one request for all the known ids
+    const data = await gql(`query { ${byId.map((w) => `a${w.year}: Media(id: ${Number(w.id)}, type: ANIME) { ${light} }`).join(" ")} }`, {});
+    byId.forEach((w) => { found[w.year] = pick(w, data[`a${w.year}`]); });
+  } catch { found = {}; } // one bad id fails the whole request: fall back to one by one
+  const out = await Promise.all(CRUNCHYROLL_AOTY.map((w) => found[w.year] || one(w)));
+  return out.filter(Boolean);
 }
 
 // Anime starting between two dates (YYYYMMDD numbers), for the Upcoming calendar
@@ -460,6 +468,8 @@ export async function fetchAniListDetail(segment, id) {
   const query = `query ($id: Int, $type: MediaType) {
     Media(id: $id, type: $type) {
       trailer { id site }
+      countryOfOrigin
+      title { english romaji }
       externalLinks { site url type language color isDisabled }
       relations {
         edges {
@@ -488,7 +498,13 @@ export async function fetchAniListDetail(segment, id) {
       item: normalize(e.node, segment),
     }));
 
-  return { trailer, related, whereToWatch: watchLinks(data.Media.externalLinks) };
+  const m = data.Media;
+  return {
+    trailer, related,
+    whereToWatch: watchLinks(m.externalLinks),
+    // manga: official readers, stores, or search boxes (shared/readLinks.js)
+    whereToRead: segment === "manga" ? readingLinks(m.externalLinks, { title: m.title?.english || m.title?.romaji, country: m.countryOfOrigin }) : null,
+  };
 }
 
 // Official streaming / reading services from AniList's external links.

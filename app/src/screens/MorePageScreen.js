@@ -11,7 +11,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import {
   getUserTier, TIERS, statusesFor, exportData, importData, clearData, storageSize, importAniListEntries,
   getCategories, addCategory, renameCategory, moveCategory, deleteCategory,
-  getExcited, toggleExcited, celebrate, getSpotlight, setSpotlight, SPOTLIGHT_MIN, exportLibraryCsv,
+  getExcited, toggleExcited, celebrate, getCategoryAccess, CATEGORY_MIN, exportLibraryCsv,
 } from "@voidation/shared/backend/store";
 import { useSettings } from "@voidation/shared/backend/SettingsContext";
 import TierBadge from "../components/TierBadge.js";
@@ -35,7 +35,7 @@ const AUTO_BACKUP = Platform.OS === "android"; // Android's folder picker (SAF)
 
 const VERSION = "1.0.0";
 const TITLES = {
-  statistics: "Statistics", appearance: "Settings", settings: "Settings",
+  statistics: "Statistics", appearance: "Appearance and Others", settings: "Appearance and Others",
   data: "Data and storage", announced: "New announcements", badge: "Your badge", categories: "Categories", anilist: "AniList", help: "Help", about: "About",
 };
 
@@ -444,8 +444,8 @@ function Categories({ styles, C }) {
   const [name, setName] = useState("");
   const [editing, setEditing] = useState(null); // { id, name }
   const [message, setMessage] = useState("");
-  const [spot, setSpot] = useState(null);
-  const refresh = useCallback(() => { getCategories().then(setCats); getSpotlight().then(setSpot); }, []);
+  const [access, setAccess] = useState(null);
+  const refresh = useCallback(() => { getCategories().then(setCats); getCategoryAccess().then(setAccess); }, []);
   useFocusEffect(refresh);
 
   const add = async () => {
@@ -454,19 +454,30 @@ function Categories({ styles, C }) {
     if (cat) setName("");
     refresh();
   };
-  const remove = (c) => Alert.alert(`Delete "${c.name}"?`, "The titles in it stay in your library.", [
+  const remove = (c) => Alert.alert(`Delete "${c.name}"?`, "Its Explore row goes; the titles stay in your library.", [
     { text: "Cancel", style: "cancel" },
     { text: "Delete", style: "destructive", onPress: async () => { await deleteCategory(c.id); refresh(); } },
   ]);
-  if (!cats) return <Text style={styles.note}>Loading…</Text>;
+  if (!cats || !access) return <Text style={styles.note}>Loading…</Text>;
+  if (!access.unlocked) {
+    return (
+      <View style={[styles.card, { borderColor: C.amber, opacity: 0.85 }]}>
+        <Text style={styles.cardTitle}>🔒 Unlocks at {CATEGORY_MIN} completed anime</Text>
+        <Text style={[styles.note, { marginTop: 4 }]}>
+          Then you can make your own categories, and each one becomes a row at the top of Explore during the third week
+          of every month. {access.needed} to go ({access.animeCompleted} completed).
+        </Text>
+      </View>
+    );
+  }
   return (
     <>
       <Text style={styles.note}>
-        Group titles your own way: Favourites, Rewatch, With friends… A title can be in several. Filter by them in the
-        Library; add titles from a title's page, or long-press in the Library to select several.
+        Each category is your own row at the top of Explore during the third week of every month (days 15–21). Add
+        titles from a title's page, or long-press in the Library to select several.
       </Text>
       <View style={[styles.modeRow, { marginTop: 12 }]}>
-        <TextInput value={name} onChangeText={setName} placeholder="New category" placeholderTextColor={C.faint} maxLength={40}
+        <TextInput value={name} onChangeText={setName} placeholder="New category, e.g. Hidden gems" placeholderTextColor={C.faint} maxLength={40}
           onSubmitEditing={add} returnKeyType="done"
           style={[styles.btn, { color: C.text, paddingHorizontal: 12, flex: 2, alignItems: undefined }]} />
         <TouchableOpacity style={[styles.btn, styles.btnOn, !name.trim() && { opacity: 0.5 }]} disabled={!name.trim()} onPress={add}>
@@ -474,19 +485,6 @@ function Categories({ styles, C }) {
         </TouchableOpacity>
       </View>
       {!!message && <Text style={{ color: C.rose, fontSize: 12, marginTop: 6 }}>{message}</Text>}
-      {spot && (
-        <View style={[styles.card, { borderColor: C.amber, opacity: spot.unlocked ? 1 : 0.8 }]}>
-          <Text style={styles.cardTitle}>⭐ Spotlight {spot.unlocked ? "" : "🔒"}</Text>
-          <Text style={[styles.note, { marginTop: 4 }]}>
-            {spot.unlocked
-              ? `Tap Spotlight on a category below to make it the top row of Explore during the third week of every month (days 15–21). ${spot.cat ? `Now: ${spot.cat.name}.` : "None picked yet."}`
-              : `A reward for serious watchers: complete ${SPOTLIGHT_MIN} anime and one of your categories can be the top row of Explore during the third week of every month. ${spot.needed} to go (${spot.animeCompleted} completed).`}
-          </Text>
-          {spot.unlocked && spot.cat && (
-            <Text style={{ color: C.purple, fontWeight: "800", marginTop: 6 }} onPress={async () => { await setSpotlight(null); refresh(); }}>Turn off</Text>
-          )}
-        </View>
-      )}
       {cats.length === 0 ? <Text style={[styles.note, { marginTop: 16 }]}>No categories yet.</Text> : (
         <View style={styles.card}>
           {cats.map((c, i) => (
@@ -501,11 +499,8 @@ function Categories({ styles, C }) {
               ) : (
                 <>
                   <Text style={[styles.trackerLabel, { flex: 1, color: C.text, fontWeight: "700" }]}>
-                    {c.name}{spot?.cat?.id === c.id ? <Text style={{ color: C.amber }}>  ⭐</Text> : null}
+                    ⭐ {c.name}
                   </Text>
-                  {spot?.unlocked && spot?.cat?.id !== c.id && (
-                    <Text style={{ color: C.amber, fontWeight: "700" }} onPress={async () => { await setSpotlight(c.id); refresh(); }}>Spotlight</Text>
-                  )}
                   <Text style={{ color: i === 0 ? C.border : C.sub, fontSize: 16 }} onPress={i === 0 ? undefined : async () => { await moveCategory(c.id, -1); refresh(); }}>↑</Text>
                   <Text style={{ color: i === cats.length - 1 ? C.border : C.sub, fontSize: 16 }} onPress={i === cats.length - 1 ? undefined : async () => { await moveCategory(c.id, 1); refresh(); }}>↓</Text>
                   <Text style={{ color: C.purple, fontWeight: "700" }} onPress={() => setEditing({ id: c.id, name: c.name })}>Rename</Text>

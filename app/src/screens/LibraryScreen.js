@@ -12,7 +12,7 @@ import { useAuth } from "@voidation/shared/backend/AuthContext";
 import {
   getLibrary, statusesFor, LIBRARY_LISTS as LISTS, inLibraryList as inList,
   setProgress, setStatus, addReview, noteAiring, LIBRARY_SORTS, sortEntries,
-  getCategories, bulkSetStatus, bulkCategory, bulkRemove,
+  getCategories, categoriesUnlocked, bulkSetStatus, bulkCategory, bulkRemove,
 } from "@voidation/shared/backend/store";
 import OptionsSheet from "../components/OptionsSheet.js";
 import VerdictModal from "../components/VerdictModal.js";
@@ -36,13 +36,12 @@ export default function LibraryScreen({ navigation }) {
   const [sort, setSort] = useState("updated");
   const [finishing, setFinishing] = useState(null); // item whose last episode you just marked
   const [cats, setCats] = useState([]);
-  const [cat, setCat] = useState(""); // "" = every category
   const [selected, setSelected] = useState(null); // null = not selecting; Set of keys while selecting
   const [sheet, setSheet] = useState(null); // "status" | "category"
 
   const reload = useCallback(async () => {
     setEntries(Object.values(await getLibrary(user).catch(() => ({}))));
-    setCats(await getCategories());
+    setCats((await categoriesUnlocked()) ? await getCategories() : []); // categories unlock at 500 completed anime
   }, [user]);
 
   useFocusEffect(
@@ -87,8 +86,8 @@ export default function LibraryScreen({ navigation }) {
   const listEntries = useMemo(
     () => entries.filter((e) => inList(e, list)
       && (!q || e.item.title.toLowerCase().includes(q))
-      && (!cat || (e.cats || []).includes(cat))),
-    [entries, list, q, cat]
+),
+    [entries, list, q]
   );
   const sorts = LIBRARY_SORTS.filter((s) => !s.anime || current.segment === "anime");
 
@@ -138,12 +137,6 @@ export default function LibraryScreen({ navigation }) {
       <View style={{ paddingHorizontal: 14 }}>
         <Chips options={tabs} value={tab} onChange={setTab} />
         <Chips options={sorts} value={sort} onChange={setSort} style={{ marginTop: 6 }} />
-        {cats.length > 0 && (
-          <Chips
-            options={[{ key: "", label: "All categories" }, ...cats.map((c) => ({ key: c.id, label: c.name }))]}
-            value={cat} onChange={setCat} style={{ marginTop: 6 }}
-          />
-        )}
       </View>
 
       {selecting && (
@@ -197,7 +190,6 @@ export default function LibraryScreen({ navigation }) {
         title="Categories"
         options={[
           ...cats.map((c) => ({ key: `+${c.id}`, label: `Add to ${c.name}` })),
-          ...(cat ? [{ key: `-${cat}`, label: `Remove from ${cats.find((c) => c.id === cat)?.name}`, danger: true }] : []),
         ]}
         onPick={(k) => bulk((keys) => bulkCategory(keys, k.slice(1), k[0] === "+"))}
         onClose={() => setSheet(null)}

@@ -7,7 +7,7 @@ import { ScrollView, View, Text, TouchableOpacity, StyleSheet, RefreshControl } 
 import { SafeAreaView } from "react-native-safe-area-context";
 import PosterRow from "../components/PosterRow.js";
 import YourShows from "../components/YourShows.js";
-import { loadSpotlightRow } from "@voidation/shared/backend/store";
+import { loadCategoryRows } from "@voidation/shared/backend/store";
 import { useNow } from "@voidation/shared/hooks/useNow";
 import Brand from "../components/Brand.js";
 import { loadExplorePools, buildExplore, knownKeys, loadVerdictRows, loadNewSeasons, loadAnimeOfTheYear } from "@voidation/shared/explore";
@@ -23,14 +23,14 @@ export default function ExploreScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [verdictRows, setVerdictRows] = useState([]);
   const [newSeasons, setNewSeasons] = useState([]);
-  const [spotlight, setSpotlight] = useState(null);
+  const [catRows, setCatRows] = useState([]); // your categories (500+ completed), days 15–21
   const now = useNow(1000); // Up next countdowns tick every second
 
   // your verdicts change as you use the app, so these rows refresh on every visit
   useFocusEffect(useCallback(() => {
     loadVerdictRows().then(setVerdictRows).catch(() => {});
     loadNewSeasons().then(setNewSeasons).catch(() => {});
-    loadSpotlightRow().then(setSpotlight).catch(() => {});
+    loadCategoryRows().then(setCatRows).catch(() => {});
   }, []));
 
   const [pools, setPools] = useState(null);
@@ -85,7 +85,7 @@ export default function ExploreScreen({ navigation }) {
         </View>
         )}
 
-        {spotlight && <PosterRow title={`⭐ ${spotlight.title}`} items={spotlight.items} onOpen={open} />}
+        {catRows.map((r) => <PosterRow key={r.id} title={`⭐ ${r.title}`} items={r.items} onOpen={open} />)}
         <YourShows now={now} layout="row" title="⏳ Up next" onOpen={open} />
         {newSeasons.length > 0 && <PosterRow title="🆕 New seasons of shows you watched" items={newSeasons} onOpen={open} />}
         {data.coming?.length > 0 && <PosterRow title={`📅 ${data.comingTitle}`} items={data.coming} onOpen={open} />}
@@ -98,10 +98,7 @@ export default function ExploreScreen({ navigation }) {
         <PosterRow title="🌀 Isekai Heaven" items={data.isekai} loading={loading} onOpen={open} />
         <PosterRow title="🔥 Shonen Feast" items={data.shonen} loading={loading} onOpen={open} />
         <PosterRow title="⭐ Voidation Angles" items={data.voidpicks} loading={loading} onOpen={open} />
-        {aoty.length > 0 && <PosterRow title="🏆 Anime of the Year · the last decade" items={aoty} onOpen={open} />}
-        <TouchableOpacity onPress={() => navigation.navigate("Browse")} style={[styles.searchBtn, { marginHorizontal: 14, marginTop: 18, alignItems: "center" }]}>
-          <Text style={{ color: C.text, fontWeight: "800" }}>🔎 Browse everything →</Text>
-        </TouchableOpacity>
+        {aoty.length > 0 && <PosterRow title="🏆 Anime of the Year (Crunchyroll Awards)" items={aoty} onOpen={open} />}
       </ScrollView>
     </SafeAreaView>
   );

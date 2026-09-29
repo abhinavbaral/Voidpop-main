@@ -2,6 +2,8 @@
 // local catalog. Constants are re-exported from the real module so the
 // filters in the UI can never drift from production.
 import { CATALOG, findItem, toAppItem } from "./catalog.js";
+import { CRUNCHYROLL_AOTY } from "../awards.js";
+import { readingLinks } from "../readLinks.js";
 export { SORTS, SEASONS, GENRES, ANIME_ORIGINS, MANGA_ORIGINS } from "../api/anilist.js";
 // the demo is always "online"; these keep the same exports as the real module
 export const onNetState = (fn) => { fn({ offline: false, since: null }); return () => {}; };
@@ -78,7 +80,16 @@ export async function fetchAniListDetail(segment, id) {
         { site: "Netflix", url: "https://www.netflix.com", color: "#E50914", languages: [] },
       ]
     : [{ site: "MANGA Plus", url: "https://mangaplus.shueisha.co.jp", color: "#E0001B", languages: ["English"] }];
-  return { trailer: null, related, whereToWatch }; // trailers can't be embedded in the demo
+  // manga: sample AniList-style links (one reader marked INFO, as AniList sometimes does), or
+  // none at all for every third title so the "search" fallback shows too
+  const sample = [
+    { site: "MANGA Plus", url: "https://mangaplus.shueisha.co.jp", type: "INFO", language: "English", color: "#E0001B" },
+    { site: "K MANGA", url: "https://kmanga.kodansha.com", type: "STREAMING", language: "English", color: "#1A1A1A" },
+    { site: "BookWalker", url: "https://global.bookwalker.jp", type: "INFO", language: "English", color: "#1E90C8" },
+    { site: "Twitter", url: "https://twitter.com", type: "SOCIAL" },
+  ];
+  const whereToRead = segment === "manga" ? readingLinks(Number(id) % 3 ? sample : [], { title: it?.title, country: it?.country }) : null;
+  return { trailer: null, related, whereToWatch, whereToRead }; // trailers can't be embedded in the demo
 }
 
 // Every episode airing in the next `days` days: each airing demo title gets its
@@ -187,11 +198,15 @@ export async function fetchEarlierSeasons(id) {
 }
 
 // Anime of the Year (demo): the most popular finished catalog anime per year.
-export async function fetchAnimeOfTheYear(years) {
+export async function fetchAnimeOfTheYear() {
   await wait(200);
-  return years.map((y) => {
-    const best = CATALOG.anime.filter((i) => !i.unreleased && i.date.startsWith(String(y))).sort((a, b) => b.popularity - a.popularity)[0];
-    return best ? { ...toAppItem(best), awardYear: y } : null;
+  // the real winners that exist in the demo catalog
+  const norm = (t) => t.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const used = new Set();
+  return CRUNCHYROLL_AOTY.map((w) => {
+    const hit = CATALOG.anime.find((i) => !used.has(i.id) && (norm(i.title) === norm(w.title) || norm(w.title).startsWith(norm(i.title))));
+    if (hit) used.add(hit.id);
+    return hit ? { ...toAppItem(hit), awardYear: w.year, award: "Crunchyroll Anime Awards" } : null;
   }).filter(Boolean);
 }
 

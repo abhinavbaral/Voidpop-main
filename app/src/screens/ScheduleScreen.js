@@ -1,25 +1,19 @@
-// SCHEDULE — when does the next episode drop? (same sections as the website)
-//   1. Your next episodes: airing anime in your library, soonest first, live countdown
-//   2. This week: everything airing in the next 7 days, grouped by day
-//   3. Upcoming anime: not started yet — mark yourself Excited
+// SCHEDULE — when does the next episode drop? (same as the website)
+//   Your watch:    countdowns for the anime you follow, and what you're behind on
+//   Out this week: premiere calendar, airing in the next 24 hours, latest premieres
 
-import { useCallback, useMemo, useState } from "react";
-import {
-  ScrollView, View, Text, Image, TouchableOpacity, StyleSheet, RefreshControl,
-} from "react-native";
+import { useCallback, useState } from "react";
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
-import { fetchAiringSchedule, fetchAniList, fetchNextEpisodes } from "@voidation/shared/api/anilist";
+import { fetchNextEpisodes } from "@voidation/shared/api/anilist";
 import { useAuth } from "@voidation/shared/backend/AuthContext";
-import { getLibrary, getExcited, toggleExcited, noteAiring } from "@voidation/shared/backend/store";
-import { formatCountdown, dayLabel, airTime, releaseLabel, secondsUntil } from "@voidation/shared/format";
+import { getLibrary, noteAiring } from "@voidation/shared/backend/store";
 import { useNow } from "@voidation/shared/hooks/useNow";
-import { useSettings } from "@voidation/shared/backend/SettingsContext";
 import { useTheme } from "../context/ThemeContext.js";
 import { openDetail } from "../lib/nav";
 import YourShows from "../components/YourShows.js";
-import FilterChips from "../components/FilterChips.js";
-import { applyFilters } from "@voidation/shared/filters";
+import OutThisWeek from "../components/OutThisWeek.js";
 
 const FOLLOWING = new Set(["watching", "plan", "onhold"]);
 
@@ -28,15 +22,8 @@ export default function ScheduleScreen({ navigation }) {
   const styles = makeStyles(C);
   const { user } = useAuth();
   const now = useNow(1000);
-  const { clock24 } = useSettings().settings;
-  const [mine, setMine] = useState(null);
-  const [week, setWeek] = useState(null);
-  const [upcoming, setUpcoming] = useState([]);
-  const [excited, setExcited] = useState({});
-  const [tracked, setTracked] = useState(new Set());
   // the Schedule tab's two views: your shows' countdowns, or everything out this week
   const [view, setView] = useState("mine");
-  const [filters, setFilters] = useState({ genre: "", studio: "" });
   const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [fetched, setFetched] = useState(0); // bumps after fresh air times are saved
@@ -45,30 +32,10 @@ export default function ScheduleScreen({ navigation }) {
     setError(false);
     const lib = Object.values(await getLibrary(user));
     const following = lib.filter((e) => e.item.segment === "anime" && FOLLOWING.has(e.status));
-    setTracked(new Set(following.map((e) => e.item.id)));
-    const [fresh, sched, up, ex] = await Promise.all([
-      fetchNextEpisodes(following.map((e) => e.item.id)).catch(() => { setError(true); return {}; }),
-      fetchAiringSchedule(7).catch(() => { setError(true); return []; }),
-      fetchAniList("anime", { sort: "popular", unreleasedOnly: true, perPage: 12 }).catch(() => ({ items: [] })),
-      getExcited(user).catch(() => ({})),
-    ]);
-    // compare with the saved times to spot delays, then read the entries back
+    const fresh = await fetchNextEpisodes(following.map((e) => e.item.id)).catch(() => { setError(true); return {}; });
+    // compare with the saved times to spot delays
     await noteAiring(fresh);
     setFetched((n) => n + 1);
-    const saved = await getLibrary(user);
-    setMine(
-      following
-        .map((e) => {
-          const now = saved[`anime:${e.item.id}`] || e;
-          const item = fresh[e.item.id] || e.item;
-          return { status: e.status, item, delay: now.delay?.episode === item.nextEpisode?.episode ? now.delay : null };
-        })
-        .filter((e) => e.item.nextEpisode)
-        .sort((a, b) => a.item.nextEpisode.airingAt - b.item.nextEpisode.airingAt)
-    );
-    setWeek(sched);
-    setUpcoming(up.items);
-    setExcited(ex);
   }, [user]);
 
   // reload whenever the tab is opened: you may have just tracked something
@@ -78,26 +45,6 @@ export default function ScheduleScreen({ navigation }) {
     setRefreshing(true);
     await load();
     setRefreshing(false);
-  };
-
-  const days = useMemo(() => {
-    const groups = [];
-    (week || [])
-      .filter((s) => secondsUntil(s.airingAt, now) > -3600)
-      .filter((s) => applyFilters([s.item], filters).length)
-      .forEach((s) => {
-        const label = dayLabel(s.airingAt, now);
-        const last = groups[groups.length - 1];
-        if (last && last.label === label) last.items.push(s);
-        else groups.push({ label, items: [s] });
-      });
-    return groups;
-  }, [week, tracked, filters, Math.floor(now / 60000)]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const open = (item) => openDetail(navigation, item);
-  const onExcite = async (item) => {
-    await toggleExcited(user, item);
-    setExcited(await getExcited(user));
   };
 
   return (
@@ -129,57 +76,10 @@ export default function ScheduleScreen({ navigation }) {
             now={now}
             refreshKey={fetched}
             onOpen={(it) => openDetail(navigation, it)}
-            emptyText="Nothing you follow is airing right now. Mark an airing anime as Watching or Plan to Watch and its countdown shows up here, or see everything in Out this week."
+            emptyText="Nothing you follow is airing right now. Mark an airing anime as Watching or Plan to Watch and its countdown shows up here, or see what's coming in Out this week."
           />
         )}
-        {view === "week" && (<>
-
-        <View style={styles.weekHead}>
-          <Text style={[styles.section, { marginTop: 0, marginBottom: 0, paddingHorizontal: 0 }]}>📅 Out this week</Text>
-        </View>
-        <FilterChips items={(week || []).map((s) => s.item)} value={filters} onChange={setFilters} style={{ paddingHorizontal: 14, marginTop: 6 }} />
-        {week === null ? (
-          <Text style={styles.empty}>Loading…</Text>
-        ) : !days.length ? (
-          <Text style={styles.empty}>{filters.genre || filters.studio ? "Nothing this week matches these filters." : "No episodes found for this week."}</Text>
-        ) : (
-          days.map((g) => (
-            <View key={g.label}>
-              <Text style={styles.day}>{g.label}</Text>
-              {g.items.map((s) => (
-                <TouchableOpacity key={`${s.item.id}-${s.episode}`} style={styles.row} onPress={() => open(s.item)}>
-                  <Text style={styles.time}>{airTime(s.airingAt, clock24)}</Text>
-                  {s.item.image ? <Image source={{ uri: s.item.image }} style={styles.thumbSm} /> : <View style={styles.thumbSm} />}
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.rowTitle} numberOfLines={2}>{s.item.title}</Text>
-                    <Text style={styles.rowSub}>Episode {s.episode}{tracked.has(s.item.id) ? " · in your library" : ""}</Text>
-                  </View>
-                  <Text style={styles.countdownSm}>{formatCountdown(s.airingAt, now)}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          ))
-        )}
-
-        {upcoming.length > 0 && <Text style={styles.section}>🚀 Upcoming anime</Text>}
-        {upcoming.slice(0, 8).map((item) => {
-          const on = !!excited[`${item.segment}:${item.id}`];
-          return (
-            <View key={item.id} style={styles.row}>
-              <TouchableOpacity style={{ flexDirection: "row", flex: 1, alignItems: "center", gap: 10 }} onPress={() => open(item)}>
-                {item.image ? <Image source={{ uri: item.image }} style={styles.thumbSm} /> : <View style={styles.thumbSm} />}
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.rowTitle} numberOfLines={1}>{item.title}</Text>
-                  <Text style={styles.rowSub}>{item.date ? releaseLabel(item) : "Release date TBA"}</Text>
-                </View>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => onExcite(item)} style={[styles.excite, on && styles.excited]}>
-                <Text style={{ fontSize: 11, fontWeight: "800", color: on ? "#fff" : C.orange }}>{on ? "Excited ✓" : "Excited?"}</Text>
-              </TouchableOpacity>
-            </View>
-          );
-        })}
-        </>)}
+        {view === "week" && <OutThisWeek navigation={navigation} refreshKey={fetched} />}
       </ScrollView>
     </SafeAreaView>
   );

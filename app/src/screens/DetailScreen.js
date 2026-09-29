@@ -10,6 +10,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import TrailerPlayer from "../components/TrailerPlayer";
 import WhereToWatch from "../components/WhereToWatch";
+import WhereToRead from "../components/WhereToRead";
 import { addToCalendar } from "../lib/calendar";
 import { completeEarlierSeasons, undoEarlierSeasons } from "@voidation/shared/seasons";
 import { getCachedItem, cacheItem, openDetail, goBackOrHome } from "../lib/nav";
@@ -21,7 +22,7 @@ import { useAuth } from "@voidation/shared/backend/AuthContext";
 import {
   statusesFor, statusesAllowed, getStatus, setStatus, addReview, getMyReview,
   getExcited, toggleExcited, getEntry, setProgress, noteAiring, totalFor, unitFor, airedFor, maxProgress, checkProgress,
-  getCategories, setEntryCategories, doneLabel, fillCompleted,
+  getCategories, categoriesUnlocked, setEntryCategories, doneLabel, fillCompleted,
 } from "@voidation/shared/backend/store";
 import { fetchAniListDetail, fetchAniListItem, fetchNextEpisodes } from "@voidation/shared/api/anilist";
 import ReviewCard from "../components/ReviewCard.js";
@@ -113,13 +114,14 @@ function DetailBody({ item, navigation }) {
   const [trailer, setTrailer] = useState(null);
   const [related, setRelated] = useState([]);
   const [watch, setWatch] = useState([]);
+  const [read, setRead] = useState(null); // manga: { read, buy, search }
 
   const refresh = useCallback(async () => {
     await fillCompleted(item); // completed = all watched, once the count is known
     const entry = await getEntry(item.segment, item.id);
     setProgressState(entry?.progress || 0);
     setMyCats(entry?.cats || []);
-    setCats(await getCategories());
+    setCats((await categoriesUnlocked()) ? await getCategories() : []); // categories unlock at 500 completed anime
     setDelay(entry?.delay?.episode === entry?.item.nextEpisode?.episode ? entry?.delay : null);
     setStatusState(await getStatus(user, item.segment, item.id));
     setMyReview(await getMyReview(user, item.segment, item.id));
@@ -136,7 +138,7 @@ function DetailBody({ item, navigation }) {
   useEffect(() => {
     let alive = true;
     fetchAniListDetail(item.segment, item.id)
-      .then((d) => { if (alive) { setTrailer(d.trailer); setRelated(d.related); setWatch(d.whereToWatch || []); } })
+      .then((d) => { if (alive) { setTrailer(d.trailer); setRelated(d.related); setWatch(d.whereToWatch || []); setRead(d.whereToRead || null); } })
       .catch(() => {});
     if (item.segment === "anime" && !item.finished) {
       fetchNextEpisodes([item.id])
@@ -227,7 +229,7 @@ function DetailBody({ item, navigation }) {
       )}
       {unreleased && (
         <Text style={{ color: C.faint, fontSize: 11, marginTop: 8 }}>
-          Not out yet: plan it or mark Excited. Tracking, progress and your verdict open once it starts.
+          Not out yet: plan it or mark Excited. Excited titles move to Watching by themselves the day they come out. Tracking, progress and your verdict open once it starts.
         </Text>
       )}
       {!!status && cats.length > 0 && (
@@ -344,7 +346,7 @@ function DetailBody({ item, navigation }) {
             <ProgressBox item={{ ...item, nextEpisode }} progress={progress} onChange={changeProgress} styles={styles} C={C} />
           )}
 
-          <WhereToWatch links={watch} segment={item.segment} />
+          {item.segment === "manga" ? <WhereToRead links={read} /> : <WhereToWatch links={watch} segment={item.segment} />}
 
           {/* your verdict */}
           {myReview && (

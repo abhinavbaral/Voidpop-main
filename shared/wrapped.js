@@ -1,4 +1,4 @@
-// VOIDATION WRAPPED — your year, from your own watch log. One user, one device:
+// VOIDATION REWIND (code still calls it "wrapped") — your year, from your own watch log. One user, one device:
 // no "top 1% of fans" (that needs everyone's data); every comparison is with
 // yourself: your busiest month, your favourite day, this year vs last year.
 //
@@ -208,11 +208,11 @@ export const loadWrapped = (which) => (which === "all" ? computeAllTime() : comp
 
 function allTimeSlides(w) {
   if (w.empty) {
-    return [{ kind: "big", eyebrow: "Voidation Wrapped · All time", big: "Nothing yet",
+    return [{ kind: "big", eyebrow: "Voidation Rewind · All time", big: "Nothing yet",
       sub: "Add the anime and manga you've watched to your Library (or import them from AniList), and this fills in." }];
   }
   const slides = [
-    { kind: "big", eyebrow: "Voidation Wrapped · All time", big: "Your anime life",
+    { kind: "big", eyebrow: "Voidation Rewind · All time", big: "Your anime life",
       sub: "Everything in your library, however long ago you watched it." },
     { kind: "big", eyebrow: "All together", big: `${fmt(w.episodes)} episodes`,
       sub: [
@@ -251,13 +251,13 @@ export function wrappedSlides(w) {
   if (w.allTime) return allTimeSlides(w);
   if (w.empty) {
     return [{
-      kind: "big", eyebrow: `Voidation Wrapped ${w.year}`, big: "Nothing yet",
-      sub: "Your Wrapped builds itself from the episodes and chapters you mark. Tap +1 as you watch and come back later.",
+      kind: "big", eyebrow: `Voidation Rewind ${w.year}`, big: "Nothing yet",
+      sub: "Your Rewind builds itself from the episodes and chapters you mark. Tap +1 as you watch and come back later.",
     }];
   }
   const slides = [];
   slides.push({
-    kind: "big", eyebrow: `Voidation Wrapped ${w.year}`, big: `Your ${w.year}`,
+    kind: "big", eyebrow: `Voidation Rewind ${w.year}`, big: `Your ${w.year}`,
     sub: w.startedLogging ? `Everything you marked since ${dateLabel(w.startedLogging)}, when Voidation started keeping track.` : "Everything you watched and read this year.",
   });
   slides.push({

@@ -14,7 +14,7 @@ export default function ReviewCard({ review, onEdit, onShare }) {
     <View style={styles.card}>
       <View style={styles.row}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.name}>Your verdict</Text>
+          <Text style={styles.name}>Your Void Verdict</Text>
           <Text style={styles.meta}>{timeAgo(review.date)}</Text>
         </View>
         {onEdit && (

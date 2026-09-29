@@ -379,36 +379,35 @@ export function yourShows(lib, fresh = {}, now = Date.now()) {
     .sort((a, b) => (a.next?.airingAt ?? Infinity) - (b.next?.airingAt ?? Infinity) || b.pending - a.pending);
 }
 
-/* ---------- Spotlight: a reward for 600+ completed anime ---------- */
-// One of your categories becomes the top row of Explore during the third week
-// of every month (days 15–21).
+/* ---------- Categories: a reward for 500+ completed anime ---------- */
+// Categories unlock at 500 completed anime. Each one you make becomes a row at
+// the top of Explore during the third week of every month (days 15–21).
 
-export const SPOTLIGHT_MIN = 600;
+export const CATEGORY_MIN = 500;
+export const SPOTLIGHT_MIN = CATEGORY_MIN; // older name
 export const spotlightWeek = (date = new Date()) => date.getDate() >= 15 && date.getDate() <= 21;
 
-export async function getSpotlight() {
+export async function getCategoryAccess() {
   const db = await load();
   const anime = Object.values(db.library).filter((e) => e.item.segment === "anime" && e.status === "completed").length;
-  const catId = db.meta?.spotlight || null;
-  const cat = db.categories.find((c) => c.id === catId) || null;
-  return { unlocked: anime >= SPOTLIGHT_MIN, animeCompleted: anime, needed: Math.max(0, SPOTLIGHT_MIN - anime), cat };
+  return { unlocked: anime >= CATEGORY_MIN, animeCompleted: anime, needed: Math.max(0, CATEGORY_MIN - anime) };
 }
+export const categoriesUnlocked = async () => (await getCategoryAccess()).unlocked;
+export const getSpotlight = getCategoryAccess; // older name
 
-export async function setSpotlight(catId) {
+// The Explore rows: one per category with titles in it, or [] when they aren't
+// showing (locked, none made, or not the third week).
+export async function loadCategoryRows(date = new Date()) {
+  if (!spotlightWeek(date) || !(await categoriesUnlocked())) return [];
   const db = await load();
-  db.meta = { ...(db.meta || {}), spotlight: catId || null };
-  await save();
-}
-
-// The Explore row, or null when it isn't showing (locked, not set, empty, or not the third week).
-export async function loadSpotlightRow(date = new Date()) {
-  const sp = await getSpotlight();
-  if (!sp.unlocked || !sp.cat || !spotlightWeek(date)) return null;
-  const items = Object.values((await load()).library)
-    .filter((e) => (e.cats || []).includes(sp.cat.id))
-    .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""))
-    .map((e) => e.item);
-  return items.length ? { title: sp.cat.name, items } : null;
+  return db.categories.map((c) => ({
+    id: c.id,
+    title: c.name,
+    items: Object.values(db.library)
+      .filter((e) => (e.cats || []).includes(c.id))
+      .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""))
+      .map((e) => e.item),
+  })).filter((r) => r.items.length);
 }
 
 /* ---------- pending: aired but not watched yet ---------- */
@@ -752,4 +751,31 @@ export function timeAgo(iso) {
   if (d < 30) return `${d} day${d > 1 ? "s" : ""} ago`;
   const mo = Math.floor(d / 30);
   return `${mo} month${mo > 1 ? "s" : ""} ago`;
+}
+
+/* ---------- Excited → Watching ---------- */
+// Excited is for anime that aren't out yet. The moment one comes out (AniList
+// marks it airing or finished), it moves to Watching by itself, so its episodes
+// count in Pending and its countdown shows in Your watch. Titles you'd already
+// put in Plan to Watch move too; any other status you chose is left alone.
+// fetchFresh(ids) → { id: item } with current AniList data.
+export async function promoteExcited(fetchFresh) {
+  const db = await load();
+  const keys = Object.keys(db.excited).filter((k) => k.startsWith("anime:") && !db.excited[k].promoted);
+  if (!keys.length) return [];
+  const fresh = await fetchFresh(keys.map((k) => Number(k.slice(6))));
+  const moved = [];
+  for (const k of keys) {
+    const item = fresh[k.slice(6)];
+    if (!item || item.unreleased) continue;
+    const status = db.library[k]?.status;
+    if (!status || status === "plan") {
+      await setStatus(null, "anime", item, "watching");
+      moved.push(item);
+    }
+    // done either way: it's out, so it won't be checked again
+    db.excited[k] = { ...db.excited[k], promoted: new Date().toISOString() };
+  }
+  await save();
+  return moved;
 }

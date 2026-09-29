@@ -47,17 +47,17 @@ export async function loadExplorePools({ shuffle = false } = {}) {
   };
 }
 
-// Anime of the Year for the last ten years: fixed picks (they don't change on
-// refresh), saved on the device and rechecked every few days.
-const AOTY_KEY = "voidation:aoty:v1";
+// Anime of the Year = the Crunchyroll Anime Awards winners (shared/awards.js).
+// Fixed picks (they don't change on refresh), saved on the device and
+// rechecked every few days for fresh posters.
+const AOTY_KEY = "voidation:aoty:v2"; // v2: Crunchyroll Anime Awards winners
 export async function loadAnimeOfTheYear() {
   const thisYear = new Date().getFullYear();
-  const years = Array.from({ length: 10 }, (_, i) => thisYear - i);
   let saved = null;
   try { saved = JSON.parse((await readKey(AOTY_KEY)) || "null"); } catch { saved = null; }
   if (saved && saved.items?.length && Date.now() - saved.at < 3 * 864e5 && saved.year === thisYear) return saved.items;
   try {
-    const items = await fetchAnimeOfTheYear(years);
+    const items = await fetchAnimeOfTheYear();
     if (items.length) await writeKey(AOTY_KEY, JSON.stringify({ at: Date.now(), year: thisYear, items }));
     return items;
   } catch {

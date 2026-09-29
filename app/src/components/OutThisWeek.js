@@ -1,21 +1,22 @@
-// UPCOMING — a month calendar of premieres (tap a day to see them), what's
-// airing in the next 24 hours, and the latest premieres. Same as the website.
+// OUT THIS WEEK (inside the Schedule tab) — a month calendar of premieres (tap
+// a day to see them), what's airing in the next 24 hours, and the latest
+// premieres. Same as the website. Drawn inside Schedule's scroll view;
+// refreshKey changes when Schedule is pulled to refresh.
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ScrollView, View, Text, Image, TouchableOpacity, StyleSheet, RefreshControl, useWindowDimensions } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { View, Text, Image, TouchableOpacity, StyleSheet, useWindowDimensions } from "react-native";
 import { loadMonthPremieres, monthGrid, dayKey, loadAiringSoon, loadLatestPremieres } from "@voidation/shared/upcoming";
 import { getExcited, toggleExcited } from "@voidation/shared/backend/store";
 import { useAuth } from "@voidation/shared/backend/AuthContext";
 import { useNow } from "@voidation/shared/hooks/useNow";
 import { useSettings } from "@voidation/shared/backend/SettingsContext";
 import { formatCountdown, airTime } from "@voidation/shared/format";
-import PosterRow from "../components/PosterRow.js";
+import PosterRow from "./PosterRow.js";
 import { useTheme } from "../context/ThemeContext.js";
 import { openDetail } from "../lib/nav";
 
 const WEEKDAYS = ["M", "T", "W", "T", "F", "S", "S"];
 
-export default function UpcomingScreen({ navigation }) {
+export default function OutThisWeek({ navigation, refreshKey = 0 }) {
   const { C } = useTheme();
   const styles = makeStyles(C);
   const { width } = useWindowDimensions();
@@ -29,7 +30,6 @@ export default function UpcomingScreen({ navigation }) {
   const [soon, setSoon] = useState(null);
   const [latest, setLatest] = useState([]);
   const [excited, setExcited] = useState({});
-  const [refreshing, setRefreshing] = useState(false);
 
   const loadMonth = useCallback(async () => {
     setByDay(null);
@@ -47,7 +47,8 @@ export default function UpcomingScreen({ navigation }) {
     getExcited(user).then(setExcited).catch(() => {});
   }, [user]);
   useEffect(() => { loadMonth(); }, [loadMonth]);
-  useEffect(() => { loadRest(); }, [loadRest]);
+  useEffect(() => { loadRest(); }, [loadRest, refreshKey]);
+  useEffect(() => { if (refreshKey) loadMonth(); }, [refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const weeks = useMemo(() => monthGrid(month.y, month.m), [month.y, month.m]);
   const title = new Date(month.y, month.m, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
@@ -56,14 +57,9 @@ export default function UpcomingScreen({ navigation }) {
   const cell = Math.floor((Math.min(width, 720) - 28 - 6 * 4) / 7);
   const open = (it) => openDetail(navigation, it);
   const excite = async (item) => { await toggleExcited(user, item); setExcited(await getExcited(user)); };
-  const refresh = async () => { setRefreshing(true); await Promise.all([loadMonth(), loadRest()]); setRefreshing(false); };
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 30 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={C.purple} colors={[C.purple]} />}>
-        <Text style={styles.title}>Upcoming</Text>
-
+    <View>
         <View style={styles.monthRow}>
           <Text style={styles.section}>🗓️ Premieres</Text>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -134,15 +130,12 @@ export default function UpcomingScreen({ navigation }) {
         ))}
 
         {latest.length > 0 && <PosterRow title="🎬 Latest premieres · last 3 weeks" items={latest} onOpen={open} />}
-      </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const makeStyles = (C) => StyleSheet.create({
-  safe: { flex: 1, backgroundColor: C.bg },
-  title: { color: C.text, fontSize: 20, fontWeight: "800", paddingHorizontal: 14, paddingTop: 8 },
-  monthRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 14, marginTop: 14, marginBottom: 8 },
+  monthRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 14, marginTop: 4, marginBottom: 8 },
   section: { color: C.text, fontWeight: "800", fontSize: 15 },
   arrow: { width: 34, height: 34, borderRadius: 9, borderWidth: 1, borderColor: C.border, alignItems: "center", justifyContent: "center" },
   arrowText: { color: C.text, fontSize: 20, marginTop: -2 },
