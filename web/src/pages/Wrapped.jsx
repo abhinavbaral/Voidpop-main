@@ -19,7 +19,7 @@ export default function Wrapped() {
   const [year, setYear] = useState(null); // "all" or a year number
   const [w, setW] = useState(null);
   const [i, setI] = useState(0);
-  useDocumentTitle(year === "all" ? "Wrapped · All time" : `Wrapped ${year || ""}`);
+  useDocumentTitle(year === "all" ? "Rewind · All time" : `Rewind ${year || ""}`);
 
   useEffect(() => { wrappedYears().then(setYears); defaultWrapped().then(setYear); }, []);
   useEffect(() => { if (year === null) return; setW(null); setI(0); loadWrapped(year).then(setW); }, [year]);
@@ -45,7 +45,7 @@ export default function Wrapped() {
           {slides.map((_, k) => <span key={k} className={k <= i ? "on" : ""} />)}
         </div>
         <div className="row gap-8">
-          <div className="wrapped-years" role="tablist" aria-label="Which Wrapped">
+          <div className="wrapped-years" role="tablist" aria-label="Which Rewind">
             {years.map((y) => (
               <button key={y} role="tab" aria-selected={y === year} className={y === year ? "on" : ""}
                 onClick={() => setYear(y)}>{y === "all" ? "All time" : y}</button>
@@ -120,7 +120,7 @@ function Summary({ w, onBack, onRestart }) {
       const blob = await new Promise((res, rej) => canvas.toBlob((b) => (b ? res(b) : rej(new Error("toBlob"))), "image/png"));
       const file = new File([blob], `voidation-wrapped-${w.allTime ? "all-time" : w.year}.png`, { type: "image/png" });
       if (navigator.canShare?.({ files: [file] })) {
-        try { await navigator.share({ files: [file], title: `My Voidation Wrapped · ${w.label}` }); setStatus(""); return; }
+        try { await navigator.share({ files: [file], title: `My Voidation Rewind · ${w.label}` }); setStatus(""); return; }
         catch (e) { if (e?.name === "AbortError") { setStatus(""); return; } }
       }
       const url = URL.createObjectURL(blob);
@@ -158,7 +158,7 @@ function Summary({ w, onBack, onRestart }) {
               <b>{w.allTime || !w.episodes ? w.completed.toLocaleString() : w.minutes < 90 ? Math.round(w.minutes) : w.hours.toLocaleString()}</b>
             </div>
           </div>
-          <div className="wc-brand">VOID<span>ATION</span> · WRAPPED</div>
+          <div className="wc-brand">VOID<span>ATION</span> · REWIND</div>
         </div>
       </div>
       <div className="row gap-8 wrap" style={{ justifyContent: "center" }}>

@@ -27,7 +27,6 @@ const Badge = ({ n }) => (n > 0 ? <span className="nav-badge" aria-label={`${n} 
 const SECTIONS = [
   { to: "/", label: "Explore", icon: "explore", end: true },
   { to: "/library", label: "Library", icon: "library" },
-  { to: "/upcoming", label: "Upcoming", icon: "calendar" },
   { to: "/history", label: "History", icon: "history" },
   { to: "/schedule", label: "Schedule", icon: "schedule" },
   { to: "/more", label: "More", icon: "more" },

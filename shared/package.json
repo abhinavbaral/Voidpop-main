@@ -8,5 +8,8 @@
   },
   "peerDependencies": {
     "react": "*"
+  },
+  "dependencies": {
+    "fflate": "^0.8.3"
   }
 }

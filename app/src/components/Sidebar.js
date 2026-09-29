@@ -8,6 +8,7 @@ import {
   Animated, Pressable, StyleSheet, Dimensions,
 } from "react-native";
 import { useTheme } from "../context/ThemeContext.js";
+import Icon from "./Icon.js";
 
 const W = Math.min(Dimensions.get("window").width * 0.8, 320);
 
@@ -29,7 +30,7 @@ function Dropdown({ label, value, options, onSelect, C }) {
         <Text style={{ color: C.text, fontSize: 13, fontWeight: "600" }}>
           {current?.label || "Select"}
         </Text>
-        <Text style={{ color: C.faint, fontSize: 11 }}>{open ? "▲" : "▼"}</Text>
+        <Icon name={open ? "up" : "down"} size={14} color={C.faint} />
       </TouchableOpacity>
 
       {open && (
@@ -124,9 +125,7 @@ export default function Sidebar({
                       >
                         {s.label}
                       </Text>
-                      <Text style={{ color: active ? "#fff" : C.faint, fontSize: 11 }}>
-                        {active ? "▾" : "▸"}
-                      </Text>
+                      <Icon name={active ? "down" : "right"} size={14} color={active ? "#fff" : C.faint} />
                     </TouchableOpacity>
 
                     {/* the active segment's filter dropdowns */}

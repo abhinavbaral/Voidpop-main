@@ -5,7 +5,7 @@ import Browse from "./Browse.jsx";
 import { useNow } from "@voidation/shared/hooks/useNow";
 import PosterRow from "../components/PosterRow.jsx";
 import YourShows from "../components/YourShows.jsx";
-import { loadSpotlightRow } from "@voidation/shared/backend/store";
+import { loadCategoryRows } from "@voidation/shared/backend/store";
 import { useDocumentTitle } from "../lib/useDocumentTitle.js";
 
 export default function Explore() {
@@ -15,7 +15,7 @@ export default function Explore() {
   const [loading, setLoading] = useState(true);
   const [verdictRows, setVerdictRows] = useState([]);
   const [newSeasons, setNewSeasons] = useState([]);
-  const [spotlight, setSpotlight] = useState(null);
+  const [catRows, setCatRows] = useState([]); // your categories (500+ completed), days 15–21
 
   const [aoty, setAoty] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -36,29 +36,29 @@ export default function Explore() {
     loadAnimeOfTheYear().then(setAoty).catch(() => {});
     loadVerdictRows().then(setVerdictRows).catch(() => {});
     loadNewSeasons().then(setNewSeasons).catch(() => {});
-    loadSpotlightRow().then(setSpotlight).catch(() => {});
+    loadCategoryRows().then(setCatRows).catch(() => {});
   }, []);
 
   return (
     <div className="stack">
       <div className="explore-head">
         <button className="btn ghost" onClick={refresh} disabled={refreshing || loading}>{refreshing ? "Refreshing…" : "↻ New picks"}</button>
-        <a className="btn ghost" href="#browse">🔎 Browse</a>
+        <a className="btn ghost" href="#browse">Browse</a>
       </div>
-      {spotlight && <PosterRow title={`⭐ ${spotlight.title}`} items={spotlight.items} now={now} />}
-      <YourShows now={now} layout="row" title="⏳ Up next" />
-      {newSeasons.length > 0 && <PosterRow title="🆕 New seasons of shows you watched" items={newSeasons} now={now} />}
-      {data.coming?.length > 0 && <PosterRow title={`📅 ${data.comingTitle}`} items={data.coming} now={now} />}
+      {catRows.map((r) => <PosterRow key={r.id} title={`${r.title}`} items={r.items} now={now} />)}
+      <YourShows now={now} layout="row" title="Up next" />
+      {newSeasons.length > 0 && <PosterRow title="New seasons of shows you watched" items={newSeasons} now={now} />}
+      {data.coming?.length > 0 && <PosterRow title={`${data.comingTitle}`} items={data.coming} now={now} />}
       {verdictRows.map((r) => (
         <PosterRow key={r.verdict} title={r.title} dot={r.color} items={r.items} now={now} />
       ))}
-      <PosterRow title="🔥 Talk of the Week" items={data.talk} loading={loading} now={now} />
-      <PosterRow title="🎌 Don't Miss This — Anime" items={data.dontMissAnime} loading={loading} now={now} />
-      <PosterRow title="📖 Don't Miss This — Manga" items={data.dontMissManga} loading={loading} now={now} />
-      <PosterRow title="🌀 Isekai Heaven" items={data.isekai} loading={loading} now={now} />
-      <PosterRow title="🔥 Shonen Feast" items={data.shonen} loading={loading} now={now} />
-      <PosterRow title="⭐ Voidation Angles" items={data.voidpicks} loading={loading} now={now} />
-      {aoty.length > 0 && <PosterRow title="🏆 Anime of the Year · the last decade" items={aoty} now={now} />}
+      <PosterRow title="Talk of the Week" items={data.talk} loading={loading} now={now} />
+      <PosterRow title="Don't Miss This — Anime" items={data.dontMissAnime} loading={loading} now={now} />
+      <PosterRow title="Don't Miss This — Manga" items={data.dontMissManga} loading={loading} now={now} />
+      <PosterRow title="Isekai Heaven" items={data.isekai} loading={loading} now={now} />
+      <PosterRow title="Shonen Feast" items={data.shonen} loading={loading} now={now} />
+      <PosterRow title="Voidation Angles" items={data.voidpicks} loading={loading} now={now} />
+      {aoty.length > 0 && <PosterRow title="Anime of the Year (Crunchyroll Awards)" items={aoty} now={now} />}
       <Browse embedded />
     </div>
   );

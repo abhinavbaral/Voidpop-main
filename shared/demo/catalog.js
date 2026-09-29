@@ -189,6 +189,6 @@ export const findItem = (segment, id) =>
   (CATALOG[segment] || []).find((i) => String(i.id) === String(id)) || null;
 
 // strip demo-only fields before handing items to the app
-export const toAppItem = ({ country, related, popularity, seasons, ...rest }) => rest;
+export const toAppItem = ({ country, related, seasons, ...rest }) => rest;
 
 export { iso };

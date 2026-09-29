@@ -6,7 +6,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@voidation/shared/backend/AuthContext";
 import {
   statusesFor, statusesAllowed, getStatus, setStatus, addReview, getMyReview, getExcited, toggleExcited,
-  getEntry, setProgress, noteAiring, getCategories, setEntryCategories, doneLabel, fillCompleted,
+  getEntry, setProgress, noteAiring, getCategories, categoriesUnlocked, setEntryCategories, doneLabel, fillCompleted,
 } from "@voidation/shared/backend/store";
 import ProgressStepper from "../components/Progress.jsx";
 import { completeEarlierSeasons, undoEarlierSeasons } from "@voidation/shared/seasons";
@@ -90,7 +90,7 @@ function TitleBody({ item }) {
     const entry = await getEntry(item.segment, item.id);
     setProgressState(entry?.progress || 0);
     setMyCats(entry?.cats || []);
-    setCats(await getCategories());
+    setCats((await categoriesUnlocked()) ? await getCategories() : []); // categories unlock at 500 completed anime
     setDelay(entry?.delay?.episode === (entry?.item.nextEpisode?.episode) ? entry.delay : null);
     setStatusState(await getStatus(user, item.segment, item.id));
     setMyReview(await getMyReview(user, item.segment, item.id));
@@ -139,9 +139,9 @@ function TitleBody({ item }) {
     if (r.reachedEnd) setVerdictOpen(true); // last episode: ask for the verdict
   };
 
-  const saveVerdict = async ({ verdict, vibes, comment }) => {
+  const saveVerdict = async ({ verdict, vibes, moods, comment }) => {
     await setStatus(user, item.segment, item, "completed");
-    await addReview(user, item.segment, item.id, { verdict, vibes, comment });
+    await addReview(user, item.segment, item.id, { verdict, vibes, moods, comment });
     setStatusState("completed");
     setVerdictOpen(false);
     refresh();
@@ -203,7 +203,7 @@ function TitleBody({ item }) {
               </div>
             )}
             {unreleased && (
-              <p className="faint small">Not out yet: plan it or mark Excited. Tracking, progress and your verdict open once it starts.</p>
+              <p className="faint small">Not out yet: plan it or mark Excited. Excited titles move to Watching by themselves the day they come out. Tracking, progress and your verdict open once it starts.</p>
             )}
 
             {status && cats.length > 0 && (

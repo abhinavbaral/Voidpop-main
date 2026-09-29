@@ -27,8 +27,11 @@ import { ensurePermission, rescheduleEpisodeAlerts } from "../lib/episodeAlerts"
 import AniListSync from "../components/AniListSync.js";
 import OptionsSheet from "../components/OptionsSheet.js";
 import * as Sharing from "expo-sharing";
-import { cacheDirectory, writeAsStringAsync } from "expo-file-system/legacy";
+import { cacheDirectory, writeAsStringAsync, readAsStringAsync } from "expo-file-system/legacy";
+import * as DocumentPicker from "expo-document-picker";
+import { importMalFile, base64ToBytes } from "@voidation/shared/malImport";
 import { timeAgo } from "@voidation/shared/backend/store";
+import Icon from "../components/Icon.js";
 
 const NATIVE = Platform.OS !== "web";
 const AUTO_BACKUP = Platform.OS === "android"; // Android's folder picker (SAF)
@@ -226,6 +229,20 @@ function DataStorage({ styles, C }) {
     try { await shareFile(`voidation-library-${new Date().toISOString().slice(0, 10)}.csv`, await exportLibraryCsv(), "text/csv"); }
     catch { setMessage("Couldn't export the list."); }
   });
+  // MyAnimeList: the .xml.gz from MAL's Export page (no MAL account link needed)
+  const importMal = () => run(async () => {
+    const res = await DocumentPicker.getDocumentAsync({ type: "*/*", copyToCacheDirectory: true });
+    if (res.canceled || !res.assets?.[0]) return;
+    try {
+      const b64 = await readAsStringAsync(res.assets[0].uri, { encoding: "base64" });
+      const r = await importMalFile(base64ToBytes(b64));
+      setMessage(`MyAnimeList: ${r.added} added, ${r.kept} already in your library` +
+        (r.notFound.length ? `, ${r.notFound.length} not found on AniList (${r.notFound.slice(0, 3).join(", ")}${r.notFound.length > 3 ? "…" : ""})` : "") + ".");
+      reload(); rescheduleEpisodeAlerts();
+    } catch (e) {
+      setMessage(e?.message?.includes("MyAnimeList") ? e.message : "Couldn't read that file. Pick the .xml or .xml.gz from MAL's Export page.");
+    }
+  });
   const clear = () => Alert.alert("Clear library?", "Deletes every tracked title, verdict and Excited mark. This can't be undone.", [
     { text: "Cancel", style: "cancel" },
     { text: "Clear", style: "destructive", onPress: async () => {
@@ -251,7 +268,7 @@ function DataStorage({ styles, C }) {
       {AUTO_BACKUP && cfg && (
         <>
           <Row title="Storage location" sub={cfg.dirUri ? cfg.dirName : "Tap to choose a folder, e.g. Download/Voidation"} onPress={pickFolder} />
-          <Text style={{ color: C.faint, fontSize: 18 }}>ⓘ</Text>
+          <Icon name="info" size={18} color={C.faint} />
           <Text style={[styles.note, { fontSize: 13, marginTop: 4 }]}>Used for automatic backups. A folder you choose survives uninstalling the app.</Text>
         </>
       )}
@@ -268,7 +285,7 @@ function DataStorage({ styles, C }) {
       {AUTO_BACKUP && cfg && (
         <Row title="Automatic backup frequency" sub={freqLabel} onPress={() => setFreqOpen(true)} />
       )}
-      <Text style={{ color: C.faint, fontSize: 18, marginTop: 4 }}>ⓘ</Text>
+      <Icon name="info" size={18} color={C.faint} style={{ marginTop: 4 }} />
       <Text style={[styles.note, { fontSize: 13, marginTop: 4 }]}>
         You should keep copies of backups in other places as well. Backups hold your whole library, verdicts and watch log.
       </Text>
@@ -286,6 +303,9 @@ function DataStorage({ styles, C }) {
       <Text style={[styles.note, { fontSize: 13, marginTop: 6 }]}>Library: {kb(size)} · Offline copy: {kb(offlineSize)} of 1.5 MB</Text>
       <Row title="Clear offline copy" sub={`Used: ${kb(offlineSize)}. Your library isn't touched.`}
         onPress={async () => { await cacheClear(); setMessage("Offline copy cleared."); measure(); }} />
+
+      <Section>Import</Section>
+      <Row title="Import from MyAnimeList" sub="On myanimelist.net: Profile → Export Lists, download the anime (and manga) file, then pick it here. Titles already in Voidation are kept as they are." onPress={importMal} />
 
       <Section>Export</Section>
       <Row title="Library list" sub="Every title as a spreadsheet (CSV): status, progress, verdict, categories" onPress={exportList} />
@@ -358,7 +378,7 @@ function BadgePage({ styles, C }) {
   const medal = (t, earned, size) => (
     <View style={{ width: size, height: size, borderRadius: size / 2, borderWidth: size / 11, borderColor: earned ? t.color : C.border,
       backgroundColor: "#171226", alignItems: "center", justifyContent: "center" }}>
-      <Text style={{ color: earned ? t.color : C.faint, fontSize: size / 3.2 }}>{earned ? (t.key === "addicted" ? "☕" : "★") : "🔒"}</Text>
+      <Icon name={earned ? (t.key === "addicted" ? "coffee" : "star") : "lock"} size={size / 3} color={earned ? t.color : C.faint} fill={earned && t.key !== "addicted"} />
     </View>
   );
   return (
@@ -387,7 +407,7 @@ function BadgePage({ styles, C }) {
               <Text style={[styles.cardTitle, earned && { color: t.color }]}>{t.label}</Text>
               <Text style={styles.note}>{t.min === 0 ? "Where everyone starts" : `${t.min} anime completed + manga finished`}</Text>
             </View>
-            <Text style={styles.note}>{earned ? "Earned ▸" : `${t.min - n} to go`}</Text>
+            <Text style={styles.note}>{earned ? "Earned" : `${t.min - n} to go`}</Text>
           </TouchableOpacity>
         );
       })}
@@ -462,7 +482,7 @@ function Categories({ styles, C }) {
   if (!access.unlocked) {
     return (
       <View style={[styles.card, { borderColor: C.amber, opacity: 0.85 }]}>
-        <Text style={styles.cardTitle}>🔒 Unlocks at {CATEGORY_MIN} completed anime</Text>
+        <Text style={styles.cardTitle}>Unlocks at {CATEGORY_MIN} completed anime</Text>
         <Text style={[styles.note, { marginTop: 4 }]}>
           Then you can make your own categories, and each one becomes a row at the top of Explore during the third week
           of every month. {access.needed} to go ({access.animeCompleted} completed).
@@ -499,7 +519,7 @@ function Categories({ styles, C }) {
               ) : (
                 <>
                   <Text style={[styles.trackerLabel, { flex: 1, color: C.text, fontWeight: "700" }]}>
-                    ⭐ {c.name}
+                    {c.name}
                   </Text>
                   <Text style={{ color: i === 0 ? C.border : C.sub, fontSize: 16 }} onPress={i === 0 ? undefined : async () => { await moveCategory(c.id, -1); refresh(); }}>↑</Text>
                   <Text style={{ color: i === cats.length - 1 ? C.border : C.sub, fontSize: 16 }} onPress={i === cats.length - 1 ? undefined : async () => { await moveCategory(c.id, 1); refresh(); }}>↓</Text>

@@ -16,6 +16,7 @@ import {
 import { useTheme } from "../context/ThemeContext.js";
 import { useGridColumns } from "../lib/layout";
 import { openDetail } from "../lib/nav";
+import Icon from "../components/Icon.js";
 
 const SEGMENTS = [
   { key: "anime", label: "Anime" },
@@ -153,7 +154,7 @@ export default function BrowseScreen({ navigation }) {
           </TouchableOpacity>
         )}
         <TouchableOpacity onPress={() => setSidebarOpen(true)} style={styles.filterBtn}>
-          <Text style={styles.filterBtnText}>☰  Filters</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}><Icon name="menu" size={15} color={C.text} /><Text style={styles.filterBtnText}>Filters</Text></View>
         </TouchableOpacity>
         <Text style={styles.summary} numberOfLines={1}>{summary}</Text>
       </View>

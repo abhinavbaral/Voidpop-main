@@ -1,7 +1,8 @@
 // SEASON CHART — every anime of a season, grouped by format (TV, ONA, Movies…),
 // with countdown badges and one-tap Plan to Watch. ‹ › moves between seasons.
+// Sort by hype (most followed), trending, soonest or A–Z; grid or list view.
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator } from "react-native";
+import { View, Text, Image, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import { useAuth } from "@voidation/shared/backend/AuthContext";
@@ -10,6 +11,9 @@ import { seasonOf, shiftSeason, seasonTitle, FORMAT_GROUPS, groupOf, fetchSeason
 import Chips from "../components/Chips.js";
 import FilterChips from "../components/FilterChips.js";
 import { applyFilters } from "@voidation/shared/filters";
+import { useSettings } from "@voidation/shared/backend/SettingsContext";
+import { hypeLabel, formatCountdown, releaseLabel } from "@voidation/shared/format";
+import Icon from "../components/Icon.js";
 import Card from "../components/Card.js";
 import { useTheme } from "../context/ThemeContext.js";
 import { useGridColumns } from "../lib/layout";
@@ -27,6 +31,9 @@ export default function SeasonScreen({ navigation }) {
   const [group, setGroup] = useState("all");
   const [lib, setLib] = useState({});
   const [filters, setFilters] = useState({ genre: "", studio: "" });
+  const [sort, setSort] = useState("hype");
+  const { settings, update } = useSettings();
+  const list = settings.seasonLayout === "list";
 
   useFocusEffect(useCallback(() => { getLibrary(user).then(setLib).catch(() => {}); }, [user]));
 
@@ -51,7 +58,13 @@ export default function SeasonScreen({ navigation }) {
     { key: "all", label: `All ${items ? items.length : ""}` },
     ...FORMAT_GROUPS.filter((g) => counts[g.key]).map((g) => ({ key: g.key, label: `${g.label} ${counts[g.key]}` })),
   ];
-  const shown = applyFilters((items || []).filter((it) => group === "all" || groupOf(it) === group), filters);
+  const SORTS = {
+    hype: (a, b) => (b.popularity || 0) - (a.popularity || 0),
+    trending: (a, b) => (b.trending || 0) - (a.trending || 0) || (b.popularity || 0) - (a.popularity || 0),
+    soonest: (a, b) => (a.nextEpisode?.airingAt ?? Infinity) - (b.nextEpisode?.airingAt ?? Infinity) || (a.date || "9").localeCompare(b.date || "9"),
+    title: (a, b) => a.title.localeCompare(b.title),
+  };
+  const shown = [...applyFilters((items || []).filter((it) => group === "all" || groupOf(it) === group), filters)].sort(SORTS[sort]);
   const label = (key) => statusesFor("anime").find((s) => s.key === key)?.label;
 
   // adds to Plan to Watch, or undoes that; never removes a title you're
@@ -82,6 +95,14 @@ export default function SeasonScreen({ navigation }) {
       <View style={{ paddingHorizontal: 14 }}>
         <Chips options={groups} value={group} onChange={setGroup} />
         <FilterChips items={items} value={filters} onChange={setFilters} style={{ marginTop: 6 }} />
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 6 }}>
+          <Chips style={{ flex: 1 }} value={sort} onChange={setSort}
+            options={[{ key: "hype", label: "Hype" }, { key: "trending", label: "Trending" }, { key: "soonest", label: "Soonest" }, { key: "title", label: "A–Z" }]} />
+          <TouchableOpacity onPress={() => update("seasonLayout", list ? "grid" : "list")} style={styles.layoutBtn}
+            accessibilityLabel={list ? "Show as grid" : "Show as list"}>
+            <Icon name={list ? "browse" : "menu"} size={18} color={C.text} />
+          </TouchableOpacity>
+        </View>
       </View>
       {items === null ? (
         <View style={{ padding: 40, alignItems: "center" }}>
@@ -90,17 +111,36 @@ export default function SeasonScreen({ navigation }) {
       ) : (
         <FlatList
           data={shown}
-          key={`season-${cols}`}
-          numColumns={cols}
+          key={list ? "season-list" : `season-${cols}`}
+          numColumns={list ? 1 : cols}
           keyExtractor={(it) => String(it.id)}
           contentContainerStyle={{ padding: 6, paddingBottom: 30 }}
           ListEmptyComponent={<Text style={styles.empty}>{loading ? "Loading…" : filters.genre || filters.studio ? "Nothing matches these filters." : "Nothing announced for this season yet."}</Text>}
           ListFooterComponent={loading ? <Text style={[styles.empty, { marginTop: 10 }]}>Loading the rest of the season…</Text> : null}
           renderItem={({ item: it }) => {
             const tracked = lib[`anime:${it.id}`];
+            if (list) {
+              return (
+                <TouchableOpacity onPress={() => openDetail(navigation, it)} style={styles.row}>
+                  {it.image ? <Image source={{ uri: it.image }} style={styles.thumb} /> : <View style={[styles.thumb, { backgroundColor: C.border }]} />}
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.rowTitle} numberOfLines={2}>{it.title}</Text>
+                    <Text style={styles.rowSub} numberOfLines={1}>{[it.format?.replace("_", " "), it.creator].filter(Boolean).join(" · ")}</Text>
+                    <Text style={styles.rowSub} numberOfLines={1}>
+                      {it.nextEpisode ? `Ep ${it.nextEpisode.episode} in ${formatCountdown(it.nextEpisode.airingAt)}` : releaseLabel(it)}
+                      {hypeLabel(it.popularity) ? `  ·  ${hypeLabel(it.popularity)}` : ""}
+                    </Text>
+                  </View>
+                  <TouchableOpacity onPress={() => togglePlan(it)} disabled={!!tracked && tracked.status !== "plan"} style={[styles.addSm, tracked && styles.addOn]}>
+                    <Text style={[styles.addText, tracked && { color: "#fff" }]} numberOfLines={1}>{tracked ? `✓ ${label(tracked.status)}` : "+ Plan"}</Text>
+                  </TouchableOpacity>
+                </TouchableOpacity>
+              );
+            }
             return (
               <View style={{ width: `${100 / cols}%`, padding: 6 }}>
                 <Card item={it} onPress={() => openDetail(navigation, it)} style={{ margin: 0 }} width="100%" />
+                {sort === "hype" && hypeLabel(it.popularity) && <Text style={styles.hype} numberOfLines={1}>{hypeLabel(it.popularity)}</Text>}
                 <TouchableOpacity onPress={() => togglePlan(it)} disabled={!!tracked && tracked.status !== "plan"} style={[styles.add, tracked && styles.addOn]}>
                   <Text style={[styles.addText, tracked && { color: "#fff" }]} numberOfLines={1}>
                     {tracked ? `✓ ${label(tracked.status)}` : "+ Plan to Watch"}
@@ -126,4 +166,11 @@ const makeStyles = (C) => StyleSheet.create({
   add: { marginTop: 6, borderWidth: 1, borderColor: C.border, borderRadius: 8, paddingVertical: 7, alignItems: "center", backgroundColor: C.card },
   addOn: { backgroundColor: C.purple, borderColor: C.purple },
   addText: { color: C.sub, fontSize: 12, fontWeight: "800" },
+  addSm: { borderWidth: 1, borderColor: C.border, borderRadius: 8, paddingVertical: 6, paddingHorizontal: 10, backgroundColor: C.card, maxWidth: 110 },
+  layoutBtn: { width: 36, height: 36, borderRadius: 9, borderWidth: 1, borderColor: C.border, alignItems: "center", justifyContent: "center" },
+  row: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 8, paddingVertical: 8 },
+  thumb: { width: 46, height: 64, borderRadius: 6 },
+  rowTitle: { color: C.text, fontSize: 14, fontWeight: "700" },
+  rowSub: { color: C.faint, fontSize: 11, marginTop: 2 },
+  hype: { color: C.orange, fontSize: 11, fontWeight: "700", marginTop: 4 },
 });

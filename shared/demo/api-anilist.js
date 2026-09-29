@@ -89,7 +89,27 @@ export async function fetchAniListDetail(segment, id) {
     { site: "Twitter", url: "https://twitter.com", type: "SOCIAL" },
   ];
   const whereToRead = segment === "manga" ? readingLinks(Number(id) % 3 ? sample : [], { title: it?.title, country: it?.country }) : null;
-  return { trailer: null, related, whereToWatch, whereToRead }; // trailers can't be embedded in the demo
+  // anime: its source, when the demo catalog has a manga of the same name
+  let source = null;
+  if (segment === "anime" && it) {
+    const norm = (t) => t.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const m = CATALOG.manga.find((x) => norm(x.title) === norm(it.title) || norm(it.title).startsWith(norm(x.title)));
+    source = m
+      ? { label: m.country === "KR" ? "Manhwa" : m.country === "CN" ? "Manhua" : "Manga", items: [{ ...toAppItem(m), kindLabel: m.country === "KR" ? "Manhwa" : "Manga" }] }
+      : { label: "Original", items: [] };
+  }
+  // sample cast so the Characters / Staff / Themes sections show in the demo
+  const who = (name, n) => ({ id: n, name, native: null, image: it?.image || null });
+  const characters = it ? ["Lead", "Rival", "Mentor", "Friend"].map((r, i) => ({
+    ...who(`${r} (demo)`, 900 + i), role: i < 2 ? "Main" : "Supporting",
+    voice: segment === "anime" ? who(`Voice actor ${i + 1}`, 950 + i) : null,
+  })) : [];
+  const staff = it ? [{ ...who(it.creator || "Demo Studio", 980), role: segment === "anime" ? "Director" : "Story & Art" }] : [];
+  const themes = (it?.genres || []).map((g, i) => ({ name: g, rank: 90 - i * 5 }));
+  const episodes = segment === "anime" && it ? Array.from({ length: 4 }, (_, i) => ({
+    number: i + 1, name: `Demo episode ${i + 1}`, thumbnail: it.banner || it.image, url: "https://www.crunchyroll.com", site: "Crunchyroll",
+  })) : [];
+  return { trailer: null, related, whereToWatch, whereToRead, source, characters, staff, themes, episodes }; // trailers can't be embedded in the demo
 }
 
 // Every episode airing in the next `days` days: each airing demo title gets its
@@ -225,4 +245,39 @@ export async function fetchPremieres(from, to, { sort = "START_DATE" } = {}) {
     return toAppItem(i);
   }).filter((i) => i.date && num(i.date) > from && num(i.date) < to);
   return items.sort((a, b) => (sort === "START_DATE_DESC" ? -1 : 1) * a.date.localeCompare(b.date));
+}
+
+// Demo: pretend MAL ids equal the catalog's ids (true for many older titles).
+export async function fetchByMalIds(segment, malIds) {
+  await wait(150);
+  const out = {};
+  malIds.forEach((id) => { const it = findItem(segment, id); if (it) out[id] = toAppItem(it); });
+  return out;
+}
+
+// Demo person page: a few roles from the catalog
+export async function fetchPerson(id) {
+  await wait(150);
+  const picks = CATALOG.anime.filter((x) => !x.unreleased).slice(0, 6);
+  return {
+    id, name: `Demo person ${id}`, native: null, image: picks[0]?.image || null,
+    occupations: ["Voice Actor"], language: "Japanese",
+    roles: picks.map((x, i) => ({ character: { id: 5000 + i, name: `Character ${i + 1}`, image: x.image }, role: i % 2 ? "Supporting" : "Main", item: toAppItem(x) })),
+    work: [],
+  };
+}
+
+// Demo watch order: this title plus its demo relations, by date
+export async function fetchWatchOrder(id) {
+  await wait(150);
+  const it = findItem("anime", id);
+  if (!it) return [];
+  const all = [it, ...(it.related || []).map((r) => findItem("anime", r)).filter(Boolean)];
+  return all.map(toAppItem).sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+}
+export async function fetchDiscussions(id) {
+  await wait(150);
+  const it = findItem("anime", id) || findItem("manga", id);
+  if (!it) return [];
+  return [3, 2, 1].map((n) => ({ id: n, title: `${it.title} Episode ${n} Discussion`, replies: 40 * n, views: 900 * n, url: it.url || "https://anilist.co", at: 0 }));
 }

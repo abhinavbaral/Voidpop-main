@@ -9,16 +9,18 @@ import { useCallback, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import { getUserTier, TIERS, categoriesUnlocked } from "@voidation/shared/backend/store";
 import { useTheme } from "../context/ThemeContext.js";
+import { LOGO } from "../components/Brand.js";
+import Icon from "../components/Icon.js";
 
 const GROUPS = [
-  [["statistics", "▥", "Statistics"], ["data", "▤", "Data and storage"]],
-  [["announced", "✦", "New announcements"]],
-  [["categories", "▦", "Categories"], ["anilist", "⇄", "AniList"]],
-  [["settings", "⚙", "Appearance and Others"], ["help", "?", "Help"], ["about", "ⓘ", "About"]],
+  [["statistics", "stats", "Statistics"], ["data", "storage", "Data and storage"]],
+  [["announced", "bell", "New announcements"]],
+  [["categories", "browse", "Categories"], ["anilist", "sync", "AniList"]],
+  [["settings", "palette", "Appearance and Others"], ["help", "help", "Help"], ["about", "info", "About"]],
 ];
 
 export default function MoreScreen({ navigation }) {
-  const { C } = useTheme();
+  const { C, dark } = useTheme();
   const styles = makeStyles(C);
   const { settings, update } = useSettings();
   const [rank, setRank] = useState(null);
@@ -31,7 +33,7 @@ export default function MoreScreen({ navigation }) {
 
   const toggle = (icon, label, hint, key) => (
     <Pressable style={styles.row} onPress={() => update(key, !settings[key])}>
-      <Text style={styles.icon}>{icon}</Text>
+      <View style={styles.icon}><Icon name={icon} size={21} color={C.purple} /></View>
       <View style={{ flex: 1 }}>
         <Text style={styles.label}>{label}</Text>
         <Text style={styles.hint}>{hint}</Text>
@@ -49,17 +51,17 @@ export default function MoreScreen({ navigation }) {
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <ScrollView contentContainerStyle={{ paddingBottom: 30 }}>
         <View style={styles.logoWrap}>
-          <Image source={require("../../assets/logo.png")} style={styles.logo} resizeMode="contain" />
+          <Image source={dark ? LOGO.dark : LOGO.light} style={styles.logo} resizeMode="contain" accessibilityLabel="Voidation" />
         </View>
         <View style={styles.group}>
-          {toggle("◷", "24-hour clock", "Airing times as 16:30", "clock24")}
-          {toggle("▣", "Countdown badges", "Next episode on posters", "posterBadges")}
+          {toggle("clock", "24-hour clock", "Airing times as 16:30", "clock24")}
+          {toggle("badge", "Countdown badges", "Next episode on posters", "posterBadges")}
         </View>
         {rank && (
           <Pressable onPress={() => navigation.navigate("MorePage", { page: "badge" })}
             style={({ pressed }) => [styles.badgeRow, { borderColor: rank.tier.color }, pressed && { opacity: 0.8 }]}>
             <View style={[styles.miniMedal, { borderColor: rank.tier.color }]}>
-              <Text style={{ color: rank.tier.color, fontSize: 18 }}>{rank.tier.key === "addicted" ? "☕" : "★"}</Text>
+              <Icon name={rank.tier.key === "addicted" ? "coffee" : "star"} size={18} color={rank.tier.color} fill={rank.tier.key !== "addicted"} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.hint}>Your badge</Text>
@@ -73,7 +75,7 @@ export default function MoreScreen({ navigation }) {
         )}
         <View style={styles.group}>
           <Pressable style={({ pressed }) => [styles.row, pressed && { backgroundColor: C.card }]} onPress={() => navigation.navigate("Wrapped")}>
-            <Text style={[styles.icon, { color: C.orange }]}>★</Text>
+            <View style={styles.icon}><Icon name="rewind" size={21} color={C.orange} /></View>
             <View style={{ flex: 1 }}>
               <Text style={[styles.label, { color: C.orange }]}>Voidation Rewind</Text>
               <Text style={styles.hint}>All time, or year by year</Text>
@@ -88,7 +90,7 @@ export default function MoreScreen({ navigation }) {
                 style={({ pressed }) => [styles.row, pressed && { backgroundColor: C.card }]}
                 onPress={() => navigation.navigate("MorePage", { page })}
               >
-                <Text style={styles.icon}>{icon}</Text>
+                <View style={styles.icon}><Icon name={icon} size={21} color={C.purple} /></View>
                 <Text style={[styles.label, { flex: 1 }]}>{label}</Text>
               </Pressable>
             ))}
@@ -107,7 +109,7 @@ const makeStyles = (C) => StyleSheet.create({
   logo: { width: 96, height: 96 },
   group: { borderTopWidth: 1, borderTopColor: C.border, paddingVertical: 6 },
   row: { flexDirection: "row", alignItems: "center", gap: 22, paddingHorizontal: 22, paddingVertical: 16 },
-  icon: { color: C.purple, fontSize: 20, width: 24, textAlign: "center" },
+  icon: { width: 24, alignItems: "center" },
   label: { color: C.text, fontSize: 16, fontWeight: "600" },
   hint: { color: C.faint, fontSize: 12, marginTop: 2 },
 });

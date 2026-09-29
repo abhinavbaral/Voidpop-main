@@ -7,6 +7,7 @@ import { useSettings } from "@voidation/shared/backend/SettingsContext";
 import { titlePath, cacheTitle } from "../lib/titles.js";
 import { progressLabel, behind, canAddOne } from "./Progress.jsx";
 import { doneLabel } from "@voidation/shared/backend/store";
+import Icon from "./Icon.jsx";
 
 // `entry` (Library only): shows your progress and, with onPlus, a +1 button.
 // `selecting` (Library's Select mode): a tap selects instead of opening.
@@ -21,7 +22,7 @@ export default function Card({ item, now, entry, onPlus, selecting, selected, on
       {selecting && <span className="select-tick" aria-hidden="true">{selected ? "✓" : ""}</span>}
       <div className="card-poster">
         {item.image ? <img src={item.image} alt="" loading="lazy" /> : <span>No image</span>}
-        {item.awardYear && <span className="award-ribbon">🏆 {item.awardYear}</span>}
+        {item.awardYear && <span className="award-ribbon"><Icon name="trophy" size={11} /> {item.awardYear}</span>}
         {next && (
           <span className={`card-countdown${entry?.delay ? " late" : ""}`} title={`Episode ${next.episode}`}>
             {entry?.delay ? "Delayed · " : ""}Ep {next.episode} · {formatCountdown(next.airingAt, now)}

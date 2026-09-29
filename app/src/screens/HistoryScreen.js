@@ -45,9 +45,9 @@ export default function HistoryScreen({ navigation }) {
     if (r.reachedEnd) setFinishing(s.item);
     readProgress();
   };
-  const finish = async ({ verdict, vibes, comment }) => {
+  const finish = async ({ verdict, vibes, moods, comment }) => {
     await setStatus(user, finishing.segment, finishing, "completed");
-    await addReview(user, finishing.segment, finishing.id, { verdict, vibes, comment });
+    await addReview(user, finishing.segment, finishing.id, { verdict, vibes, moods, comment });
     setFinishing(null);
     readProgress();
   };

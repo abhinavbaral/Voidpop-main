@@ -7,7 +7,7 @@
 // by marking a title Completed don't count, so old viewing isn't mistaken for
 // this year's.
 
-import { getLog, getLibrary, getReviews, getStats, tierFor, totalFor, VERDICTS } from "./backend/store.js";
+import { getLog, getLibrary, getReviews, getStats, tierFor, totalFor, VERDICTS, isDone } from "./backend/store.js";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -183,7 +183,7 @@ export async function computeAllTime() {
   anime.forEach((x) => x.item.creator && studios.set(x.item.creator, (studios.get(x.item.creator) || 0) + Math.max(1, x.amount)));
   const topStudio = [...studios.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || null;
 
-  const count = (seg, status) => entries.filter((x) => x.item.segment === seg && x.e.status === status).length;
+  const count = (seg, status) => entries.filter((x) => x.item.segment === seg && (status === "completed" ? isDone(x.e.status) : x.e.status === status)).length;
   return {
     year: "all",
     label: "All time",

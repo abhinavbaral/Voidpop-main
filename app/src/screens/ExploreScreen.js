@@ -10,10 +10,11 @@ import YourShows from "../components/YourShows.js";
 import { loadCategoryRows } from "@voidation/shared/backend/store";
 import { useNow } from "@voidation/shared/hooks/useNow";
 import Brand from "../components/Brand.js";
-import { loadExplorePools, buildExplore, knownKeys, loadVerdictRows, loadNewSeasons, loadAnimeOfTheYear } from "@voidation/shared/explore";
+import { loadExplorePools, buildExplore, knownKeys, loadVerdictRows, loadNewSeasons, loadAnimeOfTheYear, loadJumpBackIn } from "@voidation/shared/explore";
 import { useTheme } from "../context/ThemeContext.js";
 import { openDetail } from "../lib/nav";
 import { useIsWide } from "../lib/layout";
+import Icon from "../components/Icon.js";
 
 export default function ExploreScreen({ navigation }) {
   const { C } = useTheme();
@@ -23,6 +24,7 @@ export default function ExploreScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [verdictRows, setVerdictRows] = useState([]);
   const [newSeasons, setNewSeasons] = useState([]);
+  const [jump, setJump] = useState({ anime: [], manga: [] }); // titles you started and left
   const [catRows, setCatRows] = useState([]); // your categories (500+ completed), days 15–21
   const now = useNow(1000); // Up next countdowns tick every second
 
@@ -30,6 +32,7 @@ export default function ExploreScreen({ navigation }) {
   useFocusEffect(useCallback(() => {
     loadVerdictRows().then(setVerdictRows).catch(() => {});
     loadNewSeasons().then(setNewSeasons).catch(() => {});
+    loadJumpBackIn().then(setJump).catch(() => {});
     loadCategoryRows().then(setCatRows).catch(() => {});
   }, []));
 
@@ -59,6 +62,7 @@ export default function ExploreScreen({ navigation }) {
       setPools(fresh);
       loadVerdictRows().then(setVerdictRows).catch(() => {});
       loadNewSeasons().then(setNewSeasons).catch(() => {});
+      loadJumpBackIn().then(setJump).catch(() => {});
     } catch { /* offline: keep what's shown */ }
     setRefreshing(false);
   };
@@ -73,32 +77,35 @@ export default function ExploreScreen({ navigation }) {
       >
         {!wide && (
         <View style={styles.header}>
-          <Brand size={20} />
-          <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
+          {/* logo on the left, then search and Browse in one row */}
+          <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+            <Brand size={22} />
             <TouchableOpacity onPress={() => navigation.navigate("Search")} style={[styles.searchBtn, { flex: 1, marginTop: 0 }]}>
               <Text style={{ color: C.faint, fontSize: 13 }}>Search anime and manga...</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => navigation.navigate("Browse")} style={[styles.searchBtn, { marginTop: 0 }]}>
-              <Text style={{ color: C.text, fontSize: 13, fontWeight: "700" }}>▦ Browse</Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}><Icon name="browse" size={14} color={C.text} /><Text style={{ color: C.text, fontSize: 13, fontWeight: "700" }}>Browse</Text></View>
             </TouchableOpacity>
           </View>
         </View>
         )}
 
-        {catRows.map((r) => <PosterRow key={r.id} title={`⭐ ${r.title}`} items={r.items} onOpen={open} />)}
-        <YourShows now={now} layout="row" title="⏳ Up next" onOpen={open} />
-        {newSeasons.length > 0 && <PosterRow title="🆕 New seasons of shows you watched" items={newSeasons} onOpen={open} />}
-        {data.coming?.length > 0 && <PosterRow title={`📅 ${data.comingTitle}`} items={data.coming} onOpen={open} />}
+        {catRows.map((r) => <PosterRow key={r.id} title={r.title} items={r.items} onOpen={open} />)}
+        <YourShows now={now} layout="row" title="Up next" onOpen={open} />
+        {jump.anime.length > 0 && <PosterRow title="Jump back in: Anime" items={jump.anime} onOpen={open} />}
+        {jump.manga.length > 0 && <PosterRow title="Jump back in: Manga" items={jump.manga} onOpen={open} />}
+        {newSeasons.length > 0 && <PosterRow title="New seasons of shows you watched" items={newSeasons} onOpen={open} />}
+        {data.coming?.length > 0 && <PosterRow title={data.comingTitle} items={data.coming} onOpen={open} />}
         {verdictRows.map((r) => (
           <PosterRow key={r.verdict} title={r.title} dot={r.color} items={r.items} onOpen={open} />
         ))}
-        <PosterRow title="🔥 Talk of the Week" items={data.talk} loading={loading} onOpen={open} />
-        <PosterRow title="🎌 Don't Miss This — Anime" items={data.dontMissAnime} loading={loading} onOpen={open} />
-        <PosterRow title="📖 Don't Miss This — Manga" items={data.dontMissManga} loading={loading} onOpen={open} />
-        <PosterRow title="🌀 Isekai Heaven" items={data.isekai} loading={loading} onOpen={open} />
-        <PosterRow title="🔥 Shonen Feast" items={data.shonen} loading={loading} onOpen={open} />
-        <PosterRow title="⭐ Voidation Angles" items={data.voidpicks} loading={loading} onOpen={open} />
-        {aoty.length > 0 && <PosterRow title="🏆 Anime of the Year (Crunchyroll Awards)" items={aoty} onOpen={open} />}
+        <PosterRow title="Talk of the Week" items={data.talk} loading={loading} onOpen={open} />
+        <PosterRow title="Don't Miss This — Anime" items={data.dontMissAnime} loading={loading} onOpen={open} />
+        <PosterRow title="Don't Miss This — Manga" items={data.dontMissManga} loading={loading} onOpen={open} />
+        <PosterRow title="Isekai Heaven" items={data.isekai} loading={loading} onOpen={open} />
+        <PosterRow title="Shonen Feast" items={data.shonen} loading={loading} onOpen={open} />
+        <PosterRow title="Voidation Angles" items={data.voidpicks} loading={loading} onOpen={open} />
+        {aoty.length > 0 && <PosterRow title="Anime of the Year (Crunchyroll Awards)" items={aoty} onOpen={open} />}
       </ScrollView>
     </SafeAreaView>
   );

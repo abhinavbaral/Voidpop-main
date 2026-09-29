@@ -40,6 +40,11 @@ export default function ReviewCard({ review, onEdit, onShare }) {
             <Text style={styles.vibeChipText}>{v}</Text>
           </View>
         ))}
+        {(review.moods || []).map((m) => (
+          <View key={m} style={[styles.vibeChip, { borderColor: C.orange }]}>
+            <Text style={[styles.vibeChipText, { color: C.orange }]}>{m}</Text>
+          </View>
+        ))}
       </View>
 
       {!!review.comment && <Text style={styles.comment}>{review.comment}</Text>}

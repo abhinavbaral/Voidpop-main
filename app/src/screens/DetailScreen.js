@@ -11,6 +11,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import TrailerPlayer from "../components/TrailerPlayer";
 import WhereToWatch from "../components/WhereToWatch";
 import WhereToRead from "../components/WhereToRead";
+import SourceLine from "../components/SourceLine.js";
+import CastCrew from "../components/CastCrew.js";
+import EpisodeList from "../components/EpisodeList.js";
+import { NoteBox, WatchOrder, Discussions } from "../components/TitleExtras.js";
 import { addToCalendar } from "../lib/calendar";
 import { completeEarlierSeasons, undoEarlierSeasons } from "@voidation/shared/seasons";
 import { getCachedItem, cacheItem, openDetail, goBackOrHome } from "../lib/nav";
@@ -31,6 +35,7 @@ import ShareCardModal from "../components/ShareCardModal.js";
 import CountdownShareModal from "../components/CountdownShareModal.js";
 import Card from "../components/Card.js";
 import { useTheme } from "../context/ThemeContext.js";
+import Icon from "../components/Icon.js";
 
 const SEGMENTS = ["anime", "manga"];
 const CREATOR_LABEL = { manga: "Mangaka", anime: "Studio" };
@@ -115,6 +120,9 @@ function DetailBody({ item, navigation }) {
   const [related, setRelated] = useState([]);
   const [watch, setWatch] = useState([]);
   const [read, setRead] = useState(null); // manga: { read, buy, search }
+  const [source, setSource] = useState(null); // anime: { label, items }
+  const [cast, setCast] = useState({}); // { characters, staff, themes }
+  const [episodes, setEpisodes] = useState([]); // anime: official episode list
 
   const refresh = useCallback(async () => {
     await fillCompleted(item); // completed = all watched, once the count is known
@@ -138,7 +146,7 @@ function DetailBody({ item, navigation }) {
   useEffect(() => {
     let alive = true;
     fetchAniListDetail(item.segment, item.id)
-      .then((d) => { if (alive) { setTrailer(d.trailer); setRelated(d.related); setWatch(d.whereToWatch || []); setRead(d.whereToRead || null); } })
+      .then((d) => { if (alive) { setTrailer(d.trailer); setRelated(d.related); setWatch(d.whereToWatch || []); setRead(d.whereToRead || null); setSource(d.source || null); setCast({ characters: d.characters || [], staff: d.staff || [], themes: d.themes || [] }); setEpisodes(d.episodes || []); } })
       .catch(() => {});
     if (item.segment === "anime" && !item.finished) {
       fetchNextEpisodes([item.id])
@@ -176,9 +184,9 @@ function DetailBody({ item, navigation }) {
     if (r.reachedEnd) setModalOpen(true); // last episode: ask for the verdict
   };
 
-  const saveVerdict = async ({ verdict, vibes, comment }) => {
+  const saveVerdict = async ({ verdict, vibes, moods, comment }) => {
     await setStatus(user, item.segment, item, "completed");
-    await addReview(user, item.segment, item.id, { verdict, vibes, comment });
+    await addReview(user, item.segment, item.id, { verdict, vibes, moods, comment });
     setModalOpen(false);
     refresh();
     markEarlier("completed");
@@ -212,7 +220,7 @@ function DetailBody({ item, navigation }) {
             </Text>
           </TouchableOpacity>
         )}
-        {status === "completed" && !unreleased && (
+        {(status === "completed" || status === "rewatching") && !unreleased && (
           <TouchableOpacity onPress={() => setModalOpen(true)} style={styles.statusBtn}>
             <Text style={styles.statusText}>{myReview ? "Edit review" : "Review it"}</Text>
           </TouchableOpacity>
@@ -291,6 +299,7 @@ function DetailBody({ item, navigation }) {
                 </Text>
               )}
               <Text style={styles.sub}>{item.genre} · {releaseLabel(item)}</Text>
+              {item.segment === "anime" && <SourceLine source={source} navigation={navigation} />}
               <View style={styles.genreWrap}>
                 {(item.genres?.length ? item.genres : [item.genre]).slice(0, 4).map((g) => (
                   <View key={g} style={styles.genreChip}>
@@ -328,10 +337,10 @@ function DetailBody({ item, navigation }) {
               <View style={{ alignItems: "flex-end", gap: 8 }}>
                 <Text style={styles.nextCountdown}>{formatCountdown(nextEpisode.airingAt, now)}</Text>
                 <TouchableOpacity onPress={() => addToCalendar({ ...item, nextEpisode })} hitSlop={6}>
-                  <Text style={{ color: C.purple, fontSize: 12, fontWeight: "700" }}>＋ Add to calendar</Text>
+                  <Text style={{ color: C.purple, fontSize: 12, fontWeight: "700" }}>+ Add to calendar</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => setCountdownOpen(true)} hitSlop={6}>
-                  <Text style={{ color: C.purple, fontSize: 12, fontWeight: "700" }}>↗ Share countdown</Text>
+                  <Text style={{ color: C.purple, fontSize: 12, fontWeight: "700" }}>Share countdown</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -347,6 +356,11 @@ function DetailBody({ item, navigation }) {
           )}
 
           {item.segment === "manga" ? <WhereToRead links={read} /> : <WhereToWatch links={watch} segment={item.segment} />}
+          <NoteBox item={item} />
+          {item.segment === "anime" && <EpisodeList episodes={episodes} progress={progress} />}
+          {item.segment === "anime" && <WatchOrder item={item} navigation={navigation} />}
+          <CastCrew {...cast} segment={item.segment} navigation={navigation} />
+          <Discussions item={item} />
 
           {/* your verdict */}
           {myReview && (
@@ -452,7 +466,7 @@ function ProgressBox({ item, progress, onChange, styles, C }) {
             <Pressable onPress={() => { setDraft(String(progress)); setError(""); setEditing(true); }} hitSlop={8}>
               <Text style={styles.nextTitle}>
                 {progress}{total ? <Text style={{ color: C.faint }}> / {total}</Text> : null}
-                <Text style={{ color: C.purple, fontSize: 12 }}>  ✎</Text>
+                {"  "}<Icon name="edit" size={13} color={C.purple} />
               </Text>
             </Pressable>
           )}

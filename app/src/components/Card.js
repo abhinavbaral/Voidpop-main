@@ -9,6 +9,7 @@ import { useTheme } from "../context/ThemeContext.js";
 import { releaseLabel, formatCountdown } from "@voidation/shared/format";
 import { useSettings } from "@voidation/shared/backend/SettingsContext";
 import { totalFor, unitFor, behindBy, maxProgress, doneLabel } from "@voidation/shared/backend/store";
+import Icon from "./Icon.js";
 
 // `columns`: when used in a grid, each cell gets an exact 1/columns width so an
 // incomplete last row doesn't stretch its cards.
@@ -59,7 +60,7 @@ function CardInner({ item, entry, onPlus, onPress, onLongPress, selecting, selec
             <Text style={{ color: C.faint, fontSize: 12 }}>No image</Text>
           </View>
         )}
-        {!!item.awardYear && <Text style={styles.award}>🏆 {item.awardYear}</Text>}
+        {!!item.awardYear && <View style={styles.award}><Icon name="trophy" size={11} color="#1a1205" strokeWidth={2.4} /><Text style={styles.awardText}>{item.awardYear}</Text></View>}
         {selecting && (
           <View style={[styles.tick, selected && { backgroundColor: C.purple, borderColor: C.purple }]}>
             <Text style={{ color: "#fff", fontWeight: "900", fontSize: 12 }}>{selected ? "✓" : ""}</Text>
@@ -119,7 +120,8 @@ const makeStyles = (C) => StyleSheet.create({
   title: { color: C.text, fontWeight: "700", fontSize: 13 },
   creator: { color: C.orange, fontSize: 11, fontWeight: "600", marginTop: 3 },
   sub: { color: C.sub, fontSize: 11, marginTop: 2 },
-  award: { position: "absolute", top: 6, left: 6, backgroundColor: "#f59e0b", color: "#1a1205", fontWeight: "900", fontSize: 11, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, overflow: "hidden" },
+  award: { position: "absolute", top: 6, left: 6, flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "#f59e0b", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  awardText: { color: "#1a1205", fontWeight: "900", fontSize: 11 },
   tick: {
     position: "absolute", top: 6, left: 6, width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: "#fff",
     backgroundColor: "rgba(11,15,25,0.8)", alignItems: "center", justifyContent: "center",

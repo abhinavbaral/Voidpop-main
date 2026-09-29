@@ -85,7 +85,7 @@ export default function Browse({ embedded = false }) {
   return (
     <div className={embedded ? "stack browse-embedded" : "stack"} id={embedded ? "browse" : undefined}>
       <div className="browse-head">
-        {embedded ? <h2>🔎 Browse everything</h2> : <h1>Browse</h1>}
+        {embedded ? <h2>Browse</h2> : <h1>Browse</h1>}
         <div className="seg-tabs" role="tablist" aria-label="Type">
           {SEGMENTS.map((s) => (
             <button key={s} role="tab" aria-selected={s === segment} className={`seg-tab${s === segment ? " on" : ""}`}

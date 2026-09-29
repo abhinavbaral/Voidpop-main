@@ -1,11 +1,11 @@
 // Popup when marking Completed/Finished:
-// verdict (Peak / Dive In / One Time / Void It) + vibes + comment.
+// verdict (Peak / Dive In / One Time / Void It) + vibes + moods + comment.
 
 import { useState } from "react";
 import {
   Modal, View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet,
 } from "react-native";
-import { VERDICTS, VIBES } from "@voidation/shared/backend/store";
+import { VERDICTS, VIBES, MOODS } from "@voidation/shared/backend/store";
 import { useTheme } from "../context/ThemeContext.js";
 
 export default function VerdictModal({ visible, initial, onSave, onClose }) {
@@ -13,7 +13,9 @@ export default function VerdictModal({ visible, initial, onSave, onClose }) {
   const styles = makeStyles(C);
   const [verdict, setVerdict] = useState(initial?.verdict || null);
   const [vibes, setVibes] = useState(initial?.vibes || []);
+  const [moods, setMoods] = useState(initial?.moods || []);
   const [comment, setComment] = useState(initial?.comment || "");
+  const toggleMood = (m) => setMoods((prev) => (prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m].slice(-3)));
 
   const toggleVibe = (v) =>
     setVibes((prev) =>
@@ -68,6 +70,20 @@ export default function VerdictModal({ visible, initial, onSave, onClose }) {
               })}
             </View>
 
+            <Text style={[styles.sub, { marginTop: 16 }]}>
+              How did it make you feel? (pick up to 3)
+            </Text>
+            <View style={styles.vibeWrap}>
+              {MOODS.map((m) => {
+                const active = moods.includes(m);
+                return (
+                  <TouchableOpacity key={m} onPress={() => toggleMood(m)} style={[styles.vibe, active && styles.moodActive]}>
+                    <Text style={[styles.vibeText, active && { color: "#fff" }]}>{m}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
             <TextInput
               value={comment}
               onChangeText={setComment}
@@ -83,7 +99,7 @@ export default function VerdictModal({ visible, initial, onSave, onClose }) {
               </TouchableOpacity>
               <TouchableOpacity
                 disabled={!verdict}
-                onPress={() => onSave({ verdict, vibes, comment: comment.trim() })}
+                onPress={() => onSave({ verdict, vibes, moods, comment: comment.trim() })}
                 style={[styles.save, !verdict && { opacity: 0.4 }]}
               >
                 <Text style={{ color: "#fff", fontWeight: "700" }}>Save</Text>
@@ -121,6 +137,7 @@ const makeStyles = (C) => StyleSheet.create({
     borderColor: C.border, justifyContent: "center",
   },
   vibeActive: { backgroundColor: C.purple, borderColor: C.purple },
+  moodActive: { backgroundColor: C.orange, borderColor: C.orange },
   vibeText: { color: C.sub, fontSize: 12, fontWeight: "600" },
   input: {
     marginTop: 16, minHeight: 80, borderRadius: 10, borderWidth: 1,

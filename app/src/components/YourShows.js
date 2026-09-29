@@ -17,7 +17,7 @@ import { useTheme } from "../context/ThemeContext.js";
 
 const FOLLOWING = new Set(["watching", "plan", "onhold"]);
 
-export default function YourShows({ now, layout = "stack", title = "⏳ Your shows", emptyText, onOpen, refreshKey = 0 }) {
+export default function YourShows({ now, layout = "stack", title = "Your shows", emptyText, onOpen, refreshKey = 0 }) {
   const { C } = useTheme();
   const { user } = useAuth();
   const { width } = useWindowDimensions();
@@ -64,9 +64,9 @@ export default function YourShows({ now, layout = "stack", title = "⏳ Your sho
     const r = await setProgress(user, entry.item, (entry.progress || 0) + 1, "plus");
     if (r.reachedEnd) setFinishing(entry.item);
   };
-  const finish = async ({ verdict, vibes, comment }) => {
+  const finish = async ({ verdict, vibes, moods, comment }) => {
     await setStatus(user, finishing.segment, finishing, "completed");
-    await addReview(user, finishing.segment, finishing.id, { verdict, vibes, comment });
+    await addReview(user, finishing.segment, finishing.id, { verdict, vibes, moods, comment });
     setFinishing(null);
   };
   const card = (s, w) => <CountdownCard key={s.item.id} show={s} now={now} clock24={clock24} onPlus={plus} onOpen={onOpen} width={w} />;

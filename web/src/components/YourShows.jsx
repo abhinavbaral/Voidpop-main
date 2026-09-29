@@ -14,7 +14,7 @@ import VerdictModal from "./VerdictModal.jsx";
 
 const FOLLOWING = new Set(["watching", "plan", "onhold"]);
 
-export default function YourShows({ now, layout = "grid", title = "⏳ Your shows", emptyText }) {
+export default function YourShows({ now, layout = "grid", title = "Your shows", emptyText }) {
   const { user } = useAuth();
   const { clock24 } = useSettings().settings;
   const [lib, setLib] = useState(null);
@@ -51,9 +51,9 @@ export default function YourShows({ now, layout = "grid", title = "⏳ Your show
     const r = await setProgress(user, entry.item, (entry.progress || 0) + 1, "plus");
     if (r.reachedEnd) setFinishing(entry.item);
   };
-  const finish = async ({ verdict, vibes, comment }) => {
+  const finish = async ({ verdict, vibes, moods, comment }) => {
     await setStatus(user, finishing.segment, finishing, "completed");
-    await addReview(user, finishing.segment, finishing.id, { verdict, vibes, comment });
+    await addReview(user, finishing.segment, finishing.id, { verdict, vibes, moods, comment });
     setFinishing(null);
   };
 

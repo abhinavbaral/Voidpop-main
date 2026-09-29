@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@voidation/shared/backend/AuthContext";
 import {
   getLibrary, statusesFor, LIBRARY_LISTS, inLibraryList, setProgress, noteAiring, addReview, setStatus, LIBRARY_SORTS, sortEntries,
-  getCategories, bulkSetStatus, bulkCategory, bulkRemove,
+  getCategories, categoriesUnlocked, bulkSetStatus, bulkCategory, bulkRemove,
 } from "@voidation/shared/backend/store";
 import { fetchNextEpisodes } from "@voidation/shared/api/anilist";
 import { useNow } from "@voidation/shared/hooks/useNow";
@@ -26,13 +26,12 @@ export default function Library() {
   const [sort, setSort] = useState("updated");
   const [finishing, setFinishing] = useState(null); // item whose last episode you just marked
   const [cats, setCats] = useState([]);
-  const [cat, setCat] = useState(""); // "" = every category
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState(new Set());
 
   const reload = useCallback(async () => {
     setEntries(Object.values(await getLibrary(user).catch(() => ({}))));
-    setCats(await getCategories());
+    setCats((await categoriesUnlocked()) ? await getCategories() : []); // categories unlock at 500 completed anime
   }, [user]);
 
   useEffect(() => {
@@ -55,8 +54,8 @@ export default function Library() {
   const listEntries = useMemo(
     () => (entries || []).filter((e) => inLibraryList(e, list)
       && (!q || e.item.title.toLowerCase().includes(q))
-      && (!cat || (e.cats || []).includes(cat))),
-    [entries, list, q, cat]
+),
+    [entries, list, q]
   );
   const shown = sortEntries(listEntries.filter((e) => e.status === tab), sort);
   const count = (key) => (entries || []).filter((e) => inLibraryList(e, key)).length;
@@ -76,9 +75,9 @@ export default function Library() {
     if (r.reachedEnd) setFinishing(e.item);
     reload();
   };
-  const finish = async ({ verdict, vibes, comment }) => {
+  const finish = async ({ verdict, vibes, moods, comment }) => {
     await setStatus(user, finishing.segment, finishing, "completed");
-    await addReview(user, finishing.segment, finishing.id, { verdict, vibes, comment });
+    await addReview(user, finishing.segment, finishing.id, { verdict, vibes, moods, comment });
     setFinishing(null);
     reload();
   };
@@ -106,16 +105,6 @@ export default function Library() {
           {selecting ? "Done" : "Select"}
         </button>
       </div>
-      {cats.length > 0 && (
-        <div className="chips" role="tablist" aria-label="Category">
-          <button role="tab" aria-selected={!cat} className={`chip${!cat ? " on" : ""}`} onClick={() => setCat("")}>All categories</button>
-          {cats.map((c) => (
-            <button key={c.id} role="tab" aria-selected={cat === c.id} className={`chip${cat === c.id ? " on" : ""}`} onClick={() => setCat(c.id)}>
-              {c.name} <span className="count">{(entries || []).filter((e) => inLibraryList(e, list) && (e.cats || []).includes(c.id)).length}</span>
-            </button>
-          ))}
-        </div>
-      )}
       <div className="chips" role="tablist" aria-label="Status">
         {statuses.map((s) => (
           <button key={s.key} role="tab" aria-selected={tab === s.key} className={`chip${tab === s.key ? " on" : ""}`} onClick={() => setTab(s.key)}>
@@ -150,11 +139,6 @@ export default function Library() {
               <option value="">Add to category…</option>
               {cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
-          )}
-          {cat && (
-            <button className="link-btn" disabled={!selected.size} onClick={() => bulk((keys) => bulkCategory(keys, cat, false))}>
-              Remove from {cats.find((c) => c.id === cat)?.name}
-            </button>
           )}
           <button className="link-btn danger-text" disabled={!selected.size}
             onClick={() => window.confirm(`Remove ${selected.size} title${selected.size === 1 ? "" : "s"} from your library? Progress and categories for them are lost.`) && bulk(bulkRemove)}>

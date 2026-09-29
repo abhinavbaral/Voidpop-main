@@ -18,6 +18,7 @@ import { SettingsProvider } from "@voidation/shared/backend/SettingsContext";
 import { ThemeProvider, useTheme } from "./src/context/ThemeContext.js";
 import ExploreScreen from "./src/screens/ExploreScreen.js";
 import BrowseScreen from "./src/screens/BrowseScreen.js";
+import PersonScreen from "./src/screens/PersonScreen.js";
 import ScheduleScreen from "./src/screens/ScheduleScreen.js";
 import HistoryScreen from "./src/screens/HistoryScreen.js";
 import MoreScreen from "./src/screens/MoreScreen.js";
@@ -29,6 +30,7 @@ import SeasonScreen from "./src/screens/SeasonScreen.js";
 import WrappedScreen from "./src/screens/WrappedScreen.js";
 import OfflineBanner from "./src/components/OfflineBanner.js";
 import RankUp from "./src/components/RankUp.js";
+import Icon from "./src/components/Icon.js";
 
 const Stack = createNativeStackNavigator();
 const navRef = createNavigationContainerRef();
@@ -82,13 +84,7 @@ function useBackgroundChores() {
 }
 const Tabs = createBottomTabNavigator();
 
-const ICONS = {
-  Explore: "✦",
-  Library: "▤",
-  History: "↺",
-  Schedule: "◷",
-  More: "•••",
-};
+const ICONS = { Explore: "explore", Library: "library", History: "history", Schedule: "schedule", More: "more" };
 
 // Pending episodes (aired, not watched) for the Schedule tab badge. Rechecked
 // when your library changes and once a minute.
@@ -115,7 +111,7 @@ function MainTabs() {
         tabBarActiveTintColor: C.orange,
         tabBarInactiveTintColor: C.faint,
         tabBarIcon: ({ color }) => (
-          <Text style={{ color, fontSize: 16 }}>{ICONS[route.name]}</Text>
+          <Icon name={ICONS[route.name]} size={21} color={color} />
         ),
         tabBarLabelStyle: { fontSize: 9.5, fontWeight: "600" },
       })}
@@ -167,6 +163,7 @@ function ThemedApp() {
         <Stack.Screen name="MorePage" component={MorePageScreen} />
         <Stack.Screen name="Season" component={SeasonScreen} />
         <Stack.Screen name="Browse" component={BrowseScreen} />
+        <Stack.Screen name="Person" component={PersonScreen} getId={({ params }) => (params ? String(params.id) : undefined)} />
         <Stack.Screen name="Wrapped" component={WrappedScreen} options={{ animation: "fade" }} />
       </Stack.Navigator>
       <OfflineBanner />

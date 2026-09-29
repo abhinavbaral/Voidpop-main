@@ -5,7 +5,7 @@
 // (see storage.js):
 //   library  {"segment:id" -> { status, progress, cats, item snapshot, updatedAt, delay? }}
 //   categories [{ id, name }]  your own groups, like Mihon's ("Favourites", "Rewatch"…)
-//   reviews  {"segment:id" -> { verdict, vibes, comment, date }}
+//   reviews  {"segment:id" -> { verdict, vibes, moods, comment, date }}
 //   excited  {"segment:id" -> { item, at }}
 //   settings { clock24, posterBadges, notifyEpisodes }
 //   log      [[time ms, "segment:id", change, source], …] every progress change
@@ -20,8 +20,8 @@ import { readKey, writeKey } from "./storage.js";
 
 const DB_KEY = "voidation:db:v1";
 // notifyEpisodes only matters in the app (the website can't schedule alerts)
-export const DEFAULT_SETTINGS = { clock24: false, posterBadges: true, notifyEpisodes: true };
-const EMPTY = () => ({ library: {}, reviews: {}, excited: {}, log: [], categories: [], meta: {}, settings: { ...DEFAULT_SETTINGS } });
+export const DEFAULT_SETTINGS = { clock24: false, posterBadges: true, notifyEpisodes: true, seasonLayout: "grid" };
+const EMPTY = () => ({ library: {}, reviews: {}, excited: {}, notes: {}, log: [], categories: [], meta: {}, settings: { ...DEFAULT_SETTINGS } });
 
 let cache = null;
 let writing = Promise.resolve();
@@ -80,11 +80,17 @@ export async function getLog() {
 
 /* ---------- tracking ---------- */
 
+// Rewatching / Rereading: a finished title you've started again. It still
+// counts as finished everywhere (stats, ranks, Rewind); progress starts from 0,
+// and reaching the end puts it back in Completed with one more rewatch counted.
+export const isDone = (status) => status === "completed" || status === "rewatching";
+
 export function statusesFor(segment) {
   const reading = segment === "manga";
   return [
     { key: "watching", label: reading ? "Reading" : "Watching" },
     { key: "completed", label: reading ? "Finished" : "Completed" },
+    { key: "rewatching", label: reading ? "Rereading" : "Rewatching" },
     { key: "plan", label: reading ? "Plan to Read" : "Plan to Watch" },
     { key: "onhold", label: "On Hold" },
     { key: "dropped", label: "Dropped" },
@@ -120,7 +126,9 @@ export async function setStatus(_user, segment, item, status) {
   const prev = db.library[key];
   const total = totalFor({ ...item, segment });
   // finishing a title fills its progress, the way AniList does
-  const progress = status === "completed" && total ? total : prev?.progress || 0;
+  const progress = status === "completed" && total ? total
+    : status === "rewatching" && prev?.status !== "rewatching" ? 0
+    : prev?.progress || 0;
   logChange(db, key, progress - (prev?.progress || 0), "complete");
   logStatus(db, key, prev?.status, status);
   db.library[key] = {
@@ -238,18 +246,22 @@ export async function setProgress(_user, item, n, source = "plus") {
   let status = prev?.status || null;
   if (progress > (prev?.progress || 0) && (!status || ["plan", "onhold", "dropped"].includes(status))) status = "watching";
   if (!status) status = "watching";
+  // finishing a rewatch: back to Completed, one more rewatch counted, no verdict prompt
+  const rewatchDone = status === "rewatching" && !!total && progress >= total;
+  if (rewatchDone) status = "completed";
   logChange(db, key, progress - (prev?.progress || 0), source);
   logStatus(db, key, prev?.status, status);
   db.library[key] = {
     ...prev,
     status,
     progress,
+    ...(rewatchDone ? { rewatches: (prev?.rewatches || 0) + 1 } : {}),
     item: freshest(prev?.item, item),
     updatedAt: new Date().toISOString(),
   };
   entryChanged(key, db.library[key]);
   await save();
-  return { progress, status, reachedEnd: !!total && progress >= total && status !== "completed" };
+  return { progress, status, rewatchDone, reachedEnd: !rewatchDone && !!total && progress >= total && status !== "completed" };
 }
 
 /* ---------- library sorting (app + website) ---------- */
@@ -389,7 +401,7 @@ export const spotlightWeek = (date = new Date()) => date.getDate() >= 15 && date
 
 export async function getCategoryAccess() {
   const db = await load();
-  const anime = Object.values(db.library).filter((e) => e.item.segment === "anime" && e.status === "completed").length;
+  const anime = Object.values(db.library).filter((e) => e.item.segment === "anime" && isDone(e.status)).length;
   return { unlocked: anime >= CATEGORY_MIN, animeCompleted: anime, needed: Math.max(0, CATEGORY_MIN - anime) };
 }
 export const categoriesUnlocked = async () => (await getCategoryAccess()).unlocked;
@@ -491,7 +503,7 @@ export async function applyAniListPull(remote, { skip = new Set(), removed = [] 
 }
 
 const ANILIST_STATUS = {
-  CURRENT: "watching", REPEATING: "watching", PLANNING: "plan",
+  CURRENT: "watching", REPEATING: "rewatching", PLANNING: "plan",
   COMPLETED: "completed", PAUSED: "onhold", DROPPED: "dropped",
 };
 
@@ -521,10 +533,35 @@ export async function importAniListEntries(entries) {
   return result;
 }
 
+// entries: [{ item, status, progress, times }] from a MyAnimeList export.
+// Titles already in Voidation are left as they are (your copy wins); new ones
+// are added. times = how many times you finished it on MAL (rewatches).
+export async function importMalEntries(entries) {
+  const db = await load();
+  const result = { added: 0, kept: 0 };
+  const now = new Date().toISOString();
+  entries.forEach(({ item, status, progress, times }) => {
+    const key = keyOf(item.segment, item.id);
+    if (db.library[key]) { result.kept++; return; }
+    const total = totalFor(item);
+    db.library[key] = {
+      status,
+      progress: status === "completed" && total ? total : progress || 0,
+      ...(times > 0 ? { rewatches: times } : {}),
+      item,
+      updatedAt: now,
+    };
+    entryChanged(key, db.library[key]); // AniList sync (if on) gets them too
+    result.added++;
+  });
+  if (result.added) await save();
+  return result;
+}
+
 export async function getStats() {
   const entries = Object.values((await load()).library);
   const sum = (seg) => entries.filter((e) => (e.item.segment === "manga") === (seg === "manga")).reduce((n, e) => n + (e.progress || 0), 0);
-  const completed = entries.filter((e) => e.status === "completed");
+  const completed = entries.filter((e) => isDone(e.status)); // rewatching still counts as finished
   const by = (seg) => completed.filter((e) => e.item.segment === seg).length;
   // per list, per status: { anime: { watching: 3, completed: 9, … }, manga: {…} }
   const byStatus = { anime: {}, manga: {} };
@@ -625,10 +662,16 @@ export const VIBES = [
   "Thriller", "Horror", "Slice of Life", "Dark", "Wholesome",
 ];
 
-export async function addReview(_user, segment, id, { verdict, vibes, comment }) {
+// Moods: how it made you FEEL (vibes are what KIND of show it was). Up to 3.
+export const MOODS = [
+  "Made me laugh", "Made me cry", "Hyped me up", "Made me think", "Scared me",
+  "Surprised me", "Relaxed me", "Motivated me", "Broke my heart", "Bored me",
+];
+
+export async function addReview(_user, segment, id, { verdict, vibes, moods, comment }) {
   const db = await load();
   db.reviews[keyOf(segment, id)] = {
-    segment, titleId: id, verdict, vibes: vibes || [], comment: comment || "",
+    segment, titleId: id, verdict, vibes: vibes || [], moods: moods || [], comment: comment || "",
     date: new Date().toISOString(),
   };
   return save();
@@ -641,6 +684,24 @@ export async function getReviews() {
 
 export async function getMyReview(_user, segment, id) {
   return (await load()).reviews[keyOf(segment, id)] ?? null;
+}
+
+/* ---------- personal notes ("stopped at the tournament arc") ---------- */
+// One private note per title, any title (in your library or not). Kept in
+// backups; never synced to AniList.
+
+export async function getNote(segment, id) {
+  return (await load()).notes?.[keyOf(segment, id)]?.text || "";
+}
+export async function setNote(segment, id, text) {
+  const db = await load();
+  db.notes = db.notes || {};
+  const key = keyOf(segment, id);
+  const t = String(text || "").trim().slice(0, 2000);
+  if (t) db.notes[key] = { text: t, at: new Date().toISOString() };
+  else delete db.notes[key];
+  await save();
+  return t;
 }
 
 /* ---------- excited (upcoming titles you're waiting for) ---------- */

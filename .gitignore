@@ -19,3 +19,6 @@ app/ios/
 # in package.json workspaces so it keeps working locally; to bring it back:
 # delete these lines and `git add web`.
 web/
+
+# Commit message that comes with each zip from Claude (use: git commit -F COMMIT.txt)
+COMMIT.txt

@@ -7,7 +7,7 @@
 import { fetchEarlierSeasons } from "./api/anilist.js";
 import { getLibrary, setStatus } from "./backend/store.js";
 
-const STARTED = new Set(["watching", "completed", "onhold", "dropped"]);
+const STARTED = new Set(["watching", "completed", "rewatching", "onhold", "dropped"]);
 
 export async function completeEarlierSeasons(item, status) {
   if (item.segment !== "anime" || !STARTED.has(status)) return [];

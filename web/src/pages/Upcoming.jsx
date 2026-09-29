@@ -1,4 +1,4 @@
-// UPCOMING — a month calendar of premieres (tap a day to see them), what's
+// OUT THIS WEEK (Schedule tab) — a month calendar of premieres (tap a day to see them), what's
 // airing in the next 24 hours, and the latest premieres.
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
@@ -10,12 +10,10 @@ import { useSettings } from "@voidation/shared/backend/SettingsContext";
 import { formatCountdown, airTime } from "@voidation/shared/format";
 import PosterRow from "../components/PosterRow.jsx";
 import { titlePath, cacheTitle } from "../lib/titles.js";
-import { useDocumentTitle } from "../lib/useDocumentTitle.js";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export default function Upcoming() {
-  useDocumentTitle("Upcoming");
   const { user } = useAuth();
   const now = useNow(1000);
   const { clock24 } = useSettings().settings;
@@ -53,11 +51,10 @@ export default function Upcoming() {
 
   return (
     <div className="stack">
-      <h1>Upcoming</h1>
 
       <section className="panel stack-sm">
         <div className="row-head">
-          <h2>🗓️ Premiere calendar</h2>
+          <h2>Premiere calendar</h2>
           <div className="season-nav">
             <button className="icon-btn" aria-label="Previous month" onClick={() => shift(-1)}>‹</button>
             <b>{title}</b>
@@ -112,7 +109,7 @@ export default function Upcoming() {
       </section>
 
       <section className="panel stack-sm">
-        <h2>⏰ Airing soon <span className="faint small">next 24 hours</span></h2>
+        <h2>Airing soon <span className="faint small">next 24 hours</span></h2>
         {soon === null ? <p className="muted">Loading…</p> : !soon.length ? <p className="muted">Nothing airs in the next 24 hours.</p> : (
           <ul className="list">
             {soon.map((s) => (
@@ -129,7 +126,7 @@ export default function Upcoming() {
         )}
       </section>
 
-      {latest.length > 0 && <PosterRow title="🎬 Latest premieres · last 3 weeks" items={latest} now={now} />}
+      {latest.length > 0 && <PosterRow title="Latest premieres · last 3 weeks" items={latest} now={now} />}
     </div>
   );
 }

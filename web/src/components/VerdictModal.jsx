@@ -20,7 +20,7 @@ export default function VerdictModal({ open, initial, onSave, onClose }) {
   return (
     <Modal open={open} onClose={onClose} label="Your verdict">
       <h2>How was it?</h2>
-      <p className="muted">Your verdict — no boring numbers.</p>
+      <p className="muted">Your Void Verdict</p>
       <div className="verdict-grid">
         {VERDICTS.map((v) => (
           <button key={v.key} className={`verdict-opt${verdict === v.key ? " on" : ""}`}

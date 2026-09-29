@@ -18,7 +18,7 @@ export default function WhereToRead({ links }) {
           style={[styles.chip, { borderColor: C.border, backgroundColor: C.card }]}>
           <View style={[styles.dot, { backgroundColor: l.color || C.purple }]} />
           <View>
-            <Text style={{ color: C.text, fontWeight: "700", fontSize: 13 }}>{l.search ? `🔎 ${l.site}` : l.site}</Text>
+            <Text style={{ color: C.text, fontWeight: "700", fontSize: 13 }}>{l.site}</Text>
             {l.languages?.length > 0 && (
               <Text style={{ color: C.faint, fontSize: 10, marginTop: 1 }} numberOfLines={1}>{l.languages.join(" · ")}</Text>
             )}
@@ -32,14 +32,14 @@ export default function WhereToRead({ links }) {
   return (
     <View style={{ marginTop: 20 }}>
       <Text style={{ color: C.text, fontWeight: "800", fontSize: 15 }}>Where to read</Text>
-      {read.length > 0 && <>{head("📖 Read officially")}{chips(read)}</>}
+      {read.length > 0 && <>{head("Read officially")}{chips(read)}</>}
       {search.length > 0 && (
         <>
           {head("Not listed on AniList yet. Search on:")}
           {chips(search, "Search")}
         </>
       )}
-      {buy.length > 0 && <>{head("🛒 Buy the volumes")}{chips(buy)}</>}
+      {buy.length > 0 && <>{head("Buy the volumes")}{chips(buy)}</>}
       <Text style={{ color: C.faint, fontSize: 10, marginTop: 8 }}>
         Official services only. Availability depends on your country. Links from AniList.
       </Text>

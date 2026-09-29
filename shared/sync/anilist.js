@@ -25,7 +25,7 @@ import {
 import { applyAniListPull, getLibrary, setEntryChangeHook } from "../backend/store.js";
 
 const KEY = "voidation:anilist:v1";
-const TO_ANILIST = { watching: "CURRENT", plan: "PLANNING", completed: "COMPLETED", onhold: "PAUSED", dropped: "DROPPED" };
+const TO_ANILIST = { watching: "CURRENT", rewatching: "REPEATING", plan: "PLANNING", completed: "COMPLETED", onhold: "PAUSED", dropped: "DROPPED" };
 const PULL_EVERY_MS = 2 * 60 * 1000;
 const PUSH_DELAY_MS = 2500;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

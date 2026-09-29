@@ -27,16 +27,16 @@ export default function PendingPanel({ now, refreshKey }) {
     const r = await setProgress(user, entry.item, (entry.progress || 0) + 1, "plus");
     if (r.reachedEnd) setFinishing(entry.item);
   };
-  const finish = async ({ verdict, vibes, comment }) => {
+  const finish = async ({ verdict, vibes, moods, comment }) => {
     await setStatus(user, finishing.segment, finishing, "completed");
-    await addReview(user, finishing.segment, finishing.id, { verdict, vibes, comment });
+    await addReview(user, finishing.segment, finishing.id, { verdict, vibes, moods, comment });
     setFinishing(null);
   };
 
   return (
     <section className="panel pending-panel">
       <div className="row-head">
-        <h2>📺 Watching this season</h2>
+        <h2>Watching this season</h2>
         <span className={`pending-total${data.total ? " on" : ""}`}>
           {data.total ? `${data.total} pending` : "All caught up"}
         </span>

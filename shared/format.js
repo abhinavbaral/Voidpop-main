@@ -94,3 +94,10 @@ export function durationLabel(minutes) {
   if (h) return `${h}h ${r}m`;
   return `${r}m`;
 }
+
+// Hype: how many people follow a title on AniList. 12400 → "12.4k following"
+export function hypeLabel(n) {
+  if (!n) return null;
+  const v = n >= 1e6 ? `${(n / 1e6).toFixed(1).replace(/\.0$/, "")}M` : n >= 1000 ? `${(n / 1000).toFixed(1).replace(/\.0$/, "")}k` : String(n);
+  return `${v} following`;
+}

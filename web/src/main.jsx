@@ -6,6 +6,7 @@ import { AuthProvider } from "@voidation/shared/backend/AuthContext";
 import { SettingsProvider } from "@voidation/shared/backend/SettingsContext";
 import { ThemeProvider } from "./theme.jsx";
 import App from "./App.jsx";
+import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import "./styles.css";
 
 // Real URLs everywhere, except the single-file preview build (VITE_ROUTER=memory),
@@ -18,7 +19,9 @@ createRoot(document.getElementById("root")).render(
       <AuthProvider>
         <SettingsProvider>
           <Router>
-            <App />
+            <ErrorBoundary>
+              <App />
+            </ErrorBoundary>
           </Router>
         </SettingsProvider>
       </AuthProvider>

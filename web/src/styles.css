@@ -686,3 +686,11 @@ p { margin: 0; }
 .ds-info span { font-size: 1.3rem; color: var(--faint); }
 .ds-bar { width: 100%; height: 10px; border-radius: 999px; background: var(--card); overflow: hidden; margin: 8px 0 4px; }
 .ds-bar span { display: block; height: 100%; background: var(--purple); border-radius: 999px; }
+
+/* crash screen (ErrorBoundary) */
+.crash { margin: 24px 0; }
+.crash pre { white-space: pre-wrap; font-size: 12px; background: var(--input-bg, rgba(0,0,0,.2)); color: var(--text); padding: 12px; border-radius: 10px; overflow: auto; max-height: 260px; }
+.crash .row-gap { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+
+.mini-medal svg, .medal-star svg { color: var(--tier); }
+.locked .mini-medal svg { color: var(--faint); }

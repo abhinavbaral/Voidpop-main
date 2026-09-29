@@ -61,6 +61,8 @@ const MEDIA_FIELDS = `
   status
   format
   duration
+  popularity
+  trending
 `;
 
 // Creator line: animation studio for anime, mangaka for manga. Requested only
@@ -106,6 +108,9 @@ function normalize(m, segment) {
     finished: m.status === "FINISHED",
     format: m.format || null, // TV, TV_SHORT, ONA, MOVIE, OVA, SPECIAL…
     duration: m.duration ?? null, // minutes per episode (anime)
+    // hype: people with it on their AniList list, and recent list activity
+    popularity: m.popularity ?? null,
+    trending: m.trending ?? null,
     // anime only: total episodes (null while unknown) and the next one to air
     episodes: m.episodes ?? null,
     // manga only: total chapters (null while still publishing)
@@ -469,12 +474,25 @@ export async function fetchAniListDetail(segment, id) {
     Media(id: $id, type: $type) {
       trailer { id site }
       countryOfOrigin
+      source(version: 3)
       title { english romaji }
+      tags { name rank category isMediaSpoiler isGeneralSpoiler }
+      streamingEpisodes { title thumbnail url site }
+      characters(sort: [ROLE, RELEVANCE, ID], perPage: 16) {
+        edges {
+          role
+          node { id name { full native } image { medium } }
+          voiceActors(language: JAPANESE, sort: [RELEVANCE, ID]) { id name { full native } image { medium } }
+        }
+      }
+      staff(sort: [RELEVANCE, ID], perPage: 12) {
+        edges { role node { id name { full native } image { medium } } }
+      }
       externalLinks { site url type language color isDisabled }
       relations {
         edges {
           relationType
-          node { type ${fieldsFor(segment)} }
+          node { type countryOfOrigin chapters ${fieldsFor(segment)} }
         }
       }
     }
@@ -501,10 +519,157 @@ export async function fetchAniListDetail(segment, id) {
   const m = data.Media;
   return {
     trailer, related,
+    ...castAndCrew(m, segment),
+    // anime: official episode list (title, thumbnail, link) from streaming services
+    episodes: segment === "anime" ? episodeList(m.streamingEpisodes) : [],
+    // anime: what it's adapted from, with a link when that's a manga/manhwa/novel on AniList
+    source: segment === "anime" ? sourceInfo(m.source, m.relations?.edges || []) : null,
     whereToWatch: watchLinks(m.externalLinks),
     // manga: official readers, stores, or search boxes (shared/readLinks.js)
     whereToRead: segment === "manga" ? readingLinks(m.externalLinks, { title: m.title?.english || m.title?.romaji, country: m.countryOfOrigin }) : null,
   };
+}
+
+// Characters (with their Japanese voice actor, for anime), staff, and themes.
+// Themes are AniList's tags: non-spoiler ones that fit the title well (rank
+// 60+ out of 100), best-fitting first. AniList has no trivia.
+function castAndCrew(m, segment) {
+  const person = (n) => (n ? { id: n.id, name: n.name?.full || n.name?.native || "", native: n.name?.native || null, image: n.image?.medium || null } : null);
+  const characters = (m.characters?.edges || []).filter((e) => e.node).map((e) => ({
+    ...person(e.node),
+    role: e.role === "MAIN" ? "Main" : e.role === "SUPPORTING" ? "Supporting" : "Background",
+    voice: segment === "anime" ? person(e.voiceActors?.[0]) : null,
+  }));
+  const staff = (m.staff?.edges || []).filter((e) => e.node).map((e) => ({ ...person(e.node), role: e.role || "" }));
+  const themes = (m.tags || [])
+    .filter((t) => !t.isMediaSpoiler && !t.isGeneralSpoiler && (t.rank ?? 0) >= 60 && !/^Sexual Content|^Explicit/.test(t.category || ""))
+    .sort((a, b) => b.rank - a.rank)
+    .slice(0, 12)
+    .map((t) => ({ name: t.name, rank: t.rank }));
+  return { characters, staff, themes };
+}
+
+// Official episodes AniList lists from streaming services ("Episode 3 - The
+// Title", thumbnail, link to the legal stream). Numbered when the title says so.
+export function episodeList(list) {
+  const seen = new Set();
+  return (list || [])
+    .filter((e) => e?.url && !seen.has(e.url) && seen.add(e.url))
+    .map((e) => {
+      const title = String(e.title ?? "");
+      const m = /episode\s*(\d+)/i.exec(title);
+      const number = m ? Number(m[1]) : null;
+      const name = title.replace(/^episode\s*\d+\s*[-:–]\s*/i, "").trim();
+      return { number, name: name || title, thumbnail: e.thumbnail || null, url: e.url, site: e.site || "" };
+    })
+    .sort((a, b) => (a.number ?? 1e9) - (b.number ?? 1e9));
+}
+
+// A voice actor's or staff member's page: who they are, and what they worked
+// on — characters they voiced (newest first) and staff roles.
+export async function fetchPerson(id) {
+  const light = `id type ${LIST_FIELDS}`;
+  const query = `query ($id: Int) {
+    Staff(id: $id) {
+      id name { full native } image { large } primaryOccupations languageV2
+      characterMedia(sort: [START_DATE_DESC], perPage: 40) {
+        edges { characterRole characters { id name { full } image { medium } } node { ${light} } }
+      }
+      staffMedia(sort: [START_DATE_DESC], perPage: 30) {
+        edges { staffRole node { ${light} } }
+      }
+    }
+  }`;
+  const s = (await gql(query, { id: Number(id) })).Staff;
+  if (!s) return null;
+  const seg = (n) => (n.type === "MANGA" ? "manga" : "anime");
+  const roles = (s.characterMedia?.edges || []).filter((e) => e?.node).flatMap((e) => (Array.isArray(e.characters) ? e.characters : []).filter(Boolean).map((c) => ({
+    character: { id: c.id, name: c.name?.full || "", image: c.image?.medium || null },
+    role: e.characterRole === "MAIN" ? "Main" : e.characterRole === "SUPPORTING" ? "Supporting" : "Background",
+    item: normalize(e.node, seg(e.node)),
+  })));
+  const work = (s.staffMedia?.edges || []).filter((e) => e?.node).map((e) => ({ role: e.staffRole || "", item: normalize(e.node, seg(e.node)) }));
+  return {
+    id: s.id, name: s.name?.full || "", native: s.name?.native || null, image: s.image?.large || null,
+    occupations: s.primaryOccupations || [], language: s.languageV2 || null, roles, work,
+  };
+}
+
+// Watch order for a franchise: follows AniList's prequel / sequel / side
+// story / parent links from this title, one request per step outwards (at most
+// 6 steps, 30 titles), anime only, recaps and remakes left out. Sorted by
+// release date, which is the usual watch order.
+const ORDER_LINKS = new Set(["PREQUEL", "SEQUEL", "SIDE_STORY", "PARENT"]);
+export async function fetchWatchOrder(id) {
+  const light = `id type ${LIST_FIELDS} relations { edges { relationType node { id type format } } }`;
+  const query = `query ($ids: [Int]) { Page(page: 1, perPage: 50) { media(id_in: $ids, type: ANIME) { ${light} } } }`;
+  const seen = new Map();
+  let frontier = [Number(id)];
+  for (let step = 0; step < 6 && frontier.length && seen.size < 30; step++) {
+    const data = await gql(query, { ids: frontier });
+    const next = [];
+    for (const m of data.Page.media) {
+      if (seen.has(m.id)) continue;
+      seen.set(m.id, normalize(m, "anime"));
+      (m.relations?.edges || []).forEach((e) => {
+        if (ORDER_LINKS.has(e.relationType) && e.node?.type === "ANIME" && e.node.format !== "MUSIC" && !seen.has(e.node.id)) next.push(e.node.id);
+      });
+    }
+    frontier = [...new Set(next)].filter((x) => !seen.has(x)).slice(0, 30 - seen.size);
+  }
+  return [...seen.values()].sort((a, b) => (a.date || "9999").localeCompare(b.date || "9999"));
+}
+
+// AniList forum threads about a title (episode discussions and more), newest
+// first. They open on AniList in the browser.
+export async function fetchDiscussions(id, perPage = 6) {
+  const query = `query ($id: Int, $n: Int) { Page(page: 1, perPage: $n) {
+    threads(mediaCategoryId: $id, sort: [ID_DESC]) { id title replyCount viewCount siteUrl createdAt }
+  } }`;
+  const data = await gql(query, { id: Number(id), n: perPage });
+  return (Array.isArray(data.Page?.threads) ? data.Page.threads : []).filter((t) => t?.siteUrl).map((t) => ({
+    id: t.id, title: String(t.title || ""), replies: t.replyCount || 0, views: t.viewCount || 0, url: t.siteUrl, at: t.createdAt || 0,
+  }));
+}
+
+// What an anime is adapted from. AniList gives a type (source: MANGA,
+// LIGHT_NOVEL, ORIGINAL…) and, usually, the actual entry as a "SOURCE"
+// relation. Manga, manhwa, manhua and light novels are all "MANGA" on AniList,
+// so they can be opened and tracked. Comics are listed before novels.
+const SOURCE_KIND = {
+  ORIGINAL: "Original", MANGA: "Manga", LIGHT_NOVEL: "Light novel", WEB_NOVEL: "Web novel", NOVEL: "Novel",
+  VISUAL_NOVEL: "Visual novel", VIDEO_GAME: "Video game", GAME: "Game", COMIC: "Comic", DOUJINSHI: "Doujinshi",
+  ANIME: "Anime", LIVE_ACTION: "Live action", MULTIMEDIA_PROJECT: "Multimedia project", PICTURE_BOOK: "Picture book", OTHER: "Other",
+};
+export function sourceKindLabel(node) {
+  if (node.format === "NOVEL") return node.countryOfOrigin === "JP" ? "Light novel" : "Novel";
+  if (node.format === "ONE_SHOT") return "One-shot";
+  if (node.countryOfOrigin === "KR") return "Manhwa";
+  if (node.countryOfOrigin === "CN" || node.countryOfOrigin === "TW") return "Manhua";
+  return "Manga";
+}
+export function sourceInfo(kind, edges) {
+  const items = edges
+    .filter((e) => e.relationType === "SOURCE" && e.node?.type === "MANGA")
+    .map((e) => ({ ...normalize(e.node, "manga"), kindLabel: sourceKindLabel(e.node) }))
+    .sort((a, b) => /novel/i.test(a.kindLabel) - /novel/i.test(b.kindLabel))
+    .slice(0, 2);
+  const label = items[0]?.kindLabel || SOURCE_KIND[kind] || null;
+  return label ? { label, items } : null;
+}
+
+// MAL id → AniList item, 50 at a time (for importing a MyAnimeList export).
+// Titles AniList doesn't know are simply missing from the result.
+export async function fetchByMalIds(segment, malIds) {
+  const query = `query ($ids: [Int], $type: MediaType) {
+    Page(page: 1, perPage: 50) { media(idMal_in: $ids, type: $type) { idMal ${fieldsFor(segment)} } }
+  }`;
+  const out = {};
+  for (let i = 0; i < malIds.length; i += 50) {
+    const data = await gql(query, { ids: malIds.slice(i, i + 50).map(Number), type: segment === "anime" ? "ANIME" : "MANGA" });
+    data.Page.media.forEach((m) => { out[m.idMal] = normalize(m, segment); });
+  }
+  return out;
 }
 
 // Official streaming / reading services from AniList's external links.

@@ -37,7 +37,7 @@ function searchLinks(title, country) {
   const webtoon = { site: "WEBTOON", url: `https://www.webtoons.com/en/search?keyword=${q}`, color: "#00DC64" };
   const tapas = { site: "Tapas", url: `https://tapas.io/search?q=${q}`, color: "#FF006A" };
   const viz = { site: "VIZ", url: `https://www.viz.com/search?search=${q}`, color: "#E4002B" };
-  const bw = { site: "BOOK☆WALKER", url: `https://global.bookwalker.jp/search/?word=${q}`, color: "#1E90C8" };
+  const bw = { site: "BookWalker", url: `https://global.bookwalker.jp/search/?word=${q}`, color: "#1E90C8" };
   const list = country === "KR" || country === "CN" || country === "TW" ? [webtoon, tapas, bw] : [viz, bw, webtoon];
   return list.map((l) => ({ ...l, languages: [], search: true }));
 }

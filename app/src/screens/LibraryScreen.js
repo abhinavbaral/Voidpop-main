@@ -73,9 +73,9 @@ export default function LibraryScreen({ navigation }) {
     if (r.reachedEnd) setFinishing(e.item);
     reload();
   };
-  const finish = async ({ verdict, vibes, comment }) => {
+  const finish = async ({ verdict, vibes, moods, comment }) => {
     await setStatus(user, finishing.segment, finishing, "completed");
-    await addReview(user, finishing.segment, finishing.id, { verdict, vibes, comment });
+    await addReview(user, finishing.segment, finishing.id, { verdict, vibes, moods, comment });
     setFinishing(null);
     reload();
   };

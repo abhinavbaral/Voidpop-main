@@ -10,6 +10,27 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- If the app can't even start (a file failed to load), say so instead of a blank page. -->
+    <script>
+      (function () {
+        function show(msg) {
+          var root = document.getElementById("root");
+          if (!root || root.childElementCount) return;
+          root.innerHTML = '<div style="font:15px system-ui,sans-serif;max-width:640px;margin:60px auto;padding:20px;color:#e5e7eb;background:#111827;border-radius:12px">' +
+            '<b style="font-size:18px">Voidation couldn\'t start</b><p>Try stopping the dev server and running <code>npx vite --force</code>, then reload. The error was:</p>' +
+            '<pre style="white-space:pre-wrap;color:#fca5a5"></pre></div>';
+          root.querySelector("pre").textContent = msg;
+        }
+        window.addEventListener("error", function (e) {
+          var t = e.target;
+          if (t && t.tagName === "SCRIPT") return show("A file failed to load: " + (t.src || "the app code") + "\nOften a stale dev-server cache, or the files weren't all copied.");
+          if (t && t !== window && t.tagName) return; // a broken image etc. — not our problem here
+          show((e.message || "") + (e.filename ? "\n" + e.filename : ""));
+        }, true);
+        window.addEventListener("unhandledrejection", function (e) { if (e.reason && /import|module|fetch dynamically/i.test(String(e.reason))) show(String(e.reason)); });
+        setTimeout(function () { show("Nothing loaded after 10 seconds. Open the browser console (F12) for details."); }, 10000);
+      })();
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

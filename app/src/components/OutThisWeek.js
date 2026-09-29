@@ -9,7 +9,7 @@ import { getExcited, toggleExcited } from "@voidation/shared/backend/store";
 import { useAuth } from "@voidation/shared/backend/AuthContext";
 import { useNow } from "@voidation/shared/hooks/useNow";
 import { useSettings } from "@voidation/shared/backend/SettingsContext";
-import { formatCountdown, airTime } from "@voidation/shared/format";
+import { formatCountdown, airTime, hypeLabel } from "@voidation/shared/format";
 import PosterRow from "./PosterRow.js";
 import { useTheme } from "../context/ThemeContext.js";
 import { openDetail } from "../lib/nav";
@@ -53,7 +53,8 @@ export default function OutThisWeek({ navigation, refreshKey = 0 }) {
   const weeks = useMemo(() => monthGrid(month.y, month.m), [month.y, month.m]);
   const title = new Date(month.y, month.m, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
   const shift = (d) => setMonth(({ y, m }) => { const x = new Date(y, m + d, 1); return { y: x.getFullYear(), m: x.getMonth() }; });
-  const dayItems = picked && byDay ? byDay[picked] || [] : [];
+  // most hyped premiere of the day first
+  const dayItems = [...(picked && byDay ? byDay[picked] || [] : [])].sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
   const cell = Math.floor((Math.min(width, 720) - 28 - 6 * 4) / 7);
   const open = (it) => openDetail(navigation, it);
   const excite = async (item) => { await toggleExcited(user, item); setExcited(await getExcited(user)); };
@@ -61,7 +62,7 @@ export default function OutThisWeek({ navigation, refreshKey = 0 }) {
   return (
     <View>
         <View style={styles.monthRow}>
-          <Text style={styles.section}>🗓️ Premieres</Text>
+          <Text style={styles.section}>Premieres</Text>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
             <TouchableOpacity style={styles.arrow} onPress={() => shift(-1)} accessibilityLabel="Previous month"><Text style={styles.arrowText}>‹</Text></TouchableOpacity>
             <Text style={{ color: C.text, fontWeight: "800", minWidth: 110, textAlign: "center" }}>{title}</Text>
@@ -102,7 +103,7 @@ export default function OutThisWeek({ navigation, refreshKey = 0 }) {
                     {item.image ? <Image source={{ uri: item.image }} style={styles.thumb} /> : <View style={styles.thumb} />}
                     <View style={{ flex: 1 }}>
                       <Text style={styles.rowTitle} numberOfLines={2}>{item.title}</Text>
-                      <Text style={styles.rowSub} numberOfLines={1}>{[item.format?.replace("_", " "), item.creator, item.genres?.slice(0, 2).join(", ")].filter(Boolean).join(" · ")}</Text>
+                      <Text style={styles.rowSub} numberOfLines={1}>{[item.format?.replace("_", " "), item.creator, hypeLabel(item.popularity)].filter(Boolean).join(" · ")}</Text>
                     </View>
                   </TouchableOpacity>
                   {item.unreleased && (
@@ -116,7 +117,7 @@ export default function OutThisWeek({ navigation, refreshKey = 0 }) {
           </>
         ) : <Text style={styles.empty}>No premieres with a set date this month yet.</Text>}
 
-        <Text style={[styles.section, { paddingHorizontal: 14, marginTop: 22 }]}>⏰ Airing soon <Text style={{ color: C.faint, fontSize: 12, fontWeight: "600" }}>next 24 hours</Text></Text>
+        <Text style={[styles.section, { paddingHorizontal: 14, marginTop: 22 }]}>Airing soon <Text style={{ color: C.faint, fontSize: 12, fontWeight: "600" }}>next 24 hours</Text></Text>
         {soon === null ? <Text style={styles.empty}>Loading…</Text> : !soon.length ? <Text style={styles.empty}>Nothing airs in the next 24 hours.</Text> : soon.map((s) => (
           <TouchableOpacity key={`${s.item.id}-${s.episode}`} style={styles.row} onPress={() => open(s.item)}>
             <Text style={styles.time}>{airTime(s.airingAt, clock24)}</Text>
@@ -129,7 +130,7 @@ export default function OutThisWeek({ navigation, refreshKey = 0 }) {
           </TouchableOpacity>
         ))}
 
-        {latest.length > 0 && <PosterRow title="🎬 Latest premieres · last 3 weeks" items={latest} onOpen={open} />}
+        {latest.length > 0 && <PosterRow title="Latest premieres · last 3 weeks" items={latest} onOpen={open} />}
     </View>
   );
 }

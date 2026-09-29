@@ -2,6 +2,7 @@
 // full-screen medal pops in with a glow and confetti. Shown once per rank.
 import { useCallback, useEffect, useState } from "react";
 import { checkRankUp, markRankSeen, onDataChange, onCelebrate, TIERS } from "@voidation/shared/backend/store";
+import Icon from "./Icon.jsx";
 
 const CONFETTI = Array.from({ length: 28 }, (_, i) => ({
   left: (i * 37) % 100,
@@ -40,7 +41,7 @@ export default function RankUp() {
         <div className="medal" aria-hidden="true">
           <div className="medal-ring" />
           <div className="medal-face">
-            <span className="medal-star">{addict ? "☕" : "★"}</span>
+            <span className="medal-star"><Icon name={addict ? "coffee" : "star"} size={34} fill={!addict} /></span>
             <b>{tier.label}</b>
             <small>{tier.min}+ titles</small>
           </div>

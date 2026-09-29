@@ -14,7 +14,7 @@ import {
   getCategories, addCategory, renameCategory, moveCategory, deleteCategory,
   getExcited, toggleExcited,
   celebrate,
-  getSpotlight, setSpotlight, SPOTLIGHT_MIN,
+  getCategoryAccess, CATEGORY_MIN,
   exportLibraryCsv,
 } from "@voidation/shared/backend/store";
 import { useSettings } from "@voidation/shared/backend/SettingsContext";
@@ -24,7 +24,8 @@ import TierBadge from "../components/TierBadge.jsx";
 import Icon from "../components/Icon.jsx";
 import { useTheme } from "../theme.jsx";
 import { useDocumentTitle } from "../lib/useDocumentTitle.js";
-import logo from "../assets/logo.png";
+import logoDark from "../assets/logo.png";
+import logoLight from "../assets/logo-light.png";
 import AniListSync from "../components/AniListSync.jsx";
 import { loadAnnounced, daysLeft, ANNOUNCED_DAYS } from "@voidation/shared/announced";
 import { useAuth } from "@voidation/shared/backend/AuthContext";
@@ -35,11 +36,11 @@ const VERSION = "1.0.0";
 
 const PAGES = [
   { key: "statistics", label: "Statistics", hint: "Overview, anime, chapters" },
-  { key: "settings", label: "Settings", hint: "Theme, clock, countdown badges" },
+  { key: "settings", label: "Appearance and Others", hint: "Theme, clock, countdown badges" },
   { key: "data", label: "Data and storage", hint: "Backup, restore, clear" },
   { key: "badge", label: "Your badge", hint: "Your rank and every badge" },
   { key: "announced", label: "New announcements", hint: "Anime announced this week" },
-  { key: "categories", label: "Categories", hint: "Your own groups in the Library" },
+  { key: "categories", label: "Categories", hint: "Your own rows in Explore (500+ completed)" },
   { key: "anilist", label: "AniList", hint: "Sync or import your lists" },
   { key: "help", label: "Help", hint: "Common questions" },
   { key: "about", label: "About", hint: `Version ${VERSION}` },
@@ -73,6 +74,9 @@ export default function More() {
 // Laid out like the "More" tab in reader apps: logo, quick toggles, then menu rows.
 function MoreMenu() {
   const { settings, update } = useSettings();
+  // Categories only appear once you've completed 500 anime
+  const [catsOpen, setCatsOpen] = useState(false);
+  useEffect(() => { getCategoryAccess().then((a) => setCatsOpen(a.unlocked)).catch(() => {}); }, []);
   const row = (key, icon, label) => (
     <li key={key}>
       <Link to={`/more/${key}`} className="menu-row">
@@ -83,7 +87,7 @@ function MoreMenu() {
   );
   return (
     <div className="more-page narrow">
-      <div className="more-logo"><img src={logo} alt="Voidation" /></div>
+      <div className="more-logo"><img src={useTheme().dark ? logoDark : logoLight} alt="Voidation" /></div>
       <ul className="menu-list">
         <li>
           <label className="menu-row">
@@ -105,7 +109,7 @@ function MoreMenu() {
         <li>
           <Link to="/wrapped" className="menu-row wrapped-row">
             <Icon name="stats" size={22} className="menu-icon" />
-            <span className="grow"><b>Wrapped</b><span className="faint small">All time, or year by year</span></span>
+            <span className="grow"><b>Voidation Rewind</b><span className="faint small">All time, or year by year</span></span>
           </Link>
         </li>
       </ul>
@@ -117,11 +121,11 @@ function MoreMenu() {
         {row("data", "storage", "Data and storage")}
       </ul>
       <ul className="menu-list">
-        {row("categories", "library", "Categories")}
+        {catsOpen && row("categories", "library", "Categories")}
         {row("anilist", "browse", "AniList")}
       </ul>
       <ul className="menu-list">
-        {row("settings", "settings", "Settings")}
+        {row("settings", "settings", "Appearance and Others")}
         {row("help", "help", "Help")}
         {row("about", "info", "About")}
       </ul>
@@ -335,7 +339,7 @@ function YourBadgeRow() {
   const next = TIERS.find((t) => t.min > stats.totalCompleted);
   return (
     <Link to="/more/badge" className="badge-row" style={{ "--tier": tier.color }}>
-      <span className="mini-medal"><span>{tier.key === "addicted" ? "☕" : "★"}</span></span>
+      <span className="mini-medal"><Icon name={tier.key === "addicted" ? "coffee" : "star"} size={16} fill={tier.key !== "addicted"} /></span>
       <span className="grow">
         <small className="faint">Your badge</small>
         <b style={{ color: tier.color }}>{tier.label}</b>
@@ -362,7 +366,7 @@ function BadgePage() {
         <div className="medal static" aria-hidden="true">
           <div className="medal-ring" />
           <div className="medal-face">
-            <span className="medal-star">{tier.key === "addicted" ? "☕" : "★"}</span>
+            <span className="medal-star"><Icon name={tier.key === "addicted" ? "coffee" : "star"} size={40} fill={tier.key !== "addicted"} /></span>
             <b>{tier.label}</b>
             <small>{tier.min}+ titles</small>
           </div>
@@ -382,12 +386,12 @@ function BadgePage() {
           return (
             <li key={t.key} className={earned ? "earned" : "locked"} style={{ "--tier": t.color }}>
               <button disabled={!earned} onClick={() => celebrate(t)} title={earned ? "Replay the celebration" : undefined}>
-                <span className="mini-medal"><span>{earned ? (t.key === "addicted" ? "☕" : "★") : "🔒"}</span></span>
+                <span className="mini-medal"><Icon name={earned ? (t.key === "addicted" ? "coffee" : "star") : "lock"} size={16} fill={earned && t.key !== "addicted"} /></span>
                 <span className="grow">
                   <b>{t.label}</b>
                   <span className="faint small">{t.min === 0 ? "Where everyone starts" : `${t.min} anime completed + manga finished`}</span>
                 </span>
-                <span className="faint small">{earned ? "Earned ▸" : `${t.min - n} to go`}</span>
+                <span className="faint small">{earned ? "Earned" : `${t.min - n} to go`}</span>
               </button>
             </li>
           );
@@ -444,8 +448,8 @@ function Categories() {
   const [name, setName] = useState("");
   const [editing, setEditing] = useState(null); // { id, name }
   const [message, setMessage] = useState("");
-  const [spot, setSpot] = useState(null);
-  const refresh = () => { getCategories().then(setCats); getSpotlight().then(setSpot); };
+  const [access, setAccess] = useState(null);
+  const refresh = () => { getCategories().then(setCats); getCategoryAccess().then(setAccess); };
   useEffect(() => { refresh(); }, []);
 
   const add = async (e) => {
@@ -456,36 +460,30 @@ function Categories() {
     refresh();
   };
   const remove = async (c) => {
-    if (!window.confirm(`Delete "${c.name}"? The titles in it stay in your library.`)) return;
+    if (!window.confirm(`Delete "${c.name}"? Its Explore row goes; the titles stay in your library.`)) return;
     await deleteCategory(c.id);
     refresh();
   };
-  if (!cats) return <p className="muted">Loading…</p>;
+  if (!cats || !access) return <p className="muted">Loading…</p>;
+  if (!access.unlocked) {
+    return (
+      <section className="panel stack-sm spotlight-panel locked">
+        <b>Unlocks at {CATEGORY_MIN} completed anime</b>
+        <p className="faint small">Then you can make your own categories, and each one becomes a row at the top of Explore during the third week of every month. {access.needed} to go ({access.animeCompleted} completed).</p>
+      </section>
+    );
+  }
   return (
     <div className="stack-sm">
-      <p className="muted">Group titles your own way: Favourites, Rewatch, With friends… A title can be in several. Filter by them in the Library, and add titles from a title's page or with Select in the Library.</p>
+      <p className="muted">
+        Each category is your own row at the top of Explore during the third week of every month (days 15–21).
+        Add titles to it from a title's page, or with Select in the Library.
+      </p>
       <form className="row gap-8" onSubmit={add}>
-        <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="New category" maxLength={40} aria-label="New category name" />
+        <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="New category, e.g. Hidden gems" maxLength={40} aria-label="New category name" />
         <button className="btn primary" disabled={!name.trim()}>Add</button>
       </form>
       {message && <p className="field-error">{message}</p>}
-      {spot && (
-        <section className={`panel stack-sm spotlight-panel${spot.unlocked ? "" : " locked"}`}>
-          <b>⭐ Spotlight {spot.unlocked ? "" : "🔒"}</b>
-          {spot.unlocked ? (
-            <p className="faint small">
-              Pick one category below to be the top row of Explore during the third week of every month (days 15–21).
-              {spot.cat ? <> Now: <b>{spot.cat.name}</b>. </> : " None picked yet. "}
-              {spot.cat && <button className="link-btn" onClick={async () => { await setSpotlight(null); refresh(); }}>Turn off</button>}
-            </p>
-          ) : (
-            <p className="faint small">
-              A reward for serious watchers: complete {SPOTLIGHT_MIN} anime and one of your categories can be the top
-              row of Explore during the third week of every month. {spot.needed} to go ({spot.animeCompleted} completed).
-            </p>
-          )}
-        </section>
-      )}
       {cats.length === 0 ? <p className="empty">No categories yet.</p> : (
         <ul className="menu-list">
           {cats.map((c, i) => (
@@ -498,10 +496,7 @@ function Categories() {
                 </form>
               ) : (
                 <>
-                  <b className="grow">{c.name}{spot?.cat?.id === c.id && <span className="spot-tag">⭐ Spotlight</span>}</b>
-                  {spot?.unlocked && spot?.cat?.id !== c.id && (
-                    <button className="link-btn" onClick={async () => { await setSpotlight(c.id); refresh(); }}>Spotlight</button>
-                  )}
+                  <b className="grow">{c.name}</b>
                   <button className="icon-btn" aria-label={`Move ${c.name} up`} disabled={i === 0} onClick={async () => { await moveCategory(c.id, -1); refresh(); }}>↑</button>
                   <button className="icon-btn" aria-label={`Move ${c.name} down`} disabled={i === cats.length - 1} onClick={async () => { await moveCategory(c.id, 1); refresh(); }}>↓</button>
                   <button className="link-btn" onClick={() => setEditing({ id: c.id, name: c.name })}>Rename</button>

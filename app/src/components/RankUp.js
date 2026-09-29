@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Modal, View, Text, TouchableOpacity, Animated, Easing, StyleSheet, useWindowDimensions, AccessibilityInfo } from "react-native";
 import { checkRankUp, markRankSeen, onDataChange, onCelebrate, TIERS } from "@voidation/shared/backend/store";
+import Icon from "./Icon.js";
 
 const COLORS = ["#a855f7", "#ee8f2e", "#22d3ee", "#10b981", "#f43f5e", "#f59e0b"];
 
@@ -66,7 +67,7 @@ function Celebration({ tier, onClose }) {
             <View style={[styles.ringMark, { backgroundColor: "#fff" }]} />
           </Animated.View>
           <View style={styles.face}>
-            <Text style={{ color: tier.color, fontSize: 30 }}>{addict ? "☕" : "★"}</Text>
+            <Icon name={addict ? "coffee" : "star"} size={32} color={tier.color} fill={!addict} />
             <Text style={[styles.label, { color: tier.color }]}>{tier.label.toUpperCase()}</Text>
             <Text style={styles.min}>{tier.min}+ titles</Text>
           </View>

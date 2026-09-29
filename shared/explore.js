@@ -6,7 +6,7 @@
 import { fetchAniList, fetchAnimeOfTheYear, fetchRecommendations, fetchSequels } from "./api/anilist.js";
 import { readKey, writeKey } from "./backend/storage.js";
 import { seasonOf, shiftSeason, seasonTitle } from "./season.js";
-import { getReviews, getLibrary, getExcited, VERDICTS } from "./backend/store.js";
+import { getReviews, getLibrary, getExcited, VERDICTS, leftToWatch } from "./backend/store.js";
 
 const daySeed = () =>
   Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0)) / 864e5);
@@ -157,7 +157,7 @@ export async function loadNewSeasons() {
   const [lib, excited] = await Promise.all([getLibrary(), getExcited()]);
   const known = new Set([...Object.keys(lib), ...Object.keys(excited)]);
   const sources = Object.values(lib)
-    .filter((e) => e.item.segment === "anime" && (e.status === "completed" || e.status === "watching"))
+    .filter((e) => e.item.segment === "anime" && (e.status === "completed" || e.status === "rewatching" || e.status === "watching"))
     .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""))
     .slice(0, 150)
     .map((e) => e.item);
@@ -207,4 +207,20 @@ export async function loadNewSeasons() {
   return out
     .sort((a, b) => rank(a) - rank(b) || (b.date || "").localeCompare(a.date || ""))
     .slice(0, 20);
+}
+
+// "Jump back in": anime and manga you started and then left — Watching /
+// Reading, Rewatching or On Hold, with progress, untouched for 3+ days, and
+// with something left (a caught-up airing show isn't "left", it's waiting).
+// Most recently left first. { anime: [...], manga: [...] }, up to 12 each.
+export const JUMP_BACK_DAYS = 3;
+export async function loadJumpBackIn(now = Date.now()) {
+  const cutoff = new Date(now - JUMP_BACK_DAYS * 864e5).toISOString();
+  const entries = Object.values(await getLibrary())
+    .filter((e) => ["watching", "rewatching", "onhold"].includes(e.status) && (e.progress || 0) > 0)
+    .filter((e) => (e.updatedAt || "") < cutoff)
+    .filter((e) => { const left = leftToWatch(e); return left === null ? e.item.segment === "manga" : left > 0; })
+    .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
+  const pick = (seg) => entries.filter((e) => e.item.segment === seg).slice(0, 12).map((e) => e.item);
+  return { anime: pick("anime"), manga: pick("manga") };
 }
