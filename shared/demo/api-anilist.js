@@ -299,3 +299,20 @@ export async function fetchDiscussions(id) {
   if (!it) return [];
   return [3, 2, 1].map((n) => ({ id: n, title: `${it.title} Episode ${n} Discussion`, replies: 40 * n, views: 900 * n, url: it.url || "https://anilist.co", at: 0 }));
 }
+
+// Statistics → "Your people": the demo only knows each title's studio or mangaka.
+export async function fetchCredits(ids) {
+  await wait(150);
+  const out = {};
+  ids.forEach((id) => {
+    const anime = findItem("anime", id);
+    const it = anime || findItem("manga", id);
+    if (!it) return;
+    const who = toAppItem(it).creator;
+    const pid = who ? [...who].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) | 0, 7) : 0;
+    out[it.id] = !anime
+      ? { studios: [], staff: who ? [{ id: pid, name: who, image: null, role: "Story & Art" }] : [], voices: [] }
+      : { studios: who ? [{ id: pid, name: who }] : [], staff: [], voices: [] };
+  });
+  return out;
+}

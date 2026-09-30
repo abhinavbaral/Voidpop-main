@@ -2,7 +2,8 @@
 //   Watch list: anime  → Watching / Completed / Plan to Watch …
 //   Read list:  manga (incl. manhwa, manhua, comics) → Reading / Finished / Plan to Read …
 // Saved on this phone. Airing anime get a fresh next-episode countdown on open.
-// Search, sort, progress on every card, and +1 on what you're watching.
+// Search, sort, four layouts (compact, comfortable, covers, list), and
+// "Pick for me" for a random title from the list you're on.
 
 import { useCallback, useMemo, useState } from "react";
 import { View, Text, TextInput, FlatList, StyleSheet, TouchableOpacity, Alert } from "react-native";
@@ -11,7 +12,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useAuth } from "@voidation/shared/backend/AuthContext";
 import {
   getLibrary, statusesFor, LIBRARY_LISTS as LISTS, inLibraryList as inList,
-  setStatus, addReview, noteAiring, LIBRARY_SORTS, sortEntries,
+  setStatus, addReview, noteAiring, LIBRARY_SORTS, LIBRARY_LAYOUTS, sortEntries, getLibraryDates,
   getCategories, categoriesUnlocked, bulkSetStatus, bulkCategory, bulkRemove,
 } from "@voidation/shared/backend/store";
 import OptionsSheet from "../components/OptionsSheet.js";
@@ -23,12 +24,20 @@ import { useTheme } from "../context/ThemeContext.js";
 import { useGridColumns } from "../lib/layout";
 import { openDetail } from "../lib/nav";
 import { VoidmonEmpty } from "../components/Voidmon.js";
+import PickForMe from "../components/PickForMe.js";
+import Icon from "../components/Icon.js";
+import { useSettings } from "@voidation/shared/backend/SettingsContext";
 
 
 export default function LibraryScreen({ navigation }) {
   const { C } = useTheme();
   const styles = makeStyles(C);
-  const cols = useGridColumns();
+  const { settings, update } = useSettings();
+  const layout = settings.libraryLayout || "compact";
+  const gridCols = useGridColumns(layout === "cover" ? 120 : 190);
+  const cols = layout === "list" ? 1 : gridCols;
+  const [dates, setDates] = useState({});
+  const [picking, setPicking] = useState(false);
   const { user } = useAuth();
   const [list, setList] = useState("watch");
   const [tab, setTab] = useState("watching");
@@ -38,10 +47,11 @@ export default function LibraryScreen({ navigation }) {
   const [finishing, setFinishing] = useState(null); // item whose last episode you just marked
   const [cats, setCats] = useState([]);
   const [selected, setSelected] = useState(null); // null = not selecting; Set of keys while selecting
-  const [sheet, setSheet] = useState(null); // "status" | "category"
+  const [sheet, setSheet] = useState(null); // "status" | "category" | "sort" | "layout"
 
   const reload = useCallback(async () => {
     setEntries(Object.values(await getLibrary(user).catch(() => ({}))));
+    setDates(await getLibraryDates().catch(() => ({})));
     setCats((await categoriesUnlocked()) ? await getCategories() : []); // categories unlock at 500 completed anime
   }, [user]);
 
@@ -92,7 +102,8 @@ export default function LibraryScreen({ navigation }) {
     key: s.key,
     label: `${s.label} ${listEntries.filter((e) => e.status === s.key).length}`,
   }));
-  const filtered = sortEntries(listEntries.filter((e) => e.status === tab), sort);
+  const filtered = sortEntries(listEntries.filter((e) => e.status === tab), sort, dates);
+  const sortLabel = sorts.find((x) => x.key === sort)?.label || "Sort";
   const tabLabel = statusesFor(current.segment).find((s) => s.key === tab)?.label;
 
   return (
@@ -132,7 +143,23 @@ export default function LibraryScreen({ navigation }) {
 
       <View style={{ paddingHorizontal: 14 }}>
         <Chips options={tabs} value={tab} onChange={setTab} />
-        <Chips options={sorts} value={sort} onChange={setSort} style={{ marginTop: 6 }} />
+        <View style={styles.tools}>
+          <TouchableOpacity onPress={() => setSheet("sort")} style={[styles.tool, { flexShrink: 1 }]} accessibilityRole="button" accessibilityLabel={`Sort: ${sortLabel}`}>
+            <Icon name="sort" size={15} color={C.sub} />
+            <Text style={styles.toolText} numberOfLines={1}>{sortLabel}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setSheet("layout")} style={styles.tool} accessibilityRole="button"
+            accessibilityLabel={`Layout: ${LIBRARY_LAYOUTS.find((l) => l.key === layout)?.label}`}>
+            <Icon name={layout === "list" ? "list" : "browse"} size={15} color={C.sub} />
+          </TouchableOpacity>
+          <View style={{ flex: 1 }} />
+          {filtered.length > 1 && !selecting && (
+            <TouchableOpacity onPress={() => setPicking(true)} style={[styles.tool, { borderColor: C.purple }]} accessibilityRole="button">
+              <Icon name="shuffle" size={15} color={C.purple} />
+              <Text style={[styles.toolText, { color: C.purple }]}>Pick for me</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {selecting && (
@@ -154,7 +181,7 @@ export default function LibraryScreen({ navigation }) {
 
       <FlatList
         data={filtered}
-        key={`grid-${cols}`}
+        key={`${layout}-${cols}`}
         keyExtractor={(e) => `${e.item.segment}-${e.item.id}`}
         numColumns={cols}
         contentContainerStyle={{ padding: 6, paddingBottom: 30 }}
@@ -162,6 +189,7 @@ export default function LibraryScreen({ navigation }) {
           <LibraryCard
             entry={entry}
             columns={cols}
+            layout={layout}
             selecting={selecting}
             selected={selecting && selected.has(keyOf(entry))}
             onLongPress={() => (selecting ? toggle(entry) : setSelected(new Set([keyOf(entry)])))}
@@ -189,6 +217,22 @@ export default function LibraryScreen({ navigation }) {
         onPick={(k) => bulk((keys) => bulkCategory(keys, k.slice(1), k[0] === "+"))}
         onClose={() => setSheet(null)}
       />
+      <OptionsSheet
+        visible={sheet === "sort"}
+        title="Sort by"
+        options={sorts.map((x) => ({ key: x.key, label: x.key === sort ? `${x.label}  (now)` : x.label }))}
+        onPick={(k) => { setSort(k); setSheet(null); }}
+        onClose={() => setSheet(null)}
+      />
+      <OptionsSheet
+        visible={sheet === "layout"}
+        title="Layout"
+        options={LIBRARY_LAYOUTS.map((x) => ({ key: x.key, label: x.key === layout ? `${x.label}  (now)` : x.label }))}
+        onPick={(k) => { update("libraryLayout", k); setSheet(null); }}
+        onClose={() => setSheet(null)}
+      />
+      <PickForMe visible={picking} entries={filtered} onClose={() => setPicking(false)}
+        onOpen={(item) => { setPicking(false); openDetail(navigation, item); }} />
       {finishing && (
         <VerdictModal visible initial={null} onSave={finish} onClose={() => { setFinishing(null); reload(); }} />
       )}
@@ -220,6 +264,12 @@ const makeStyles = (C) => StyleSheet.create({
   bulkBtn: { color: C.purple, fontWeight: "800" },
   bulkOff: { opacity: 0.4 },
   empty: { color: C.faint, textAlign: "center", marginTop: 40, paddingHorizontal: 20 },
+  tools: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 },
+  tool: {
+    flexDirection: "row", alignItems: "center", gap: 6, height: 34, paddingHorizontal: 11,
+    borderRadius: 999, borderWidth: 1, borderColor: C.border, backgroundColor: C.card,
+  },
+  toolText: { color: C.sub, fontWeight: "700", fontSize: 13 },
   search: {
     marginHorizontal: 14, marginTop: 8, height: 40, borderRadius: 10, borderWidth: 1, borderColor: C.border,
     backgroundColor: C.card, color: C.text, paddingHorizontal: 12, fontSize: 14,

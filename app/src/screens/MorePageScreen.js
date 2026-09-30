@@ -14,6 +14,7 @@ import {
   getExcited, toggleExcited, celebrate, getCategoryAccess, CATEGORY_MIN, exportLibraryCsv,
 } from "@voidation/shared/backend/store";
 import { useSettings } from "@voidation/shared/backend/SettingsContext";
+import { THEMES, PALETTES, applyPalette } from "@voidation/shared/theme";
 import { useTheme } from "../context/ThemeContext.js";
 import { goBackOrHome, openDetail } from "../lib/nav";
 import { loadAnnounced, daysLeft, ANNOUNCED_DAYS } from "@voidation/shared/announced";
@@ -41,6 +42,7 @@ const AUTO_BACKUP = Platform.OS === "android"; // Android's folder picker (SAF)
 import appConfig from "../../app.json";
 import Chips from "../components/Chips.js";
 import { computeAchievements } from "@voidation/shared/achievements";
+import { loadPeopleStats, PEOPLE_KINDS } from "@voidation/shared/peopleStats";
 
 const VERSION = appConfig.expo.version;
 const TITLES = {
@@ -69,7 +71,7 @@ export default function MorePageScreen({ route, navigation }) {
 }
 
 // Statistics, laid out like Mihon's: Overview, Anime, Chapters, then trackers.
-function Statistics({ styles, C }) {
+function Statistics({ styles, C, navigation }) {
   const [data, setData] = useState(null);
   useFocusEffect(useCallback(() => { getUserTier().then(setData).catch(() => {}); }, []));
   if (!data) return <SkeletonList rows={4} thumb={false} style={{ paddingHorizontal: 0 }} />;
@@ -93,6 +95,7 @@ function Statistics({ styles, C }) {
       {block("Overview", [[fmt(stats.tracking), "In library"], [fmt(stats.totalCompleted), "Completed & finished"], [durationLabel(stats.minutesWatched), "Time watched"]])}
       {block("Anime", [[fmt(stats.episodesTotal), "Total"], [fmt(stats.episodesWatched), "Watched"], [fmt(stats.inLibrary.anime), "Entries"]])}
       {block("Chapters", [[fmt(stats.chaptersTotal), "Total"], [fmt(stats.chaptersRead), "Read"], [fmt(stats.inLibrary.manga), "Entries"]])}
+      <YourPeople styles={styles} C={C} navigation={navigation} />
       <Text style={{ color: C.purple, fontWeight: "700", fontSize: 14, marginTop: 14 }}>Trackers</Text>
       {["anime", "manga"].map((seg) => (
         <View key={seg} style={styles.card}>
@@ -106,6 +109,72 @@ function Statistics({ styles, C }) {
         </View>
       ))}
     </>
+  );
+}
+
+// "Your people" (idea from AniList's stats): the genres, studios, voice
+// actors, directors and creators that come up most in your library, each with
+// how many of your titles and a few covers. People open their page.
+function YourPeople({ styles, C, navigation }) {
+  const [kind, setKind] = useState("genres");
+  const [data, setData] = useState(null);
+  const [progress, setProgress] = useState(null);
+  useFocusEffect(useCallback(() => {
+    let alive = true;
+    loadPeopleStats({ onProgress: (done, total) => alive && total > 20 && setProgress({ done, total }) })
+      .then((d) => { if (alive) { setData(d); setProgress(null); } })
+      .catch(() => alive && setData({ counted: 0, missing: 0 }));
+    return () => { alive = false; };
+  }, []));
+  const rows = data?.[kind] || [];
+  const isPerson = kind === "voices" || kind === "directors" || kind === "creators";
+  return (
+    <View style={{ marginTop: 14 }}>
+      <Text style={{ color: C.purple, fontWeight: "700", fontSize: 14, marginBottom: 8 }}>Your people</Text>
+      <Chips options={PEOPLE_KINDS} value={kind} onChange={setKind} />
+      <View style={[styles.card, { marginTop: 8 }]}>
+        {!data ? (
+          <VoidmonLoading delay={300} text={progress ? `Looking up who made your titles (${progress.done} of ${progress.total})` : "Looking up who made your titles"} />
+        ) : !rows.length ? (
+          <Text style={styles.note}>
+            {data.counted ? "Nothing here yet. It fills in as your library grows." : "Add some titles you're watching or have finished, and this fills in."}
+          </Text>
+        ) : (
+          rows.map((r, i) => (
+            <Pressable key={`${kind}-${r.id ?? r.name}`} disabled={!isPerson}
+              onPress={() => navigation.navigate("Person", { id: r.id, name: r.name })}
+              style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 9 }, i > 0 && { borderTopWidth: 1, borderTopColor: C.border }, pressed && { opacity: 0.7 }]}
+              accessibilityRole={isPerson ? "button" : undefined}
+              accessibilityLabel={`${r.name}, ${r.count} of your titles`}>
+              {isPerson ? (
+                r.image
+                  ? <Image source={{ uri: r.image }} style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: C.border }} />
+                  : <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: C.border, alignItems: "center", justifyContent: "center" }}>
+                      <Text style={{ color: C.sub, fontWeight: "800" }}>{r.name.slice(0, 1)}</Text>
+                    </View>
+              ) : null}
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={{ color: C.text, fontWeight: "800", fontSize: 14 }} numberOfLines={1}>{r.name}</Text>
+                <Text style={{ color: C.faint, fontSize: 12 }} numberOfLines={1}>
+                  {r.count} {r.count === 1 ? "title" : "titles"} · {r.titles.slice(0, 2).map((t) => t.title).join(", ")}
+                </Text>
+              </View>
+              <View style={{ flexDirection: "row" }}>
+                {r.titles.slice(0, 3).map((t, k) => (
+                  <Image key={`${t.segment}${t.id}`} source={t.image ? { uri: t.image } : undefined}
+                    style={{ width: 26, height: 38, borderRadius: 4, marginLeft: k ? -8 : 0, borderWidth: 1, borderColor: C.card, backgroundColor: C.border }} />
+                ))}
+              </View>
+            </Pressable>
+          ))
+        )}
+        {!!data?.missing && (
+          <Text style={[styles.note, { marginTop: 8 }]}>
+            {data.missing} {data.missing === 1 ? "title" : "titles"} still to look up (offline or AniList was busy). Open this page again later.
+          </Text>
+        )}
+      </View>
+    </View>
   );
 }
 
@@ -140,7 +209,7 @@ function LogoSettings({ styles, C }) {
 
 // Theme, like Mihon: System / Light / Dark, plus Pure black for dark.
 function ThemeSettings({ styles, C }) {
-  const { pref, setPref, pureBlack, setPureBlack, dark } = useTheme();
+  const { pref, setPref, pureBlack, setPureBlack, dark, palette, setPalette, mode } = useTheme();
   return (
     <View style={styles.card}>
       <Text style={styles.cardTitle}>Theme</Text>
@@ -158,6 +227,20 @@ function ThemeSettings({ styles, C }) {
         </View>
         <Switch value={pureBlack} onValueChange={setPureBlack} trackColor={{ false: C.border, true: C.purple }} thumbColor="#fff" />
       </Pressable>
+      <Text style={[styles.cardTitle, { marginTop: 14 }]}>Colour</Text>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+        {PALETTES.map((p) => {
+          const on = palette === p.key;
+          const look = applyPalette(THEMES[mode], mode, p.key);
+          return (
+            <TouchableOpacity key={p.key} onPress={() => setPalette(p.key)} accessibilityRole="radio" accessibilityState={{ selected: on }}
+              style={[styles.btn, { flexDirection: "row", alignItems: "center", gap: 7, flex: 0, paddingHorizontal: 12 }, on && { borderColor: look.purple, borderWidth: 2 }]}>
+              <View style={{ width: 16, height: 16, borderRadius: 8, backgroundColor: look.purple, borderWidth: 3, borderColor: look.orange }} />
+              <Text style={[styles.btnText, on && { color: look.purple }]}>{p.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
     </View>
   );
 }
@@ -179,7 +262,7 @@ function Settings({ styles, C }) {
     <LogoSettings styles={styles} C={C} />
     <View style={styles.card}>
       {row("clock24", "24-hour clock", "Airing times as 16:30 instead of 4:30 PM")}
-      {row("posterBadges", "Badges on posters", 'Score (★ 8.7) and "Ep 7 · 3h 30m" countdowns on posters')}
+      {row("posterBadges", "Badges on posters", '"Ep 7 · 3h 30m" countdowns on posters')}
       {NATIVE && (
         <Pressable style={styles.toggleRow} onPress={() => toggleAlerts(!settings.notifyEpisodes)}>
           <View style={{ flex: 1 }}>

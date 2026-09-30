@@ -1,29 +1,84 @@
-// Library poster: the whole card is the cover, title over the bottom, and a
-// badge with how many episodes (chapters) are out that you haven't watched.
+// Library poster in one of four layouts (idea from Mihon):
+//   compact      the whole card is the cover, title over the bottom
+//   comfortable  cover, then the title and progress underneath
+//   cover        covers only
+//   list         a row: small cover, title, status line and progress
+// Every layout keeps the badge with how many episodes (chapters) are out that
+// you haven't watched, and the Delayed tag.
 import { Pressable, Image, Text, View, StyleSheet } from "react-native";
-import { leftToWatch } from "@voidation/shared/backend/store";
+import { leftToWatch, totalFor } from "@voidation/shared/backend/store";
 import { useTheme } from "../context/ThemeContext.js";
 
-export default function LibraryCard({ entry, columns, onPress, onLongPress, selecting, selected }) {
+const progressLine = (entry) => {
+  const item = entry.item;
+  const unit = item.segment === "manga" ? "Ch" : "Ep";
+  const total = totalFor(item);
+  return `${unit} ${entry.progress || 0}${total ? ` / ${total}` : ""}`;
+};
+
+export default function LibraryCard({ entry, columns, layout = "compact", onPress, onLongPress, selecting, selected }) {
   const { C } = useTheme();
   const item = entry.item;
   const left = leftToWatch(entry);
-  return (
-    <View style={{ width: `${100 / columns}%`, padding: 6 }}>
-      <Pressable onPress={onPress} onLongPress={onLongPress} delayLongPress={350}
-        style={({ pressed }) => [styles.card, { backgroundColor: C.card }, selected && { borderColor: C.purple, borderWidth: 3 }, pressed && { opacity: 0.85 }]}
-        accessibilityLabel={`${item.title}${left ? `, ${left} ${item.segment === "manga" ? "chapters" : "episodes"} left` : ""}`}>
-        {item.image ? <Image source={{ uri: item.image }} style={StyleSheet.absoluteFill} /> : null}
-        <View style={styles.shade} />
-        {left > 0 && <Text style={[styles.badge, { backgroundColor: C.purple }]}>{left}</Text>}
-        {!!entry.delay && <Text style={[styles.late, { backgroundColor: C.rose }]}>Delayed</Text>}
-        {selecting && (
-          <View style={[styles.tick, selected && { backgroundColor: C.purple, borderColor: C.purple }]}>
-            <Text style={{ color: "#fff", fontWeight: "900", fontSize: 12 }}>{selected ? "✓" : ""}</Text>
-          </View>
-        )}
-        <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
+  const label = `${item.title}${left ? `, ${left} ${item.segment === "manga" ? "chapters" : "episodes"} left` : ""}`;
+  const tick = selecting && (
+    <View style={[styles.tick, selected && { backgroundColor: C.purple, borderColor: C.purple }]}>
+      <Text style={{ color: "#fff", fontWeight: "900", fontSize: 12 }}>{selected ? "✓" : ""}</Text>
+    </View>
+  );
+  const badges = (
+    <>
+      {left > 0 && <Text style={[styles.badge, { backgroundColor: C.purple }]}>{left}</Text>}
+      {!!entry.delay && !selecting && <Text style={[styles.late, { backgroundColor: C.rose }]}>Delayed</Text>}
+    </>
+  );
+  const press = { onPress, onLongPress, delayLongPress: 350, accessibilityLabel: label };
+
+  if (layout === "list") {
+    const total = totalFor(item);
+    const pct = total ? Math.min(1, (entry.progress || 0) / total) : 0;
+    return (
+      <Pressable {...press}
+        style={({ pressed }) => [styles.row, { backgroundColor: C.card, borderColor: selected ? C.purple : C.border }, selected && { borderWidth: 2 }, pressed && { opacity: 0.85 }]}>
+        <View style={styles.rowCover}>
+          {item.image ? <Image source={{ uri: item.image }} style={StyleSheet.absoluteFill} /> : null}
+        </View>
+        <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+          <Text style={{ color: C.text, fontWeight: "800", fontSize: 15 }} numberOfLines={2}>{item.title}</Text>
+          <Text style={{ color: C.sub, fontSize: 12 }} numberOfLines={1}>
+            {[progressLine(entry), left > 0 ? `${left} to catch up` : null, entry.delay ? "Delayed" : null].filter(Boolean).join(" · ")}
+          </Text>
+          {total ? (
+            <View style={[styles.bar, { backgroundColor: C.border }]}>
+              <View style={{ width: `${pct * 100}%`, height: "100%", backgroundColor: C.purple, borderRadius: 2 }} />
+            </View>
+          ) : null}
+        </View>
+        {tick}
       </Pressable>
+    );
+  }
+
+  const cover = (
+    <Pressable {...press}
+      style={({ pressed }) => [styles.card, { backgroundColor: C.card }, selected && { borderColor: C.purple, borderWidth: 3 }, pressed && { opacity: 0.85 }]}>
+      {item.image ? <Image source={{ uri: item.image }} style={StyleSheet.absoluteFill} /> : null}
+      {layout === "compact" && <View style={styles.shade} />}
+      {badges}
+      {tick}
+      {layout === "compact" && <Text style={styles.title} numberOfLines={2}>{item.title}</Text>}
+    </Pressable>
+  );
+
+  return (
+    <View style={{ width: `${100 / columns}%`, padding: layout === "cover" ? 4 : 6 }}>
+      {cover}
+      {layout === "comfortable" && (
+        <View style={{ paddingTop: 6, paddingHorizontal: 2 }}>
+          <Text style={{ color: C.text, fontWeight: "700", fontSize: 13, lineHeight: 17 }} numberOfLines={2}>{item.title}</Text>
+          <Text style={{ color: C.faint, fontSize: 11, marginTop: 1 }} numberOfLines={1}>{progressLine(entry)}</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -36,4 +91,7 @@ const styles = StyleSheet.create({
   badge: { position: "absolute", top: 7, left: 7, minWidth: 26, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 7, color: "#fff", fontWeight: "800", fontSize: 13, textAlign: "center", overflow: "hidden" },
   late: { position: "absolute", top: 7, right: 7, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 7, color: "#fff", fontWeight: "800", fontSize: 10, overflow: "hidden" },
   tick: { position: "absolute", top: 7, right: 7, width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: "#fff", backgroundColor: "rgba(11,15,25,0.8)", alignItems: "center", justifyContent: "center" },
+  row: { flexDirection: "row", alignItems: "center", gap: 12, marginHorizontal: 6, marginVertical: 4, padding: 8, borderRadius: 12, borderWidth: 1 },
+  rowCover: { width: 52, aspectRatio: 2 / 3, borderRadius: 8, overflow: "hidden", backgroundColor: "rgba(127,127,127,0.2)" },
+  bar: { height: 4, borderRadius: 2, overflow: "hidden", marginTop: 3 },
 });

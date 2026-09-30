@@ -784,6 +784,39 @@ export async function fetchNextEpisodes(ids) {
   return out;
 }
 
+// Who made each title, for Statistics → "Your people": main studio, the top
+// staff with their roles, and the Japanese voice actors of the main cast.
+// Not saved in the shared cache (peopleStats keeps its own copy per title).
+export async function fetchCredits(ids) {
+  if (!ids.length) return {};
+  const query = `query ($ids: [Int]) {
+    Page(page: 1, perPage: 10) {
+      media(id_in: $ids) {
+        id type
+        studios(isMain: true) { nodes { id name } }
+        staff(perPage: 8, sort: RELEVANCE) { edges { role node { id name { full } image { medium } } } }
+        characters(role: MAIN, perPage: 6, sort: RELEVANCE) { edges { voiceActors(language: JAPANESE) { id name { full } image { medium } } } }
+      }
+    }
+  }`;
+  const person = (n) => ({ id: n.id, name: n.name?.full || "", image: n.image?.medium || null });
+  // 10 titles a request keeps the nested staff and cast under AniList's query complexity limit
+  const out = {};
+  for (let i = 0; i < ids.length; i += 10) {
+    const data = await gql(query, { ids: ids.slice(i, i + 10).map(Number) }, { save: false });
+    data.Page.media.forEach((m) => {
+      const vas = new Map();
+      (m.characters?.edges || []).forEach((e) => (e.voiceActors || []).slice(0, 1).forEach((v) => vas.set(v.id, person(v))));
+      out[m.id] = {
+        studios: (m.studios?.nodes || []).map((n) => ({ id: n.id, name: n.name })),
+        staff: (m.staff?.edges || []).filter((e) => e.node).map((e) => ({ ...person(e.node), role: e.role || "" })),
+        voices: [...vas.values()],
+      };
+    });
+  }
+  return out;
+}
+
 // Episodes that have ALREADY aired for specific anime in the last `days` days,
 // newest first (History page: what dropped for the shows you follow).
 export async function fetchRecentEpisodes(ids, days = 14) {

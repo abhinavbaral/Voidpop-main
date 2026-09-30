@@ -25,6 +25,36 @@ export const THEMES = {
     green: "#059669", amber: "#d97706", rose: "#e11d48",
   },
 };
+// Colour themes (idea from Mihon's named themes). Each one swaps the accent
+// pair everywhere and tints the dark background; light mode and Pure black
+// only take the accents, so Pure black stays truly black.
+// Accents are picked dark enough for white text on buttons.
+export const PALETTES = [
+  { key: "void", label: "Void" },
+  { key: "ember", label: "Ember", accent: ["#ef4444", "#dc2626"], second: "#f59e0b",
+    tint: { bg: "#130a0c", card: "#1e1013", border: "#35191e", inputBg: "#170c0f" } },
+  { key: "sakura", label: "Sakura", accent: ["#ec4899", "#db2777"], second: "#fb923c",
+    tint: { bg: "#140b13", card: "#20121e", border: "#361f33", inputBg: "#190e18" } },
+  { key: "tide", label: "Tide", accent: ["#0891b2", "#0e7490"], second: "#f59e0b",
+    tint: { bg: "#07121a", card: "#0c1d27", border: "#17323f", inputBg: "#0a1720" } },
+  { key: "matcha", label: "Matcha", accent: ["#16a34a", "#15803d"], second: "#eab308",
+    tint: { bg: "#09120c", card: "#101d15", border: "#1c3325", inputBg: "#0c170f" } },
+  { key: "frost", label: "Frost", accent: ["#5e81ac", "#4c6a92"], second: "#ebcb8b",
+    tint: { bg: "#1b1f27", card: "#242a35", border: "#343c4b", inputBg: "#20252f", sub: "#b4bccb", faint: "#8791a3" } },
+];
+
+export function applyPalette(theme, mode, key) {
+  const p = PALETTES.find((x) => x.key === key);
+  if (!p || !p.accent) return theme;
+  const light = mode === "pop";
+  return {
+    ...theme,
+    ...(mode === "void" ? p.tint : {}),
+    purple: light ? p.accent[1] : p.accent[0],
+    orange: light ? theme.orange : p.second,
+  };
+}
+
 // fallback for anything not yet converted
 export const C = THEMES.void;
 

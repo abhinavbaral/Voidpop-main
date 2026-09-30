@@ -25,7 +25,7 @@ import { readKey, writeKey } from "./storage.js";
 const DB_KEY = "voidation:db:v1";
 // notifyEpisodes only matters in the app (the website can't schedule alerts)
 // logo: which logo the app shows (see Brand.js): "classic", "voidmon" or "peeking"
-export const DEFAULT_SETTINGS = { clock24: false, posterBadges: true, notifyEpisodes: true, seasonLayout: "grid", logo: "classic" };
+export const DEFAULT_SETTINGS = { clock24: false, posterBadges: true, notifyEpisodes: true, seasonLayout: "grid", logo: "classic", libraryLayout: "compact" };
 const EMPTY = () => ({ library: {}, reviews: {}, excited: {}, notes: {}, log: [], categories: [], meta: {}, settings: { ...DEFAULT_SETTINGS } });
 
 let cache = null;
@@ -166,7 +166,7 @@ export async function setStatus(_user, segment, item, status) {
   logChange(db, key, progress - (prev?.progress || 0), "complete");
   logStatus(db, key, prev?.status, status);
   db.library[key] = {
-    ...(prev ? {} : { rewindYear: new Date().getFullYear() }), // added now: counts in this year's Rewind
+    ...(prev ? {} : { rewindYear: new Date().getFullYear(), addedAt: new Date().toISOString() }), // added now: counts in this year's Rewind
     ...prev,
     status,
     progress,
@@ -287,7 +287,7 @@ export async function setProgress(_user, item, n, source = "plus") {
   logChange(db, key, progress - (prev?.progress || 0), source);
   logStatus(db, key, prev?.status, status);
   db.library[key] = {
-    ...(prev ? {} : { rewindYear: new Date().getFullYear() }), // added now: counts in this year's Rewind
+    ...(prev ? {} : { rewindYear: new Date().getFullYear(), addedAt: new Date().toISOString() }), // added now: counts in this year's Rewind
     ...prev,
     status,
     progress,
@@ -304,18 +304,54 @@ export async function setProgress(_user, item, n, source = "plus") {
 
 export const LIBRARY_SORTS = [
   { key: "updated", label: "Recently updated" },
+  { key: "watched", label: "Last watched" },
+  { key: "added", label: "Date added" },
   { key: "title", label: "Title A–Z" },
+  { key: "longest", label: "Longest first" },
   { key: "airing", label: "Airing soonest", anime: true },
   { key: "behind", label: "Most to catch up", anime: true },
 ];
 
-export function sortEntries(list, sort) {
+// How the library grid looks (idea from Mihon): title over the cover,
+// title under the cover, covers only, or a list with progress.
+export const LIBRARY_LAYOUTS = [
+  { key: "compact", label: "Compact grid" },
+  { key: "comfortable", label: "Comfortable grid" },
+  { key: "cover", label: "Covers only" },
+  { key: "list", label: "List" },
+];
+
+// When each title was added and last watched, from the saved entry and the
+// watch log. Older entries have no addedAt, so their first log line stands in.
+export async function getLibraryDates() {
+  const db = await load();
+  const out = {};
+  for (const [time, key, change] of db.log) {
+    const d = (out[key] ||= { added: time, watched: 0 });
+    if (time < d.added) d.added = time;
+    if (change > 0 && time > d.watched) d.watched = time;
+  }
+  for (const [key, e] of Object.entries(db.library)) {
+    const d = (out[key] ||= { added: 0, watched: 0 });
+    if (e.addedAt) d.added = Date.parse(e.addedAt);
+    const updated = Date.parse(e.updatedAt || 0) || 0;
+    if (!d.added) d.added = updated;
+    if (!d.watched) d.watched = updated;
+  }
+  return out;
+}
+
+export function sortEntries(list, sort, dates = {}) {
   const s = [...list];
+  const date = (e, k) => dates[keyOf(e.item.segment, e.item.id)]?.[k] || Date.parse(e.updatedAt || 0) || 0;
   if (sort === "title") s.sort((a, b) => a.item.title.localeCompare(b.item.title));
   else if (sort === "airing") {
     const t = (e) => e.item.nextEpisode?.airingAt ?? Infinity;
     s.sort((a, b) => t(a) - t(b));
   } else if (sort === "behind") s.sort((a, b) => behindBy(b) - behindBy(a));
+  else if (sort === "added") s.sort((a, b) => date(b, "added") - date(a, "added"));
+  else if (sort === "watched") s.sort((a, b) => date(b, "watched") - date(a, "watched"));
+  else if (sort === "longest") s.sort((a, b) => (totalFor(b.item) ?? -1) - (totalFor(a.item) ?? -1));
   else s.sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
   return s;
 }
