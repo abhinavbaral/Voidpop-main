@@ -16,7 +16,7 @@ import { openDetail } from "../lib/nav";
 import { useIsWide } from "../lib/layout";
 import Icon from "../components/Icon.js";
 import AnimatedBanner from "../components/AnimatedBanner.js";
-import { NewEpisodeCards, PremiereCountdown } from "../components/ExploreCards.js";
+import { NewEpisodeCards, Countdowns } from "../components/ExploreCards.js";
 import RankedRow from "../components/RankedRow.js";
 import { COUNTRIES } from "./TrendsScreen.js";
 import { fetchAniList } from "@voidation/shared/api/anilist";
@@ -128,7 +128,7 @@ export default function ExploreScreen({ navigation }) {
         <NewEpisodeCards onOpen={open} />
         {catRows.map((r) => <PosterRow key={r.id} title={r.title} items={r.items} onOpen={open} />)}
         <YourShows now={now} layout="row" title="Up next" onOpen={open} />
-        <PremiereCountdown upcoming={data.coming || []} onOpen={open} />
+        <Countdowns onOpen={open} />
         {jump.anime.length > 0 && <PosterRow title="Jump back in: Anime" items={jump.anime} onOpen={open} />}
         {jump.manga.length > 0 && <PosterRow title="Jump back in: Manga" items={jump.manga} onOpen={open} />}
         {newSeasons.length > 0 && <PosterRow title="New seasons of shows you watched" items={newSeasons} onOpen={open} />}

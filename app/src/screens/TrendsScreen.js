@@ -1,6 +1,6 @@
 // Trends: what's trending on AniList right now, one big poster at a time.
-// Swipe sideways; the card under the poster shows its score, genres, episodes,
-// minutes per episode and how many people have it listed and favourited.
+// Swipe sideways; the card under the poster shows its genres, episodes and
+// minutes per episode (no scores or counts).
 // Country switch: all, Japan, Korea, China.
 import { useEffect, useState } from "react";
 import { View, Text, Image, FlatList, Pressable, TouchableOpacity, StyleSheet, useWindowDimensions } from "react-native";
@@ -19,7 +19,6 @@ export const COUNTRIES = [
   { key: "KR", label: "Korea" },
   { key: "CN", label: "China" },
 ];
-const short = (n) => (n == null ? "–" : n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}K` : String(n));
 
 export default function TrendsScreen({ navigation, route }) {
   const { C } = useTheme();
@@ -82,21 +81,11 @@ export default function TrendsScreen({ navigation, route }) {
             <View style={styles.info}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 10, justifyContent: "center" }}>
                 <Text style={styles.name} numberOfLines={1}>{it.title}</Text>
-                {it.score != null && (
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
-                    <Icon name="star" size={14} color={C.purple} fill />
-                    <Text style={{ color: C.purple, fontWeight: "800" }}>{it.score.toFixed(1)}</Text>
-                  </View>
-                )}
               </View>
               <Text style={styles.genres} numberOfLines={1}>{it.genres.slice(0, 3).join("  ·  ")}</Text>
               <View style={styles.stats}>
                 <View style={styles.stat}><Text style={styles.statNum}>{it.episodes ?? (it.nextEpisode ? it.nextEpisode.episode - 1 : "?")}</Text><Text style={styles.statLabel}>{it.episodes ? "Episodes" : "Episodes so far"}</Text></View>
                 <View style={[styles.stat, { borderLeftWidth: 1, borderLeftColor: C.border }]}><Text style={styles.statNum}>{it.duration ? `${it.duration} min` : "?"}</Text><Text style={styles.statLabel}>Per episode</Text></View>
-              </View>
-              <View style={styles.pills}>
-                <View style={styles.pill}><Icon name="library" size={13} color={C.sub} /><Text style={styles.pillText}>{short(it.popularity)} listed</Text></View>
-                <View style={styles.pill}><Icon name="heart" size={13} color={C.sub} /><Text style={styles.pillText}>{short(it.favourites)} favourites</Text></View>
               </View>
             </View>
           )}
@@ -119,7 +108,4 @@ const makeStyles = (C) => StyleSheet.create({
   stat: { flex: 1, alignItems: "center", paddingVertical: 10 },
   statNum: { color: C.text, fontSize: 17, fontWeight: "900" },
   statLabel: { color: C.faint, fontSize: 11, marginTop: 2 },
-  pills: { flexDirection: "row", justifyContent: "center", gap: 8 },
-  pill: { flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 999, borderWidth: 1, borderColor: C.border, paddingHorizontal: 10, paddingVertical: 5 },
-  pillText: { color: C.sub, fontSize: 12, fontWeight: "700" },
 });

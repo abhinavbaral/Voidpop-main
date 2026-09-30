@@ -1,9 +1,8 @@
 // "Top rated" (idea from Zenshu): a sideways row with a big 01, 02… above
-// each poster, a status badge (Finished / Airing / Upcoming) and the AniList
-// score on the poster, and "Ep 28 · Adventure" under the title.
+// each poster, a status badge (Finished / Airing / Upcoming) on the poster
+// (no scores: Voidation only shows your own verdict), and "Ep 28 · Adventure" under the title.
 import { View, Text, Image, FlatList, Pressable, StyleSheet } from "react-native";
 import { useTheme } from "../context/ThemeContext.js";
-import Icon from "./Icon.js";
 import Skeleton from "./Skeleton.js";
 
 const STATUS = (it) => (it.unreleased ? "UPCOMING" : it.finished ? "FINISHED" : "AIRING");
@@ -37,19 +36,13 @@ export default function RankedRow({ title, subtitle, items, loading, onOpen, onM
           contentContainerStyle={{ gap: 12, paddingHorizontal: 14, paddingTop: 4 }}
           renderItem={({ item, index }) => (
             <Pressable onPress={() => onOpen(item)} style={{ width: 140 }} accessibilityRole="button"
-              accessibilityLabel={`${index + 1}. ${item.title}${item.score ? `, score ${item.score.toFixed(1)}` : ""}`}>
+              accessibilityLabel={`${index + 1}. ${item.title}`}>
               <Text style={[s.num, { color: C.purple }]}>{String(index + 1).padStart(2, "0")}</Text>
               <View style={[s.card, { backgroundColor: C.card }]}>
                 {item.image ? <Image source={{ uri: item.image }} style={StyleSheet.absoluteFill} /> : null}
                 <View style={s.shade} />
                 <View style={s.top}>
                   <View style={s.status}><Text style={s.statusText}>{STATUS(item)}</Text></View>
-                  {item.score != null && (
-                    <View style={s.score}>
-                      <Icon name="star" size={10} color="#fff" fill />
-                      <Text style={s.scoreText}>{item.score.toFixed(1)}</Text>
-                    </View>
-                  )}
                 </View>
                 <View style={s.bottom}>
                   <Text style={s.title} numberOfLines={2}>{item.title}</Text>
@@ -73,8 +66,6 @@ const s = StyleSheet.create({
   top: { flexDirection: "row", justifyContent: "space-between", padding: 7 },
   status: { backgroundColor: "rgba(0,0,0,0.55)", borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2, borderWidth: 1, borderColor: "rgba(255,255,255,0.25)" },
   statusText: { color: "#e5e7eb", fontSize: 8, fontWeight: "900", letterSpacing: 1 },
-  score: { flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "rgba(0,0,0,0.6)", borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2 },
-  scoreText: { color: "#fff", fontSize: 10, fontWeight: "900" },
   bottom: { padding: 8, backgroundColor: "rgba(0,0,0,0.55)" },
   title: { color: "#fff", fontSize: 12, fontWeight: "800" },
   meta: { color: "#d1d5db", fontSize: 10, marginTop: 2 },

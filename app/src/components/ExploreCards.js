@@ -1,12 +1,11 @@
 // Explore's big cards (ideas from the "It's Fun Time!" concept):
 //   NewEpisodeCards   one colourful card per show with episodes you haven't
 //                     watched yet: "New episode · Ep 22", swipe sideways
-//   PremiereCountdown "Tick tock": a big days : hours : minutes countdown to
-//                     the next premiere you're waiting for (your Excited or
-//                     Plan to Watch titles first, otherwise the most popular
-//                     upcoming one)
+//   Countdowns        "Coming up": a days : hours : minutes banner card for
+//                     every anime you're Watching or Excited about, until its
+//                     next episode or premiere, soonest first
 import { useCallback, useEffect, useState } from "react";
-import { View, Text, Image, ScrollView, Pressable, StyleSheet } from "react-native";
+import { View, Text, Image, ScrollView, Pressable, StyleSheet, useWindowDimensions } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import Svg, { Defs, LinearGradient, Stop, Rect } from "react-native-svg";
 import { getLibrary, getExcited, yourShows, onDataChange } from "@voidation/shared/backend/store";
@@ -70,53 +69,96 @@ export function NewEpisodeCards({ onOpen }) {
 }
 
 const pad = (n) => String(Math.max(0, n)).padStart(2, "0");
-// when a title starts: its first episode's air time, or its start date
-const premiereAt = (item) => (item.nextEpisode?.episode === 1 ? item.nextEpisode.airingAt * 1000 : item.unreleased && item.date ? new Date(item.date).getTime() : null);
+// when the next thing drops: the next episode's air time, or the start date
+const nextAt = (item) => (item.nextEpisode ? item.nextEpisode.airingAt * 1000 : item.unreleased && item.date ? new Date(item.date).getTime() : null);
+const nextLabel = (item) => (!item.nextEpisode || item.nextEpisode.episode === 1 ? "Premiere" : `Episode ${item.nextEpisode.episode}`);
 
-export function PremiereCountdown({ upcoming = [], onOpen }) {
+// dark only at the bottom so the banner itself stays clear
+function Fade({ id }) {
+  return (
+    <Svg style={StyleSheet.absoluteFill} preserveAspectRatio="none" viewBox="0 0 100 100">
+      <Defs>
+        <LinearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor="#000" stopOpacity="0.15" />
+          <Stop offset="0.45" stopColor="#000" stopOpacity="0.05" />
+          <Stop offset="1" stopColor="#000" stopOpacity="0.8" />
+        </LinearGradient>
+      </Defs>
+      <Rect x="0" y="0" width="100" height="100" fill={`url(#${id})`} />
+    </Svg>
+  );
+}
+
+// Every anime you're Watching or Excited about that has something coming,
+// soonest first, one banner card each (swipe sideways).
+export function Countdowns({ onOpen }) {
   const { C } = useTheme();
+  const { width } = useWindowDimensions();
+  const cardW = Math.min(width - 28, 520);
   const now = useNow(30000);
   const [mine, setMine] = useState([]);
-  useFocusEffect(useCallback(() => {
-    Promise.all([getLibrary(), getExcited()]).then(([lib, ex]) => {
-      const fromLib = Object.values(lib).filter((e) => e.item.segment === "anime" && ["plan", "watching"].includes(e.status)).map((e) => e.item);
-      setMine([...Object.values(ex).map((e) => e.item).filter((i) => i.segment === "anime"), ...fromLib]);
-    }).catch(() => {});
-  }, []));
-  const future = (list) => list.map((item) => ({ item, at: premiereAt(item) })).filter((x) => x.at && x.at > now);
-  const yours = future(mine).sort((a, b) => a.at - b.at)[0];
-  const popular = future(upcoming).sort((a, b) => (b.item.popularity || 0) - (a.item.popularity || 0))[0];
-  const pick = yours || popular;
-  if (!pick) return null;
-  const { item, at } = pick;
-  const left = Math.floor((at - now) / 60000);
-  const [d, h, m] = [Math.floor(left / 1440), Math.floor((left % 1440) / 60), left % 60];
+  const read = useCallback(async () => {
+    const [lib, ex] = await Promise.all([getLibrary(), getExcited()]);
+    const picked = [
+      ...Object.values(lib).filter((e) => e.status === "watching"),
+      ...Object.values(ex),
+    ].map((e) => e.item).filter((i) => i.segment === "anime");
+    const ids = [...new Set(picked.map((i) => i.id))];
+    // fresh data: the saved copy may be old or missing its banner
+    const fresh = await fetchNextEpisodes(ids).catch(() => ({}));
+    setMine(ids.map((id) => fresh[id] || picked.find((i) => i.id === id)));
+  }, []);
+  useFocusEffect(useCallback(() => { read().catch(() => {}); }, [read]));
+  useEffect(() => onDataChange(() => { read().catch(() => {}); }), [read]);
+  const list = mine.map((item) => ({ item, at: nextAt(item) })).filter((x) => x.at && x.at > now).sort((a, b) => a.at - b.at);
+  if (!list.length) return null;
   return (
     <View style={{ marginTop: 22 }}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, marginBottom: 10 }}>
         <Icon name="clock" size={17} color={C.orange} />
-        <Text style={{ color: C.text, fontWeight: "800", fontSize: 16 }}>Tick tock…</Text>
-        <Text style={{ color: C.faint, fontSize: 12 }}>{yours ? "on your list" : "most awaited"}</Text>
+        <Text style={{ color: C.text, fontWeight: "800", fontSize: 16 }}>Coming up</Text>
+        <Text style={{ color: C.faint, fontSize: 12 }}>watching and excited</Text>
       </View>
-      <Pressable onPress={() => onOpen(item)} style={s.tick} accessibilityRole="button"
-        accessibilityLabel={`${item.title} premieres in ${d} days, ${h} hours and ${m} minutes`}>
-        <Image source={{ uri: item.banner || item.image }} style={StyleSheet.absoluteFill} blurRadius={item.banner ? 0 : 6} />
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(20,8,30,0.55)" }]} />
-        <View style={{ flex: 1, justifyContent: "space-between", padding: 16 }}>
-          <Text style={s.tickTitle} numberOfLines={2}>{item.title}</Text>
-          <View style={{ flexDirection: "row", gap: 14, alignItems: "flex-end" }}>
-            {[[d, "Days"], [h, "Hours"], [m, "Min"]].map(([n, label], k) => (
-              <View key={label} style={{ flexDirection: "row", alignItems: "flex-end", gap: 14 }}>
-                {k > 0 && <Text style={s.tickColon}>:</Text>}
-                <View style={{ alignItems: "center" }}>
-                  <Text style={s.tickNum}>{pad(n)}</Text>
-                  <Text style={s.tickLabel}>{label}</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} snapToInterval={cardW + 10} decelerationRate="fast"
+        contentContainerStyle={{ gap: 10, paddingHorizontal: 14 }}>
+        {list.map(({ item, at }) => {
+          const left = Math.floor((at - now) / 60000);
+          const [d, h, m] = [Math.floor(left / 1440), Math.floor((left % 1440) / 60), left % 60];
+          const what = nextLabel(item);
+          return (
+            <Pressable key={item.id} onPress={() => onOpen(item)} style={[s.tick, { width: cardW, backgroundColor: C.card }]} accessibilityRole="button"
+              accessibilityLabel={`${item.title}: ${what} in ${d} days, ${h} hours and ${m} minutes`}>
+              {item.banner ? (
+                <Image source={{ uri: item.banner }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+              ) : item.image ? (
+                // no banner: the cover sits on the right on its own colour, never stretched or blurred
+                <>
+                  <View style={[StyleSheet.absoluteFill, { backgroundColor: readableAccent(item.color, C.purple) }]} />
+                  <Image source={{ uri: item.image }} style={s.tickCover} />
+                </>
+              ) : null}
+              <Fade id={`f${item.id}`} />
+              <View style={{ flex: 1, justifyContent: "space-between", padding: 16 }}>
+                <View style={s.tickTag}><Text style={s.tickTagText}>{what}</Text></View>
+                <View>
+                  <Text style={s.tickTitle} numberOfLines={2}>{item.title}</Text>
+                  <View style={{ flexDirection: "row", gap: 14, alignItems: "flex-end", marginTop: 6 }}>
+                    {[[d, "Days"], [h, "Hours"], [m, "Min"]].map(([n, label], k) => (
+                      <View key={label} style={{ flexDirection: "row", alignItems: "flex-end", gap: 14 }}>
+                        {k > 0 && <Text style={s.tickColon}>:</Text>}
+                        <View style={{ alignItems: "center" }}>
+                          <Text style={s.tickNum}>{pad(n)}</Text>
+                          <Text style={s.tickLabel}>{label}</Text>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
                 </View>
               </View>
-            ))}
-          </View>
-        </View>
-      </Pressable>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
     </View>
   );
 }
@@ -128,8 +170,11 @@ const s = StyleSheet.create({
   epTitle: { color: "#fff", fontSize: 16, fontWeight: "900" },
   epSub: { color: "rgba(255,255,255,0.85)", fontSize: 12, fontWeight: "700", marginTop: 2 },
   epPoster: { width: 86, height: 130 },
-  tick: { marginHorizontal: 14, height: 170, borderRadius: 18, overflow: "hidden" },
-  tickTitle: { color: "#fff", fontSize: 20, fontWeight: "900" },
+  tick: { height: 190, borderRadius: 18, overflow: "hidden" },
+  tickCover: { position: "absolute", right: 0, top: 0, bottom: 0, width: 132 },
+  tickTag: { alignSelf: "flex-start", backgroundColor: "rgba(0,0,0,0.55)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  tickTagText: { color: "#fff", fontSize: 11, fontWeight: "800" },
+  tickTitle: { color: "#fff", fontSize: 20, fontWeight: "900", textShadowColor: "rgba(0,0,0,0.6)", textShadowRadius: 6 },
   tickNum: { color: "#fff", fontSize: 34, fontWeight: "900" },
   tickColon: { color: "#fff", fontSize: 28, fontWeight: "900", marginBottom: 18 },
   tickLabel: { color: "rgba(255,255,255,0.8)", fontSize: 11, fontWeight: "700" },

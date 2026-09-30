@@ -19,7 +19,7 @@ import { NoteBox, WatchOrder, Discussions, RewindToggle } from "../components/Ti
 import { addToCalendar } from "../lib/calendar";
 import { completeEarlierSeasons, undoEarlierSeasons } from "@voidation/shared/seasons";
 import { getCachedItem, cacheItem, openDetail, goBackOrHome } from "../lib/nav";
-import { releaseLabel, formatCountdown, dayLabel, airTime, hypeLabel } from "@voidation/shared/format";
+import { releaseLabel, formatCountdown, dayLabel, airTime } from "@voidation/shared/format";
 import { useNow } from "@voidation/shared/hooks/useNow";
 import { useSettings } from "@voidation/shared/backend/SettingsContext";
 import { useIsWide } from "../lib/layout";
@@ -333,13 +333,6 @@ function DetailBody({ item, navigation }) {
                 </Text>
               )}
               <Text style={styles.sub}>{item.genre} · {releaseLabel(item)}</Text>
-              {item.score != null && (
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginTop: 4 }}>
-                  <Icon name="star" size={13} color={C.orange} fill />
-                  <Text style={{ color: C.text, fontWeight: "800", fontSize: 13 }}>{item.score.toFixed(1)}</Text>
-                  {item.popularity ? <Text style={{ color: C.faint, fontSize: 12 }}>· {hypeLabel(item.popularity)}</Text> : null}
-                </View>
-              )}
               {item.segment === "anime" && <SourceLine source={source} navigation={navigation} />}
               <View style={styles.genreWrap}>
                 {(item.genres?.length ? item.genres : [item.genre]).slice(0, 4).map((g) => (

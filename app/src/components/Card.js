@@ -60,10 +60,6 @@ function CardInner({ item, entry, onPlus, onPress, onLongPress, selecting, selec
             <Text style={{ color: C.faint, fontSize: 12 }}>No image</Text>
           </View>
         )}
-        {/* AniList score in the corner (hidden with the other poster badges in settings) */}
-        {settings.posterBadges && item.score != null && !selecting && (
-          <View style={styles.score}><Icon name="star" size={10} color="#fbbf24" fill /><Text style={styles.scoreText}>{item.score.toFixed(1)}</Text></View>
-        )}
         {!!item.awardYear && <View style={styles.award}><Icon name="trophy" size={11} color="#1a1205" strokeWidth={2.4} /><Text style={styles.awardText}>{item.awardYear}</Text></View>}
         {selecting && (
           <View style={[styles.tick, selected && { backgroundColor: C.purple, borderColor: C.purple }]}>
@@ -107,8 +103,6 @@ function CardInner({ item, entry, onPlus, onPress, onLongPress, selecting, selec
 }
 
 const makeStyles = (C) => StyleSheet.create({
-  score: { position: "absolute", top: 6, right: 6, flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "rgba(0,0,0,0.65)", borderRadius: 6, paddingHorizontal: 5, paddingVertical: 2 },
-  scoreText: { color: "#fff", fontSize: 10, fontWeight: "900" },
   card: {
     flex: 1,
     margin: 6,
