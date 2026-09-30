@@ -1,7 +1,7 @@
 // YOUR SHOWS — "Your next episodes" and "Watching this season" in one: every
 // anime you follow with an episode coming (big countdown) or episodes you
-// haven't watched yet (Pending, +1). Schedule shows them stacked; Explore as a
-// sideways "Up next" row.
+// haven't watched yet (Pending, +1), stacked on Schedule. (Explore's old
+// "Up next" row is now part of Coming up in ExploreCards.js.)
 import { useCallback, useEffect, useState } from "react";
 import { View, Text, ScrollView, StyleSheet, useWindowDimensions } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";

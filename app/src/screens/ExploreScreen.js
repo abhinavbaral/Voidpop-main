@@ -6,9 +6,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import PosterRow from "../components/PosterRow.js";
-import YourShows from "../components/YourShows.js";
 import { loadCategoryRows } from "@voidation/shared/backend/store";
-import { useNow } from "@voidation/shared/hooks/useNow";
 import Brand from "../components/Brand.js";
 import { loadExplorePools, buildExplore, knownKeys, loadVerdictRows, loadNewSeasons, loadAnimeOfTheYear, loadJumpBackIn } from "@voidation/shared/explore";
 import { useTheme } from "../context/ThemeContext.js";
@@ -35,7 +33,6 @@ export default function ExploreScreen({ navigation }) {
   const [newSeasons, setNewSeasons] = useState([]);
   const [jump, setJump] = useState({ anime: [], manga: [] }); // titles you started and left
   const [catRows, setCatRows] = useState([]); // your categories (500+ completed), days 15–21
-  const now = useNow(1000); // Up next countdowns tick every second
 
   // your verdicts change as you use the app, so these rows refresh on every visit
   useFocusEffect(useCallback(() => {
@@ -127,12 +124,13 @@ export default function ExploreScreen({ navigation }) {
 
         <NewEpisodeCards onOpen={open} />
         {catRows.map((r) => <PosterRow key={r.id} title={r.title} items={r.items} onOpen={open} />)}
-        <YourShows now={now} layout="row" title="Up next" onOpen={open} />
         <Countdowns onOpen={open} />
+        {/* right under Coming up on purpose: mark one of these Excited and it
+            leaves this row and starts counting down in Coming up */}
+        {data.coming?.length > 0 && <PosterRow title={data.comingTitle} chip={data.comingChip} items={data.coming} onOpen={open} />}
         {jump.anime.length > 0 && <PosterRow title="Jump back in: Anime" items={jump.anime} onOpen={open} />}
         {jump.manga.length > 0 && <PosterRow title="Jump back in: Manga" items={jump.manga} onOpen={open} />}
         {newSeasons.length > 0 && <PosterRow title="New seasons of shows you watched" items={newSeasons} onOpen={open} />}
-        {data.coming?.length > 0 && <PosterRow title={data.comingTitle} chip={data.comingChip} items={data.coming} onOpen={open} />}
         {verdictRows.map((r) => (
           <PosterRow key={r.verdict} title={r.title} dot={r.color} items={r.items} onOpen={open} />
         ))}
