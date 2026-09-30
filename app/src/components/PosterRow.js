@@ -6,6 +6,7 @@
 import { useRef, useState } from "react";
 import { View, Text, FlatList, Pressable, StyleSheet, Platform } from "react-native";
 import Card from "./Card.js";
+import Icon from "./Icon.js";
 import Skeleton from "./Skeleton.js";
 import { useTheme } from "../context/ThemeContext.js";
 import { useIsWide } from "../lib/layout";
@@ -13,7 +14,10 @@ import { useIsWide } from "../lib/layout";
 // A row with fewer titles than this looks empty, so it isn't shown at all.
 export const MIN_ROW = 4;
 
-export default function PosterRow({ title, items, loading, onOpen, dot }) {
+// chip: an optional pill after the title, e.g. { label: "Fall 2026", icon: "fall" };
+//   with onPress it's a button (Trending in [Japan ▾])
+// onMore: shows "See all ›" on the right
+export default function PosterRow({ title, items, loading, onOpen, dot, chip, onMore }) {
   const { C } = useTheme();
   const styles = makeStyles(C);
   const wide = useIsWide();
@@ -34,7 +38,22 @@ export default function PosterRow({ title, items, loading, onOpen, dot }) {
   return (
     <View style={{ marginTop: wide ? 26 : 18 }}>
       <View style={styles.head}>
-        <Text style={[styles.title, wide && { fontSize: 19 }]}>{dot ? <Text style={{ color: dot }}>● </Text> : null}{title}</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 1 }}>
+          <Text style={[styles.title, wide && { fontSize: 19 }]} numberOfLines={1}>{dot ? <Text style={{ color: dot }}>● </Text> : null}{title}</Text>
+          {chip && (
+            <Pressable disabled={!chip.onPress} onPress={chip.onPress} style={[styles.chip, chip.onPress && { borderColor: C.purple }]}
+              accessibilityRole={chip.onPress ? "button" : undefined} accessibilityLabel={chip.a11y}>
+              {chip.icon && <Icon name={chip.icon} size={13} color={chip.onPress ? C.purple : C.sub} />}
+              <Text style={[styles.chipText, chip.onPress && { color: C.purple }]} numberOfLines={1}>{chip.label}</Text>
+              {chip.onPress && <Icon name="down" size={12} color={C.purple} />}
+            </Pressable>
+          )}
+        </View>
+        {onMore && !wide && (
+          <Pressable onPress={onMore} hitSlop={10} accessibilityRole="button" accessibilityLabel={`See all: ${title}`}>
+            <Text style={{ color: C.purple, fontWeight: "800", fontSize: 13 }}>See all ›</Text>
+          </Pressable>
+        )}
         {wide && !loading && (
           <View style={{ flexDirection: "row", gap: 8 }}>
             {[["‹", -1, canLeft], ["›", 1, canRight]].map(([glyph, dir, enabled]) => (
@@ -79,6 +98,8 @@ export default function PosterRow({ title, items, loading, onOpen, dot }) {
 }
 
 const makeStyles = (C) => StyleSheet.create({
+  chip: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3, flexShrink: 1 },
+  chipText: { color: C.sub, fontSize: 12, fontWeight: "700" },
   head: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingHorizontal: 14, marginBottom: 4,

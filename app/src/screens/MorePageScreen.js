@@ -33,15 +33,19 @@ import { timeAgo } from "@voidation/shared/backend/store";
 import Icon from "../components/Icon.js";
 import { SkeletonList } from "../components/Skeleton.js";
 import { VoidmonLoading } from "../components/Voidmon.js";
-import { LOGOS } from "../components/Brand.js";
+import { LOGOS, applyAppIcon, canChangeAppIcon } from "../components/Brand.js";
 
 const NATIVE = Platform.OS !== "web";
 const AUTO_BACKUP = Platform.OS === "android"; // Android's folder picker (SAF)
 
-const VERSION = "1.0.0";
+import appConfig from "../../app.json";
+import Chips from "../components/Chips.js";
+import { computeAchievements } from "@voidation/shared/achievements";
+
+const VERSION = appConfig.expo.version;
 const TITLES = {
   statistics: "Statistics", appearance: "Appearance and Others", settings: "Appearance and Others",
-  data: "Data and storage", announced: "New announcements", badge: "Your badge", categories: "Categories", anilist: "AniList", help: "Help", about: "About",
+  data: "Data and storage", announced: "New announcements", badge: "Ranks and achievements", categories: "Categories", anilist: "AniList", help: "Help", about: "About",
 };
 
 export default function MorePageScreen({ route, navigation }) {
@@ -113,12 +117,16 @@ function LogoSettings({ styles, C }) {
   return (
     <View style={[styles.card, { marginTop: 12 }]}>
       <Text style={styles.cardTitle}>Logo</Text>
-      <Text style={styles.note}>The logo inside the app. The home-screen icon stays the same.</Text>
+      <Text style={styles.note}>
+        {canChangeAppIcon()
+          ? "Changes the logo in the app and your home-screen icon. On some phones the icon takes a moment to update, and you may need to add it to your home screen again."
+          : "Changes the logo in the app. The home-screen icon changes too once you install the next version of the app."}
+      </Text>
       <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
         {Object.entries(LOGOS).map(([key, l]) => {
           const on = current === key;
           return (
-            <TouchableOpacity key={key} onPress={() => update("logo", key)} accessibilityRole="radio" accessibilityState={{ selected: on }}
+            <TouchableOpacity key={key} onPress={() => { update("logo", key); applyAppIcon(key); }} accessibilityRole="radio" accessibilityState={{ selected: on }}
               style={{ flex: 1, alignItems: "center", gap: 6, padding: 10, borderRadius: 12, borderWidth: 2, borderColor: on ? C.purple : C.border }}>
               <Image source={dark ? l.dark : l.light} style={{ width: 56, height: 56 }} resizeMode="contain" />
               <Text style={[styles.note, { textAlign: "center" }, on && { color: C.purple, fontWeight: "800" }]}>{l.label}</Text>
@@ -171,7 +179,7 @@ function Settings({ styles, C }) {
     <LogoSettings styles={styles} C={C} />
     <View style={styles.card}>
       {row("clock24", "24-hour clock", "Airing times as 16:30 instead of 4:30 PM")}
-      {row("posterBadges", "Countdown badges on posters", 'Shows "Ep 7 · 3h 30m" on airing anime')}
+      {row("posterBadges", "Badges on posters", 'Score (★ 8.7) and "Ep 7 · 3h 30m" countdowns on posters')}
       {NATIVE && (
         <Pressable style={styles.toggleRow} onPress={() => toggleAlerts(!settings.notifyEpisodes)}>
           <View style={{ flex: 1 }}>
@@ -397,9 +405,46 @@ function AniListImport({ styles, C, onDone }) {
   );
 }
 
+// Achievements: badges for how you watch (streaks, night owl, bingeing…), each
+// with its progress. Worked out from this phone's data (shared/achievements.js).
+function Achievements({ styles, C }) {
+  const [list, setList] = useState(null);
+  useFocusEffect(useCallback(() => { computeAchievements().then(setList).catch(() => setList([])); }, []));
+  if (!list) return <SkeletonList rows={4} thumb={false} style={{ paddingHorizontal: 0 }} />;
+  const earned = list.filter((a) => a.done).length;
+  return (
+    <>
+      <Text style={[styles.note, { marginBottom: 10 }]}>{earned} of {list.length} earned. Ranks count what you finish; these are about how you watch.</Text>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+        {list.map((a) => (
+          <View key={a.key} accessible accessibilityLabel={`${a.name}: ${a.text}. ${a.done ? "Earned" : `${a.have} of ${a.need}`}`}
+            style={{ flexBasis: "47%", flexGrow: 1, borderRadius: 16, borderWidth: 1, borderColor: a.done ? a.color : C.border, backgroundColor: C.card, padding: 14, alignItems: "center", gap: 6 }}>
+            <View style={{ width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center", backgroundColor: a.done ? a.color : C.border }}>
+              <Icon name={a.icon} size={28} color={a.done ? "#fff" : C.faint} />
+            </View>
+            <Text style={{ color: a.done ? a.color : C.text, fontWeight: "900", fontSize: 15 }}>{a.name}</Text>
+            <Text style={[styles.note, { textAlign: "center", minHeight: 32 }]}>{a.text}</Text>
+            {a.done ? (
+              <Text style={{ color: a.color, fontWeight: "800", fontSize: 12 }}>Earned</Text>
+            ) : (
+              <View style={{ width: "100%", gap: 4 }}>
+                <View style={{ height: 6, borderRadius: 3, backgroundColor: C.border, overflow: "hidden" }}>
+                  <View style={{ width: `${Math.round((a.have / a.need) * 100)}%`, height: "100%", backgroundColor: a.color }} />
+                </View>
+                <Text style={[styles.note, { textAlign: "right", fontSize: 11 }]}>{a.have.toLocaleString()} / {a.need.toLocaleString()}</Text>
+              </View>
+            )}
+          </View>
+        ))}
+      </View>
+    </>
+  );
+}
+
 // Your rank, progress to the next, and every badge (locked ones greyed out).
 // Tap an earned badge to replay its celebration.
 function BadgePage({ styles, C }) {
+  const [tab, setTab] = useState("ranks"); // ranks: how much you've finished; achievements: how you watch
   const [data, setData] = useState(null);
   useFocusEffect(useCallback(() => { getUserTier().then(setData).catch(() => {}); }, []));
   if (!data) return <SkeletonList rows={4} thumb={false} style={{ paddingHorizontal: 0 }} />;
@@ -414,6 +459,10 @@ function BadgePage({ styles, C }) {
     </View>
   );
   return (
+    <>
+      <Chips style={{ marginBottom: 12 }} value={tab} onChange={setTab}
+        options={[{ key: "ranks", label: "Ranks" }, { key: "ach", label: "Achievements" }]} />
+      {tab === "ach" ? <Achievements styles={styles} C={C} /> : (
     <>
       <View style={[styles.card, { alignItems: "center", gap: 8 }]}>
         {medal(tier, true, 130)}
@@ -443,6 +492,8 @@ function BadgePage({ styles, C }) {
           </TouchableOpacity>
         );
       })}
+    </>
+      )}
     </>
   );
 }

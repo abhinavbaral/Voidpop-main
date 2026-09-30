@@ -42,7 +42,9 @@ export async function loadExplorePools({ shuffle = false } = {}) {
   return {
     trA, trM, popA: [...popA1, ...popA2], popM: [...popM1, ...popM2],
     coming: [...comingNow, ...comingNext],
-    comingTitle: `Coming in ${seasonTitle(now)} & ${seasonTitle(next)}`,
+    comingTitle: "Coming soon",
+    // shown as a pill next to the title, with the season's icon
+    comingChip: { label: `${seasonTitle(now)} & ${seasonTitle(next)}`, icon: now.season },
     isekai, shonen,
   };
 }
@@ -90,6 +92,7 @@ export function buildExplore(pools, known = new Set(), seed = daySeed()) {
   return {
     coming,
     comingTitle: pools.comingTitle,
+    comingChip: pools.comingChip,
     // Talk of the Week is what everyone's talking about, so it includes shows you've seen
     talk: [...pools.trA.slice(0, 7), ...pools.trM.slice(0, 5)],
     dontMissAnime,

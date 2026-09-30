@@ -4,7 +4,9 @@
 // There are no accounts. Everything lives in one JSON document on this device
 // (see storage.js):
 //   library  {"segment:id" -> { status, progress, cats, item snapshot, updatedAt, delay?, rewindYear? }}
-//            rewindYear: the Rewind year a title counts in (new titles you add
+//            rewindYear: the Rewind year a title counts in; 0 = "Before" on
+//            purpose (switched off). Anything you're Watching counts in the
+//            current year by itself (not Rewatching). (New titles you add
 //            get the year you added them; imports get none, see wrapped.js)
 //   categories [{ id, name }]  your own groups, like Mihon's ("Favourites", "Rewatch"…)
 //   reviews  {"segment:id" -> { verdict, vibes, moods, comment, date }}
@@ -29,6 +31,16 @@ const EMPTY = () => ({ library: {}, reviews: {}, excited: {}, notes: {}, log: []
 let cache = null;
 let writing = Promise.resolve();
 
+// Watching something (not a rewatch) puts it in this year's Rewind, unless you
+// already chose a year for it (or switched it off, rewindYear 0). Runs on load
+// and before every save, so imports and AniList pulls are covered too.
+function stampWatching(db) {
+  const year = new Date().getFullYear();
+  Object.values(db.library || {}).forEach((e) => {
+    if (e && e.status === "watching" && e.rewindYear == null) e.rewindYear = year;
+  });
+}
+
 async function load() {
   if (cache) return cache;
   try {
@@ -39,6 +51,7 @@ async function load() {
   } catch {
     cache = EMPTY(); // corrupt or unreadable storage: start clean rather than crash
   }
+  stampWatching(cache);
   return cache;
 }
 
@@ -52,6 +65,7 @@ export function onDataChange(fn) {
 
 // Writes are queued so two quick taps can't save an older copy over a newer one.
 function save() {
+  stampWatching(cache);
   const snapshot = JSON.stringify(cache);
   writing = writing.then(() => writeKey(DB_KEY, snapshot)).catch(() => {});
   listeners.forEach((fn) => { try { fn(); } catch { /* a listener must never break saving */ } });
@@ -77,14 +91,16 @@ function logStatus(db, key, prevStatus, status) {
 }
 
 // Rewind's "Pick titles": put titles in a year's Rewind (year), or take them
-// out (null). keys: ["anime:123", …]
+// out (null → 0, "Before" on purpose, so Watching doesn't put it back).
+// keys: ["anime:123", …]
 export async function setRewindYear(keys, year) {
   const db = await load();
   let changed = 0;
   keys.forEach((key) => {
     const e = db.library[key];
-    if (!e || (e.rewindYear ?? null) === (year ?? null)) return;
-    if (year == null) delete e.rewindYear; else e.rewindYear = year;
+    const next = year == null ? 0 : year;
+    if (!e || e.rewindYear === next) return;
+    e.rewindYear = next;
     changed++;
   });
   if (changed) await save();

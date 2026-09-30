@@ -47,6 +47,10 @@ web/            website (React + Vite), kept locally, frozen
   After editing a drawing, `node app/scripts/voidmon-art.mjs` remakes the PNGs.
   `shared/voidmon.js` lists the poses. Skeletons stay for anything with a
   layout; `VoidmonLoading` is only for waits with nothing to lay out.
+- **Rewind story video:** `shared/storyVideo.js` encodes the story images as an
+  MP4 with the browser's WebCodecs. The website runs it directly; the app runs
+  it in a hidden WebView (`StoryVideoMaker.js`) from `app/src/lib/storyVideoHtml.js`,
+  which `node app/scripts/story-video-html.mjs` rebuilds after that file changes.
 - Comments explain *why*, in plain words.
 
 ## Checks

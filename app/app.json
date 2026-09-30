@@ -2,7 +2,7 @@
   "expo": {
     "name": "Voidation",
     "slug": "voidation",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -21,6 +21,20 @@
       "blockedPermissions": [
         "android.permission.READ_CALENDAR",
         "android.permission.WRITE_CALENDAR"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "voidation"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
       ]
     },
     "ios": {
@@ -40,7 +54,7 @@
           "widgets": [
             {
               "name": "NextEpisodes",
-              "label": "Voidation \u00b7 Next episodes",
+              "label": "Voidation · Next episodes",
               "description": "Countdowns for up to 30 anime you follow",
               "minWidth": "250dp",
               "minHeight": "180dp",
@@ -53,6 +67,27 @@
             }
           ]
         }
+      ],
+      [
+        "expo-alternate-app-icons",
+        [
+          {
+            "name": "Voidmon",
+            "ios": "./assets/app-icons/voidmon-ios.png",
+            "android": {
+              "foregroundImage": "./assets/app-icons/voidmon-foreground.png",
+              "backgroundColor": "#0b0f19"
+            }
+          },
+          {
+            "name": "Peeking",
+            "ios": "./assets/app-icons/peeking-ios.png",
+            "android": {
+              "foregroundImage": "./assets/app-icons/peeking-foreground.png",
+              "backgroundColor": "#0b0f19"
+            }
+          }
+        ]
       ]
     ],
     "scheme": "voidation",

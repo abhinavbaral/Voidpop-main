@@ -1,10 +1,11 @@
 // OUT THIS WEEK (inside the Schedule tab) — a month calendar of premieres (tap
-// a day to see them), what's airing in the next 24 hours, and the latest
-// premieres. Same as the website. Drawn inside Schedule's scroll view;
+// a day to see them), a release calendar for the next 7 days (tap a day in the
+// strip: every episode airing that day, by time, with a countdown), and the
+// latest premieres. Same as the website. Drawn inside Schedule's scroll view;
 // refreshKey changes when Schedule is pulled to refresh.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { View, Text, Image, TouchableOpacity, StyleSheet, useWindowDimensions } from "react-native";
-import { loadMonthPremieres, monthGrid, dayKey, loadAiringSoon, loadLatestPremieres } from "@voidation/shared/upcoming";
+import { loadMonthPremieres, monthGrid, dayKey, loadAiringWeek, loadLatestPremieres } from "@voidation/shared/upcoming";
 import { getExcited, toggleExcited } from "@voidation/shared/backend/store";
 import { useAuth } from "@voidation/shared/backend/AuthContext";
 import { useNow } from "@voidation/shared/hooks/useNow";
@@ -28,7 +29,8 @@ export default function OutThisWeek({ navigation, refreshKey = 0 }) {
   const [month, setMonth] = useState({ y: today.getFullYear(), m: today.getMonth() });
   const [byDay, setByDay] = useState(null);
   const [picked, setPicked] = useState(null);
-  const [soon, setSoon] = useState(null);
+  const [week, setWeek] = useState(null); // { "2026-09-30": [episodes] }
+  const [weekDay, setWeekDay] = useState(dayKey(new Date()));
   const [latest, setLatest] = useState([]);
   const [excited, setExcited] = useState({});
 
@@ -43,7 +45,7 @@ export default function OutThisWeek({ navigation, refreshKey = 0 }) {
     } catch { setByDay({}); }
   }, [month.y, month.m]);
   const loadRest = useCallback(async () => {
-    loadAiringSoon(24).then(setSoon).catch(() => setSoon([]));
+    loadAiringWeek(7).then(setWeek).catch(() => setWeek({}));
     loadLatestPremieres(21).then(setLatest).catch(() => {});
     getExcited(user).then(setExcited).catch(() => {});
   }, [user]);
@@ -118,16 +120,34 @@ export default function OutThisWeek({ navigation, refreshKey = 0 }) {
           </>
         ) : <Text style={styles.empty}>No premieres with a set date this month yet.</Text>}
 
-        <Text style={[styles.section, { paddingHorizontal: 14, marginTop: 22 }]}>Airing soon <Text style={{ color: C.faint, fontSize: 12, fontWeight: "600" }}>next 24 hours</Text></Text>
-        {soon === null ? <SkeletonList rows={3} /> : !soon.length ? <Text style={styles.empty}>Nothing airs in the next 24 hours.</Text> : soon.map((s) => (
-          <TouchableOpacity key={`${s.item.id}-${s.episode}`} style={styles.row} onPress={() => open(s.item)}>
-            <Text style={styles.time}>{airTime(s.airingAt, clock24)}</Text>
-            {s.item.image ? <Image source={{ uri: s.item.image }} style={styles.thumbSm} /> : <View style={styles.thumbSm} />}
+        <Text style={[styles.section, { paddingHorizontal: 14, marginTop: 22 }]}>Release calendar <Text style={{ color: C.faint, fontSize: 12, fontWeight: "600" }}>every episode, next 7 days</Text></Text>
+        <View style={styles.strip}>
+          {Array.from({ length: 7 }, (_, n) => {
+            const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + n);
+            const k = dayKey(d);
+            const on = weekDay === k;
+            const count = week?.[k]?.length || 0;
+            return (
+              <TouchableOpacity key={k} onPress={() => setWeekDay(k)} accessibilityRole="tab" accessibilityState={{ selected: on }}
+                accessibilityLabel={`${d.toDateString()}: ${count} episodes`}
+                style={[styles.dayChip, on && { backgroundColor: C.purple, borderColor: C.purple }]}>
+                <Text style={[styles.dayName, on && { color: "#fff" }]}>{n === 0 ? "Today" : d.toLocaleDateString(undefined, { weekday: "short" })}</Text>
+                <Text style={[styles.dayNum, on && { color: "#fff" }]}>{d.getDate()}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        {week === null ? <SkeletonList rows={3} /> : !(week[weekDay] || []).length ? (
+          <Text style={styles.empty}>No episodes left to air that day.</Text>
+        ) : week[weekDay].map((s) => (
+          <TouchableOpacity key={`${s.item.id}-${s.episode}`} style={styles.calRow} onPress={() => open(s.item)}>
+            <Text style={styles.calTime}>{airTime(s.airingAt, clock24)}</Text>
+            {s.item.image ? <Image source={{ uri: s.item.image }} style={styles.thumb} /> : <View style={styles.thumb} />}
             <View style={{ flex: 1 }}>
-              <Text style={styles.rowTitle} numberOfLines={1}>{s.item.title}</Text>
-              <Text style={styles.rowSub}>Episode {s.episode}</Text>
+              <Text style={styles.rowTitle} numberOfLines={2}>{s.item.title}</Text>
+              <Text style={styles.rowSub} numberOfLines={1}>{[`Episode ${s.episode}${s.item.episodes ? ` of ${s.item.episodes}` : ""}`, s.item.format?.replace("_", " ")].filter(Boolean).join(" · ")}</Text>
+              <Text style={styles.countdown}>{formatCountdown(s.airingAt, now)}</Text>
             </View>
-            <Text style={styles.countdown}>{formatCountdown(s.airingAt, now)}</Text>
           </TouchableOpacity>
         ))}
 
@@ -157,6 +177,12 @@ const makeStyles = (C) => StyleSheet.create({
   rowTitle: { color: C.text, fontSize: 13, fontWeight: "700" },
   rowSub: { color: C.faint, fontSize: 11, marginTop: 2 },
   time: { color: C.sub, fontSize: 11, fontWeight: "700", width: 58 },
-  countdown: { color: C.purple, fontWeight: "800", fontSize: 12 },
+  countdown: { color: C.purple, fontWeight: "800", fontSize: 12, marginTop: 4 },
+  strip: { flexDirection: "row", gap: 6, paddingHorizontal: 14, marginTop: 10, marginBottom: 6 },
+  dayChip: { flex: 1, alignItems: "center", paddingVertical: 8, borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.card },
+  dayName: { color: C.faint, fontSize: 10, fontWeight: "800" },
+  dayNum: { color: C.text, fontSize: 16, fontWeight: "900", marginTop: 2 },
+  calRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: C.border },
+  calTime: { color: C.text, fontSize: 15, fontWeight: "900", width: 64 },
   excite: { borderWidth: 1, borderColor: C.orange, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
 });

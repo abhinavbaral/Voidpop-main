@@ -13,6 +13,7 @@ const URL = "https://graphql.anilist.co";
 export const SORTS = [
   { key: "popular", label: "Popular" },
   { key: "trending", label: "Trending" },
+  { key: "score", label: "Top rated" },
   { key: "newest", label: "Newest" },
   { key: "oldest", label: "Oldest" },
 ];
@@ -20,6 +21,7 @@ export const SORTS = [
 const sortMap = {
   popular: "POPULARITY_DESC",
   trending: "TRENDING_DESC",
+  score: "SCORE_DESC",
   newest: "START_DATE_DESC",
   oldest: "START_DATE",
 };
@@ -63,6 +65,8 @@ const MEDIA_FIELDS = `
   duration
   popularity
   trending
+  averageScore
+  favourites
 `;
 
 // Creator line: animation studio for anime, mangaka for manga. Requested only
@@ -112,6 +116,9 @@ function normalize(m, segment) {
     // hype: people with it on their AniList list, and recent list activity
     popularity: m.popularity ?? null,
     trending: m.trending ?? null,
+    // AniList's average score out of 10 (8.6), and how many made it a favourite
+    score: m.averageScore ? m.averageScore / 10 : null,
+    favourites: m.favourites ?? null,
     // anime only: total episodes (null while unknown) and the next one to air
     episodes: m.episodes ?? null,
     // manga only: total chapters (null while still publishing)
@@ -572,6 +579,21 @@ export function episodeList(list) {
       return { number, name: name || title, thumbnail: e.thumbnail || null, url: e.url, site: e.site || "" };
     })
     .sort((a, b) => (a.number ?? 1e9) - (b.number ?? 1e9));
+}
+
+// Search people (voice actors, directors, mangaka…) by name, most-favourited
+// first: [{ id, name, native, image, occupations }]
+export async function fetchPeople(search, perPage = 10) {
+  const query = `query ($search: String, $perPage: Int) {
+    Page(perPage: $perPage) {
+      staff(search: $search, sort: [SEARCH_MATCH, FAVOURITES_DESC]) { id name { full native } image { medium } primaryOccupations }
+    }
+  }`;
+  const data = await gql(query, { search, perPage });
+  return (Array.isArray(data.Page?.staff) ? data.Page.staff : []).filter(Boolean).map((p) => ({
+    id: p.id, name: p.name?.full || p.name?.native || "", native: p.name?.native || null,
+    image: p.image?.medium || null, occupations: Array.isArray(p.primaryOccupations) ? p.primaryOccupations : [],
+  }));
 }
 
 // A voice actor's or staff member's page: who they are, and what they worked

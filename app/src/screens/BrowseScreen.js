@@ -35,11 +35,11 @@ const YEAR_OPTIONS = Array.from({ length: 10 }, (_, i) => ({
   key: String(THIS_YEAR - i), label: String(THIS_YEAR - i),
 }));
 const SEASON_OPTIONS = [
-  { key: "", label: "All time" },
-  ...SEASONS.map((s) => ({ key: s, label: s[0].toUpperCase() + s.slice(1) })),
+  { key: "", label: "All time", icon: "calendar" },
+  ...SEASONS.map((s) => ({ key: s, label: s[0].toUpperCase() + s.slice(1), icon: s === "summer" ? "sun" : s })),
 ];
 
-export default function BrowseScreen({ navigation }) {
+export default function BrowseScreen({ navigation, route }) {
   const { C } = useTheme();
   const styles = makeStyles(C);
   const cols = useGridColumns();
@@ -49,7 +49,7 @@ export default function BrowseScreen({ navigation }) {
   const [origin, setOrigin] = useState("");
   const [season, setSeason] = useState("");
   const [year, setYear] = useState(String(THIS_YEAR));
-  const [sort, setSort] = useState("popular");
+  const [sort, setSort] = useState(route?.params?.sort || "popular"); // "See all" from Top rated opens it sorted by score
   const [genre, setGenre] = useState("");
 
   const [items, setItems] = useState([]);
@@ -106,28 +106,28 @@ export default function BrowseScreen({ navigation }) {
     }
   };
 
-  // dropdown sections for the ACTIVE segment
+  // filter sections for the ACTIVE segment (Genres, Season + Year, Origin, Sort)
   const sections = [
+    {
+      label: "Genres",
+      value: genre,
+      options: [{ key: "", label: "All" }, ...GENRES.map((g) => ({ key: g, label: g }))],
+      onSelect: setGenre,
+    },
+    ...(segment === "anime"
+      ? [
+          { label: "Season", value: season, options: SEASON_OPTIONS, onSelect: setSeason, layout: "tiles" },
+          ...(season
+            ? [{ label: "Year", value: year, options: YEAR_OPTIONS, onSelect: setYear, layout: "row" }]
+            : []),
+        ]
+      : []),
     {
       label: "Origin",
       value: origin,
       options: ORIGIN_MAP[segment],
       onSelect: setOrigin,
     },
-    {
-      label: "Genre",
-      value: genre,
-      options: [{ key: "", label: "All genres" }, ...GENRES.map((g) => ({ key: g, label: g }))],
-      onSelect: setGenre,
-    },
-    ...(segment === "anime"
-      ? [
-          { label: "Season", value: season, options: SEASON_OPTIONS, onSelect: setSeason },
-          ...(season
-            ? [{ label: "Year", value: year, options: YEAR_OPTIONS, onSelect: setYear }]
-            : []),
-        ]
-      : []),
     ...(!(segment === "anime" && season)
       ? [{ label: "Sort by", value: sort, options: SORTS, onSelect: setSort }]
       : []),

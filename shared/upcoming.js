@@ -35,6 +35,19 @@ export async function loadAiringSoon(hours = 24) {
   return (await fetchAiringSchedule(2)).filter((s) => s.airingAt > now && s.airingAt < now + hours * 3600);
 }
 
+// Release calendar: every episode airing in the next 7 days, grouped by your
+// local day: { "2026-09-30": [{ item, episode, airingAt }, …], … } (soonest first)
+export async function loadAiringWeek(days = 7) {
+  const now = Date.now() / 1000;
+  const out = {};
+  (await fetchAiringSchedule(days)).filter((s) => s.airingAt > now).forEach((s) => {
+    const k = dayKey(new Date(s.airingAt * 1000));
+    (out[k] = out[k] || []).push(s);
+  });
+  Object.values(out).forEach((list) => list.sort((a, b) => a.airingAt - b.airingAt));
+  return out;
+}
+
 // Anime whose first episode came out in the last `days` days, newest first.
 export async function loadLatestPremieres(days = 21) {
   const today = new Date();

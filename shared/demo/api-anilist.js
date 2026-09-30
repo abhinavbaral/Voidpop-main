@@ -21,6 +21,7 @@ function sortItems(items, sort) {
   const s = [...items];
   if (sort === "newest") s.sort((a, b) => byDate(b) - byDate(a));
   else if (sort === "oldest") s.sort((a, b) => byDate(a) - byDate(b));
+  else if (sort === "score") s.sort((a, b) => (b.score || 0) - (a.score || 0) || b.popularity - a.popularity);
   else if (sort === "trending") s.sort((a, b) => byDate(b) - byDate(a) || b.popularity - a.popularity);
   else s.sort((a, b) => b.popularity - a.popularity);
   return s;
@@ -266,6 +267,13 @@ export async function fetchByMalIds(segment, malIds) {
 }
 
 // Demo person page: a few roles from the catalog
+export async function fetchPeople(search) {
+  await wait(150);
+  const q = String(search || "").toLowerCase();
+  return ["Kana Hanazawa", "Yuki Kaji", "Hiroshi Kamiya", "Eiichiro Oda"].filter((n) => n.toLowerCase().includes(q))
+    .map((name, i) => ({ id: 9000 + i, name, native: null, image: null, occupations: [i === 3 ? "Mangaka" : "Voice Actor"] }));
+}
+
 export async function fetchPerson(id) {
   await wait(150);
   const picks = CATALOG.anime.filter((x) => !x.unreleased).slice(0, 6);

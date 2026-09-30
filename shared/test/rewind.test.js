@@ -45,5 +45,19 @@ test("Rewind: titles you add get this year; imports don't; picks can change", as
   assert.equal(await store.setRewindYear(["anime:11"], year), 1);
   assert.equal((await store.getLibrary())["anime:11"].rewindYear, year);
   await store.setRewindYear(["anime:11"], null);
-  assert.equal((await store.getLibrary())["anime:11"].rewindYear, undefined);
+  assert.equal((await store.getLibrary())["anime:11"].rewindYear, 0); // off on purpose
+});
+
+test("Rewind: anything you're Watching counts this year by itself; rewatches and switched-off ones don't", async () => {
+  const year = new Date().getFullYear();
+  await store.importMalEntries([
+    { item: it(20), status: "watching", progress: 2, times: 0 },
+    { item: it(21), status: "rewatching", progress: 2, times: 1 },
+  ]);
+  const lib = await store.getLibrary();
+  assert.equal(lib["anime:20"].rewindYear, year);
+  assert.equal(lib["anime:21"].rewindYear, undefined);
+  await store.setRewindYear(["anime:20"], null);
+  await store.setProgress(null, it(20), 3);
+  assert.equal((await store.getLibrary())["anime:20"].rewindYear, 0);
 });

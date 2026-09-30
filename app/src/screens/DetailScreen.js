@@ -19,7 +19,7 @@ import { NoteBox, WatchOrder, Discussions, RewindToggle } from "../components/Ti
 import { addToCalendar } from "../lib/calendar";
 import { completeEarlierSeasons, undoEarlierSeasons } from "@voidation/shared/seasons";
 import { getCachedItem, cacheItem, openDetail, goBackOrHome } from "../lib/nav";
-import { releaseLabel, formatCountdown, dayLabel, airTime } from "@voidation/shared/format";
+import { releaseLabel, formatCountdown, dayLabel, airTime, hypeLabel } from "@voidation/shared/format";
 import { useNow } from "@voidation/shared/hooks/useNow";
 import { useSettings } from "@voidation/shared/backend/SettingsContext";
 import { useIsWide } from "../lib/layout";
@@ -128,6 +128,7 @@ function DetailBody({ item, navigation }) {
   const [related, setRelated] = useState([]);
   const [watch, setWatch] = useState([]);
   const [read, setRead] = useState(null); // manga: { read, buy, search }
+  const [moreText, setMoreText] = useState(false); // synopsis: + More
   const [source, setSource] = useState(null); // anime: { label, items }
   const [cast, setCast] = useState({}); // { characters, staff, themes }
   const [episodes, setEpisodes] = useState([]); // anime: official episode list
@@ -270,8 +271,26 @@ function DetailBody({ item, navigation }) {
     </>
   );
 
+  // the synopsis starts cut to 5 lines on phones: "+ More" shows the rest
+  const longText = (item.overview || "").length > 320;
   const overview = !!item.overview && (
-    <Text style={[styles.overview, wide && styles.overviewWide]}>{item.overview}</Text>
+    <View>
+      <Text style={[styles.overview, wide && styles.overviewWide]} numberOfLines={!wide && longText && !moreText ? 5 : undefined}>{item.overview}</Text>
+      {!wide && longText && (
+        <TouchableOpacity onPress={() => setMoreText(!moreText)} hitSlop={8} accessibilityRole="button">
+          <Text style={{ color: C.purple, fontWeight: "800", marginTop: 4 }}>{moreText ? "Show less" : "+ More"}</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+  // one big main button: watch (or read) it on the first official service
+  const mainLink = item.segment === "manga" ? read?.read?.[0] : watch[0];
+  const mainAction = !!mainLink && (
+    <TouchableOpacity onPress={() => Linking.openURL(mainLink.url).catch(() => {})} accessibilityRole="link"
+      style={[styles.mainBtn, { backgroundColor: accent }]}>
+      <Icon name={item.segment === "manga" ? "book" : "play"} size={16} color="#fff" fill={item.segment !== "manga"} />
+      <Text style={styles.mainBtnText} numberOfLines={1}>{item.segment === "manga" ? "Read" : "Watch"} on {mainLink.site}</Text>
+    </TouchableOpacity>
   );
 
   return (
@@ -314,6 +333,13 @@ function DetailBody({ item, navigation }) {
                 </Text>
               )}
               <Text style={styles.sub}>{item.genre} · {releaseLabel(item)}</Text>
+              {item.score != null && (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginTop: 4 }}>
+                  <Icon name="star" size={13} color={C.orange} fill />
+                  <Text style={{ color: C.text, fontWeight: "800", fontSize: 13 }}>{item.score.toFixed(1)}</Text>
+                  {item.popularity ? <Text style={{ color: C.faint, fontSize: 12 }}>· {hypeLabel(item.popularity)}</Text> : null}
+                </View>
+              )}
               {item.segment === "anime" && <SourceLine source={source} navigation={navigation} />}
               <View style={styles.genreWrap}>
                 {(item.genres?.length ? item.genres : [item.genre]).slice(0, 4).map((g) => (
@@ -327,11 +353,13 @@ function DetailBody({ item, navigation }) {
               </TouchableOpacity>
               {/* desktop: actions + synopsis sit beside the poster */}
               {wide && statusButtons}
+              {wide && mainAction}
               {wide && overview}
             </View>
           </View>
 
           {!wide && statusButtons}
+          {!wide && mainAction}
           {!wide && overview}
 
           {/* next episode countdown (airing anime) */}
@@ -576,6 +604,8 @@ const makeStyles = (C) => StyleSheet.create({
     backgroundColor: C.bg, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, overflow: "hidden",
   },
   overview: { color: C.sub, fontSize: 13, lineHeight: 20, marginTop: 16 },
+  mainBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, height: 46, borderRadius: 999, marginTop: 14, paddingHorizontal: 18 },
+  mainBtnText: { color: "#fff", fontWeight: "900", fontSize: 15 },
   overviewWide: { fontSize: 14, lineHeight: 22, maxWidth: 720 },
   panelsWide: { flexDirection: "row", gap: 16, alignItems: "stretch" },
   seasonGrid: { flexDirection: "row", flexWrap: "wrap", columnGap: 16 },

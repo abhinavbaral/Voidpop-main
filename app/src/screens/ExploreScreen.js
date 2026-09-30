@@ -15,9 +15,18 @@ import { useTheme } from "../context/ThemeContext.js";
 import { openDetail } from "../lib/nav";
 import { useIsWide } from "../lib/layout";
 import Icon from "../components/Icon.js";
+import AnimatedBanner from "../components/AnimatedBanner.js";
+import { NewEpisodeCards, PremiereCountdown } from "../components/ExploreCards.js";
+import RankedRow from "../components/RankedRow.js";
+import { COUNTRIES } from "./TrendsScreen.js";
+import { fetchAniList } from "@voidation/shared/api/anilist";
+
+// the greeting on the banner, by the time of day
+const greeting = (h = new Date().getHours()) =>
+  h < 5 ? "Still up?" : h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : h < 22 ? "Good evening" : "Still up?";
 
 export default function ExploreScreen({ navigation }) {
-  const { C } = useTheme();
+  const { C, dark } = useTheme();
   const styles = makeStyles(C);
   const wide = useIsWide();
   const [data, setData] = useState({});
@@ -69,6 +78,25 @@ export default function ExploreScreen({ navigation }) {
 
   const open = (item) => openDetail(navigation, item);
 
+  // "Trending in [Japan]": tap the pill to switch Japan → Korea → China
+  const [country, setCountry] = useState("JP");
+  const [trend, setTrend] = useState(null);
+  const nextCountry = () => {
+    const list = COUNTRIES.filter((c) => c.key);
+    setCountry(list[(list.findIndex((c) => c.key === country) + 1) % list.length].key);
+  };
+  // "Top rated": the highest-scored anime on AniList
+  const [topRated, setTopRated] = useState(null);
+  useEffect(() => {
+    fetchAniList("anime", { sort: "score", perPage: 10 }).then((r) => setTopRated(r.items)).catch(() => setTopRated([]));
+  }, []);
+  useEffect(() => {
+    let alive = true;
+    setTrend(null);
+    fetchAniList("anime", { sort: "trending", origin: country, perPage: 15 }).then((r) => alive && setTrend(r.items)).catch(() => alive && setTrend([]));
+    return () => { alive = false; };
+  }, [country]);
+
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <ScrollView
@@ -76,10 +104,16 @@ export default function ExploreScreen({ navigation }) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={C.purple} colors={[C.purple]} />}
       >
         {!wide && (
+        <>
+        <View style={styles.hero}>
+          {/* the same animated sky as More (sun by day, moon and stars by night) */}
+          <View style={StyleSheet.absoluteFill}><AnimatedBanner accent={C.purple} dark={dark} height={170} /></View>
+          <View style={styles.heroTop}><Brand size={20} /></View>
+          <Text style={styles.hello} accessibilityRole="header">{greeting()}</Text>
+        </View>
         <View style={styles.header}>
-          {/* logo on the left, then search and Browse in one row */}
+          {/* search and Browse in one row */}
           <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-            <Brand size={22} />
             <TouchableOpacity onPress={() => navigation.navigate("Search")} style={[styles.searchBtn, { flex: 1, marginTop: 0 }]}>
               <Text style={{ color: C.faint, fontSize: 13 }}>Search anime and manga...</Text>
             </TouchableOpacity>
@@ -88,18 +122,26 @@ export default function ExploreScreen({ navigation }) {
             </TouchableOpacity>
           </View>
         </View>
+        </>
         )}
 
+        <NewEpisodeCards onOpen={open} />
         {catRows.map((r) => <PosterRow key={r.id} title={r.title} items={r.items} onOpen={open} />)}
         <YourShows now={now} layout="row" title="Up next" onOpen={open} />
+        <PremiereCountdown upcoming={data.coming || []} onOpen={open} />
         {jump.anime.length > 0 && <PosterRow title="Jump back in: Anime" items={jump.anime} onOpen={open} />}
         {jump.manga.length > 0 && <PosterRow title="Jump back in: Manga" items={jump.manga} onOpen={open} />}
         {newSeasons.length > 0 && <PosterRow title="New seasons of shows you watched" items={newSeasons} onOpen={open} />}
-        {data.coming?.length > 0 && <PosterRow title={data.comingTitle} items={data.coming} onOpen={open} />}
+        {data.coming?.length > 0 && <PosterRow title={data.comingTitle} chip={data.comingChip} items={data.coming} onOpen={open} />}
         {verdictRows.map((r) => (
           <PosterRow key={r.verdict} title={r.title} dot={r.color} items={r.items} onOpen={open} />
         ))}
-        <PosterRow title="Talk of the Week" items={data.talk} loading={loading} onOpen={open} />
+        <PosterRow title="Talk of the Week" items={data.talk} loading={loading} onOpen={open} onMore={() => navigation.navigate("Trends")} />
+        <RankedRow title="Top rated" subtitle="The highest-scored anime on AniList" items={topRated} loading={topRated === null} onOpen={open}
+          onMore={() => navigation.navigate("Browse", { sort: "score" })} />
+        <PosterRow title="Trending in" items={trend} loading={trend === null} onOpen={open}
+          chip={{ label: COUNTRIES.find((c) => c.key === country)?.label, onPress: nextCountry, a11y: "Change country" }}
+          onMore={() => navigation.navigate("Trends", { country })} />
         <PosterRow title="Don't Miss This — Anime" items={data.dontMissAnime} loading={loading} onOpen={open} />
         <PosterRow title="Don't Miss This — Manga" items={data.dontMissManga} loading={loading} onOpen={open} />
         <PosterRow title="Isekai Heaven" items={data.isekai} loading={loading} onOpen={open} />
@@ -113,7 +155,10 @@ export default function ExploreScreen({ navigation }) {
 
 const makeStyles = (C) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
-  header: { paddingHorizontal: 14, paddingTop: 8 },
+  header: { paddingHorizontal: 14, paddingTop: 10 },
+  hero: { height: 170, overflow: "hidden", justifyContent: "space-between", padding: 14, paddingBottom: 18 },
+  heroTop: { flexDirection: "row", alignItems: "center" },
+  hello: { color: "#fff", fontSize: 30, fontWeight: "900", textShadowColor: "rgba(0,0,0,0.35)", textShadowRadius: 8, textShadowOffset: { width: 0, height: 2 } },
   brand: { color: C.text, fontSize: 22, fontWeight: "800" },
   searchBtn: {
     marginTop: 10, height: 40, borderRadius: 12, borderWidth: 1,
