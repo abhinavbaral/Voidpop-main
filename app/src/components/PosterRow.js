@@ -84,6 +84,12 @@ export default function PosterRow({ title, items, loading, onOpen, dot, chip, on
           keyExtractor={(i) => `${i.segment}-${i.id}`}
           showsHorizontalScrollIndicator={Platform.OS === "web" && wide}
           contentContainerStyle={{ paddingHorizontal: 8 }}
+          // only the posters on screen (plus one screen either side) are drawn;
+          // swiping loads the next ones and drops those far behind
+          initialNumToRender={wide ? 8 : 4}
+          maxToRenderPerBatch={4}
+          windowSize={3}
+          removeClippedSubviews={Platform.OS === "android"}
           onScroll={(e) => setX(e.nativeEvent.contentOffset.x)}
           scrollEventThrottle={32}
           onLayout={(e) => setViewW(e.nativeEvent.layout.width)}

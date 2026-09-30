@@ -98,6 +98,8 @@ function normalize(m, segment) {
     // the Japanese (romaji) title, when it's different: "Re:Zero kara Hajimeru Isekai Seikatsu"
     altTitle: m.title.english && m.title.romaji && m.title.romaji !== m.title.english ? m.title.romaji : null,
     image: m.coverImage?.extraLarge || m.coverImage?.large,
+    // smaller copy: posters fall back to it when the big one fails to load
+    imageSmall: m.coverImage?.large || null,
     color: m.coverImage?.color || null, // the cover's main colour (tints its page)
     banner: m.bannerImage || null,
     // zero-pad: "2013-4-7" is not ISO, so new Date() returns Invalid Date

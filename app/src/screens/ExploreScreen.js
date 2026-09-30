@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, RefreshControl } from "react-native";
+import { FlatList, View, Text, TouchableOpacity, StyleSheet, RefreshControl, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import PosterRow from "../components/PosterRow.js";
 import { loadCategoryRows } from "@voidation/shared/backend/store";
@@ -94,59 +94,73 @@ export default function ExploreScreen({ navigation }) {
     return () => { alive = false; };
   }, [country]);
 
+
+  // Explore's rows in order. Each one renders only when it's near the screen.
+  const row = (key, render) => ({ key, render });
+  const sections = [
+    row("new-eps", () => <NewEpisodeCards onOpen={open} />),
+    ...catRows.map((r) => row(`cat-${r.id}`, () => <PosterRow title={r.title} items={r.items} onOpen={open} />)),
+    row("coming-up", () => <Countdowns onOpen={open} />),
+    // right under Coming up on purpose: mark one of these Excited and it
+    // leaves this row and starts counting down in Coming up
+    data.coming?.length > 0 && row("coming-soon", () => <PosterRow title={data.comingTitle} chip={data.comingChip} items={data.coming} onOpen={open} />),
+    jump.anime.length > 0 && row("jump-anime", () => <PosterRow title="Jump back in: Anime" items={jump.anime} onOpen={open} />),
+    jump.manga.length > 0 && row("jump-manga", () => <PosterRow title="Jump back in: Manga" items={jump.manga} onOpen={open} />),
+    newSeasons.length > 0 && row("new-seasons", () => <PosterRow title="New seasons of shows you watched" items={newSeasons} onOpen={open} />),
+    ...verdictRows.map((r) => row(`verdict-${r.verdict}`, () => <PosterRow title={r.title} dot={r.color} items={r.items} onOpen={open} />)),
+    row("talk", () => <PosterRow title="Talk of the Week" items={data.talk} loading={loading} onOpen={open} onMore={() => navigation.navigate("Trends")} />),
+    row("top-rated", () => <RankedRow title="Top rated" subtitle="The highest-scored anime on AniList" items={topRated} loading={topRated === null} onOpen={open}
+      onMore={() => navigation.navigate("Browse", { sort: "score" })} />),
+    row("trending-in", () => <PosterRow title="Trending in" items={trend} loading={trend === null} onOpen={open}
+      chip={{ label: COUNTRIES.find((c) => c.key === country)?.label, onPress: nextCountry, a11y: "Change country" }}
+      onMore={() => navigation.navigate("Trends", { country })} />),
+    row("dont-miss-anime", () => <PosterRow title="Don't Miss This — Anime" items={data.dontMissAnime} loading={loading} onOpen={open} />),
+    row("dont-miss-manga", () => <PosterRow title="Don't Miss This — Manga" items={data.dontMissManga} loading={loading} onOpen={open} />),
+    row("isekai", () => <PosterRow title="Isekai Heaven" items={data.isekai} loading={loading} onOpen={open} />),
+    row("shonen", () => <PosterRow title="Shonen Feast" items={data.shonen} loading={loading} onOpen={open} />),
+    row("angles", () => <PosterRow title="Voidation Angles" items={data.voidpicks} loading={loading} onOpen={open} />),
+    aoty.length > 0 && row("aoty", () => <PosterRow title="Anime of the Year (Crunchyroll Awards)" items={aoty} onOpen={open} />),
+  ].filter(Boolean);
+
+  const header = !wide && (
+    <>
+    <View style={styles.hero}>
+      {/* the same animated sky as More (sun by day, moon and stars by night) */}
+      <View style={StyleSheet.absoluteFill}><AnimatedBanner accent={C.purple} dark={dark} height={170} /></View>
+      <View style={styles.heroTop}><Brand size={20} /></View>
+      <Text style={styles.hello} accessibilityRole="header">{greeting()}</Text>
+    </View>
+    <View style={styles.header}>
+      {/* search and Browse in one row */}
+      <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+        <TouchableOpacity onPress={() => navigation.navigate("Search")} style={[styles.searchBtn, { flex: 1, marginTop: 0 }]}>
+          <Text style={{ color: C.faint, fontSize: 13 }}>Search anime and manga...</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.navigate("Browse")} style={[styles.searchBtn, { marginTop: 0 }]}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}><Icon name="browse" size={14} color={C.text} /><Text style={{ color: C.text, fontSize: 13, fontWeight: "700" }}>Browse</Text></View>
+        </TouchableOpacity>
+      </View>
+    </View>
+    </>
+    ) || null;
+
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
-      <ScrollView
+      {/* One vertical list of rows, drawn only near the screen: rows (and their
+          posters) appear as you scroll to them and are dropped once they're
+          well above or below, so Explore never holds every poster at once. */}
+      <FlatList
+        data={sections}
+        keyExtractor={(x) => x.key}
+        renderItem={({ item: x }) => x.render()}
+        ListHeaderComponent={header}
         contentContainerStyle={{ paddingBottom: 30 }}
+        initialNumToRender={4}
+        maxToRenderPerBatch={2}
+        windowSize={5}
+        removeClippedSubviews={Platform.OS === "android"}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={C.purple} colors={[C.purple]} />}
-      >
-        {!wide && (
-        <>
-        <View style={styles.hero}>
-          {/* the same animated sky as More (sun by day, moon and stars by night) */}
-          <View style={StyleSheet.absoluteFill}><AnimatedBanner accent={C.purple} dark={dark} height={170} /></View>
-          <View style={styles.heroTop}><Brand size={20} /></View>
-          <Text style={styles.hello} accessibilityRole="header">{greeting()}</Text>
-        </View>
-        <View style={styles.header}>
-          {/* search and Browse in one row */}
-          <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-            <TouchableOpacity onPress={() => navigation.navigate("Search")} style={[styles.searchBtn, { flex: 1, marginTop: 0 }]}>
-              <Text style={{ color: C.faint, fontSize: 13 }}>Search anime and manga...</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => navigation.navigate("Browse")} style={[styles.searchBtn, { marginTop: 0 }]}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}><Icon name="browse" size={14} color={C.text} /><Text style={{ color: C.text, fontSize: 13, fontWeight: "700" }}>Browse</Text></View>
-            </TouchableOpacity>
-          </View>
-        </View>
-        </>
-        )}
-
-        <NewEpisodeCards onOpen={open} />
-        {catRows.map((r) => <PosterRow key={r.id} title={r.title} items={r.items} onOpen={open} />)}
-        <Countdowns onOpen={open} />
-        {/* right under Coming up on purpose: mark one of these Excited and it
-            leaves this row and starts counting down in Coming up */}
-        {data.coming?.length > 0 && <PosterRow title={data.comingTitle} chip={data.comingChip} items={data.coming} onOpen={open} />}
-        {jump.anime.length > 0 && <PosterRow title="Jump back in: Anime" items={jump.anime} onOpen={open} />}
-        {jump.manga.length > 0 && <PosterRow title="Jump back in: Manga" items={jump.manga} onOpen={open} />}
-        {newSeasons.length > 0 && <PosterRow title="New seasons of shows you watched" items={newSeasons} onOpen={open} />}
-        {verdictRows.map((r) => (
-          <PosterRow key={r.verdict} title={r.title} dot={r.color} items={r.items} onOpen={open} />
-        ))}
-        <PosterRow title="Talk of the Week" items={data.talk} loading={loading} onOpen={open} onMore={() => navigation.navigate("Trends")} />
-        <RankedRow title="Top rated" subtitle="The highest-scored anime on AniList" items={topRated} loading={topRated === null} onOpen={open}
-          onMore={() => navigation.navigate("Browse", { sort: "score" })} />
-        <PosterRow title="Trending in" items={trend} loading={trend === null} onOpen={open}
-          chip={{ label: COUNTRIES.find((c) => c.key === country)?.label, onPress: nextCountry, a11y: "Change country" }}
-          onMore={() => navigation.navigate("Trends", { country })} />
-        <PosterRow title="Don't Miss This — Anime" items={data.dontMissAnime} loading={loading} onOpen={open} />
-        <PosterRow title="Don't Miss This — Manga" items={data.dontMissManga} loading={loading} onOpen={open} />
-        <PosterRow title="Isekai Heaven" items={data.isekai} loading={loading} onOpen={open} />
-        <PosterRow title="Shonen Feast" items={data.shonen} loading={loading} onOpen={open} />
-        <PosterRow title="Voidation Angles" items={data.voidpicks} loading={loading} onOpen={open} />
-        {aoty.length > 0 && <PosterRow title="Anime of the Year (Crunchyroll Awards)" items={aoty} onOpen={open} />}
-      </ScrollView>
+      />
     </SafeAreaView>
   );
 }

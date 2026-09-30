@@ -4,6 +4,7 @@
 //                    Genre · release date
 // Anime that are airing get an "Ep 7 · 2d 4h" countdown badge on the poster.
 
+import { useState } from "react";
 import { Pressable, Image, Text, View, StyleSheet, Platform } from "react-native";
 import { useTheme } from "../context/ThemeContext.js";
 import { releaseLabel, formatCountdown } from "@voidation/shared/format";
@@ -38,6 +39,12 @@ export default function Card({ item, onPress, width, columns, entry, onPlus, sel
 function CardInner({ item, entry, onPlus, onPress, onLongPress, selecting, selected, styles, C, style }) {
   const creator = item.creator;
   const { settings } = useSettings();
+  // Explore has 15+ rows of posters. Android decodes each picture at full size,
+  // and with too many on screen some fail to load and stay blank. So: decode at
+  // the poster's size (resizeMethod), and if the big cover still fails, use
+  // AniList's smaller one, then "No image".
+  const [failed, setFailed] = useState(0);
+  const src = failed === 0 ? item.image : failed === 1 ? item.imageSmall : null;
   const next = settings.posterBadges ? item.nextEpisode : null;
   return (
     <Pressable
@@ -53,8 +60,9 @@ function CardInner({ item, entry, onPlus, onPress, onLongPress, selecting, selec
       ]}
     >
       <View>
-        {item.image ? (
-          <Image source={{ uri: item.image }} style={styles.poster} />
+        {src ? (
+          <Image source={{ uri: src }} style={styles.poster} resizeMethod="resize"
+            onError={() => setFailed((n) => (n === 0 && item.imageSmall && item.imageSmall !== item.image ? 1 : 2))} />
         ) : (
           <View style={[styles.poster, styles.noImg]}>
             <Text style={{ color: C.faint, fontSize: 12 }}>No image</Text>
