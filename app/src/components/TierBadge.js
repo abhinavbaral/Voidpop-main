@@ -1,4 +1,4 @@
-// Your rank badge (Rookie -> Addicted), from how many titles you've completed.
+// Your rank badge (Newbie -> Addicted), from how many titles you've completed.
 
 import { View, Text, StyleSheet } from "react-native";
 

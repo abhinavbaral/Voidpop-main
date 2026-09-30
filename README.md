@@ -10,7 +10,7 @@ Android app, built from one codebase. No sign-up and no API keys: open it and us
 - **Your verdict** instead of a number: Peak / Dive In / One Time / Void It, plus up to
   three vibes, shareable as an image card
 - **Explore, Browse and Search** by origin (Japan, Korea, China), season, year and popularity
-- **Tiers** that grow with what you complete, from Rookie to Addicted
+- **Tiers** that grow with what you complete, from Newbie to Addicted (15 ranks)
 - **History:** episodes that aired in the last 14 days for everything you follow
 - **More:** statistics, appearance, settings (24-hour clock, countdown badges), data and storage, help, about
 - **Progress:** episodes watched / chapters read on every title, +1 from the Library, "Mark watched" in History,

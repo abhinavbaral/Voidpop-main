@@ -12,4 +12,15 @@ export const VOIDMON_POSES = {
   peeking: { ratio: 0.25, label: "Voidmon peeking" },
   sleeping: { ratio: 0.575, label: "Voidmon sleeping" },
   celebrating: { ratio: 1, label: "Voidmon celebrating" },
+  asking: { ratio: 1, label: "Voidmon asking" },
 };
+
+// What Voidmon asks in the verdict window, one question at a time as you
+// answer: verdict, then vibes, then moods (where the window has them), then
+// a cheer once everything is picked.
+export function verdictPrompt({ verdict, vibes = [], moods = [], withMoods = true }) {
+  if (!verdict) return { pose: "asking", text: "So... how was it? Give it your Void Verdict." };
+  if (!vibes.length) return { pose: "asking", text: "What was it like? Pick up to 3 vibes." };
+  if (withMoods && !moods.length) return { pose: "asking", text: "And how did it leave you feeling?" };
+  return { pose: "celebrating", text: "Got it. Add a note if you like, then save." };
+}

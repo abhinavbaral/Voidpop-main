@@ -574,10 +574,6 @@ function Help({ styles, navigation }) {
           {open === i && <Text style={[styles.note, { marginTop: 6 }]}>{a}</Text>}
         </Pressable>
       ))}
-      <Pressable style={styles.card} onPress={() => navigation?.navigate("Onboarding")}>
-        <Text style={styles.cardTitle}>Show the welcome screens again</Text>
-        <Text style={[styles.note, { marginTop: 4 }]}>Theme, importing your list, and episode alerts.</Text>
-      </Pressable>
     </>
   );
 }

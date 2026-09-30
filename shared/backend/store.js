@@ -602,20 +602,36 @@ export const inLibraryList = (entry, list) =>
 // Ranks, by anime Completed + manga Finished. The gaps start
 // at 60 and grow, so each rank takes longer than the last.
 export const TIERS = [
-  { key: "rookie", label: "Rookie", min: 0, color: "#9ca3af",
-    title: "You are a Rookie", message: "Every Legend started here. Complete anime and finish manga to climb the ranks." },
-  { key: "explorer", label: "Explorer", min: 60, color: "#22d3ee",
-    title: "You are an Explorer", message: "60 anime completed and manga finished. You know your way around now." },
-  { key: "collector", label: "Collector", min: 130, color: "#10b981",
-    title: "You are a Collector", message: "130 anime completed and manga finished. That's a proper collection." },
-  { key: "critic", label: "Critic", min: 210, color: "#f59e0b",
-    title: "You are a Critic", message: "210 anime completed and manga finished. Your verdicts carry weight now." },
-  { key: "elite", label: "Elite", min: 300, color: "#f43f5e",
-    title: "You are an Elite", message: "300 anime completed and manga finished. Very few get this far." },
-  { key: "legend", label: "Legend", min: 400, color: "#e879f9",
-    title: "You are a Legend", message: "400 anime completed and manga finished. People will ask you what to watch." },
-  { key: "addicted", label: "Addicted", min: 520, color: "#a855f7",
-    title: "You have become an Addict", message: "520 anime completed and manga finished. Seriously: take a break, drink some water, go outside." },
+  { key: "newbie", label: "Newbie", min: 0, color: "#9ca3af",
+    title: "You are a Newbie", message: "Welcome to Voidation. Complete anime and finish manga to climb the ranks." },
+  { key: "rookie", label: "Rookie", min: 5, color: "#60a5fa",
+    title: "You are a Rookie", message: "5 anime completed and manga finished. You've started something." },
+  { key: "amateur", label: "Amateur", min: 10, color: "#38bdf8",
+    title: "You are an Amateur", message: "10 anime completed and manga finished. It's becoming a habit." },
+  { key: "collector", label: "Collector", min: 25, color: "#22d3ee",
+    title: "You are a Collector", message: "25 anime completed and manga finished. That's the start of a proper collection." },
+  { key: "critic", label: "Critic", min: 60, color: "#2dd4bf",
+    title: "You are a Critic", message: "60 anime completed and manga finished. Your verdicts carry weight now." },
+  { key: "seasonkeeper", label: "Season Keeper", min: 130, color: "#34d399",
+    title: "You are a Season Keeper", message: "130 anime completed and manga finished. You keep up with every season." },
+  { key: "seasonmaster", label: "Season Master", min: 210, color: "#10b981",
+    title: "You are a Season Master", message: "210 anime completed and manga finished. Seasons answer to you now." },
+  { key: "relentless", label: "Relentless Watcher", min: 300, color: "#a3e635",
+    title: "You are a Relentless Watcher", message: "300 anime completed and manga finished. Nothing slows you down." },
+  { key: "champion", label: "Champion", min: 490, color: "#facc15",
+    title: "You are a Champion", message: "490 anime completed and manga finished. Very few get this far." },
+  { key: "elite", label: "Elite", min: 700, color: "#f59e0b",
+    title: "You are Elite", message: "700 anime completed and manga finished. People ask you what to watch." },
+  { key: "legend", label: "Legend", min: 1000, color: "#fb923c",
+    title: "You are a Legend", message: "1,000 anime completed and manga finished. A thousand stories, and counting." },
+  { key: "mythic", label: "Mythic", min: 1500, color: "#f43f5e",
+    title: "You are Mythic", message: "1,500 anime completed and manga finished. They tell stories about you now." },
+  { key: "unrivalled", label: "Unrivalled", min: 2000, color: "#ec4899",
+    title: "You are Unrivalled", message: "2,000 anime completed and manga finished. No one is close." },
+  { key: "godly", label: "Godly", min: 3000, color: "#e879f9",
+    title: "You are Godly", message: "3,000 anime completed and manga finished. This is beyond human." },
+  { key: "addicted", label: "Addicted", min: 3500, color: "#a855f7",
+    title: "You have become an Addict", message: "3,500 anime completed and manga finished. Seriously: take a break, drink some water, go outside." },
 ];
 
 export const tierFor = (n) => [...TIERS].reverse().find((t) => n >= t.min) || TIERS[0];
@@ -628,10 +644,22 @@ export async function getUserTier() {
 // Rank-up celebrations: the highest rank you've already been shown. A new,
 // higher rank → celebrate once. Dropping a rank (removing titles) never
 // celebrates again when you climb back.
+// The ranks changed on 30 Sep 2026 (7 became 15, and some names moved).
+// A rank "seen" under the old list is matched to the new list by the titles
+// it needed, so nobody is re-celebrated for ranks they'd passed, and nobody
+// skips a celebration for a new rank they haven't reached yet.
+const OLD_TIER_MIN = { rookie: 0, explorer: 60, collector: 130, critic: 210, elite: 300, legend: 400, addicted: 520 };
+export function seenTierIndex(meta) {
+  if (!meta?.tierSeen) return -1;
+  if (meta.tierSeenV === 2) return TIERS.findIndex((t) => t.key === meta.tierSeen);
+  const min = OLD_TIER_MIN[meta.tierSeen] ?? 0;
+  return TIERS.reduce((best, t, i) => (t.min <= min ? i : best), 0);
+}
+
 export async function checkRankUp() {
   const db = await load();
   const { tier } = await getUserTier();
-  const seenIndex = TIERS.findIndex((t) => t.key === db.meta?.tierSeen);
+  const seenIndex = seenTierIndex(db.meta);
   const nowIndex = TIERS.findIndex((t) => t.key === tier.key);
   return nowIndex > seenIndex ? tier : null;
 }
@@ -642,9 +670,9 @@ export function celebrate(tier) { celebrateListeners.forEach((fn) => { try { fn(
 
 export async function markRankSeen(key) {
   const db = await load();
-  const seenIndex = TIERS.findIndex((t) => t.key === db.meta?.tierSeen);
+  const seenIndex = seenTierIndex(db.meta);
   if (TIERS.findIndex((t) => t.key === key) <= seenIndex) return;
-  db.meta = { ...(db.meta || {}), tierSeen: key };
+  db.meta = { ...(db.meta || {}), tierSeen: key, tierSeenV: 2 };
   await save();
 }
 

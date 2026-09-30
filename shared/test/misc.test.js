@@ -59,3 +59,26 @@ test("cover accent stays readable on dark, light and under white text", () => {
   }
   assert.equal(readableAccent(null, "#a855f7"), "#a855f7");
 });
+
+test("ranks: 15 in order; old 'seen' ranks map by titles needed; Voidmon's verdict questions", async () => {
+  const s = await import("../backend/store.js");
+  const mins = s.TIERS.map((t) => t.min);
+  assert.equal(s.TIERS.length, 15);
+  assert.deepEqual([...mins].sort((a, b) => a - b), mins);
+  assert.equal(s.tierFor(0).key, "newbie");
+  assert.equal(s.tierFor(4).key, "newbie");
+  assert.equal(s.tierFor(5).key, "rookie");
+  assert.equal(s.tierFor(9999).key, "addicted");
+  // old list: "elite" needed 300 → new Relentless Watcher (300), not the new Elite (700)
+  assert.equal(s.TIERS[s.seenTierIndex({ tierSeen: "elite" })].key, "relentless");
+  assert.equal(s.TIERS[s.seenTierIndex({ tierSeen: "rookie" })].key, "newbie");
+  assert.equal(s.TIERS[s.seenTierIndex({ tierSeen: "elite", tierSeenV: 2 })].key, "elite");
+  assert.equal(s.seenTierIndex({}), -1);
+
+  const { verdictPrompt } = await import("../voidmon.js");
+  assert.equal(verdictPrompt({}).pose, "asking");
+  assert.match(verdictPrompt({ verdict: "peak" }).text, /vibes/);
+  assert.match(verdictPrompt({ verdict: "peak", vibes: ["Cozy"] }).text, /feeling/);
+  assert.equal(verdictPrompt({ verdict: "peak", vibes: ["Cozy"], withMoods: false }).pose, "celebrating");
+  assert.equal(verdictPrompt({ verdict: "peak", vibes: ["Cozy"], moods: ["Happy"] }).pose, "celebrating");
+});

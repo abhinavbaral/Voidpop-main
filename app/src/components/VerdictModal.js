@@ -6,7 +6,9 @@ import {
   Modal, View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet,
 } from "react-native";
 import { VERDICTS, VIBES, MOODS } from "@voidation/shared/backend/store";
+import { verdictPrompt } from "@voidation/shared/voidmon";
 import { useTheme } from "../context/ThemeContext.js";
+import Voidmon from "./Voidmon.js";
 
 export default function VerdictModal({ visible, initial, onSave, onClose }) {
   const { C } = useTheme();
@@ -16,6 +18,8 @@ export default function VerdictModal({ visible, initial, onSave, onClose }) {
   const [moods, setMoods] = useState(initial?.moods || []);
   const [comment, setComment] = useState(initial?.comment || "");
   const toggleMood = (m) => setMoods((prev) => (prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m].slice(-3)));
+
+  const prompt = verdictPrompt({ verdict, vibes, moods });
 
   const toggleVibe = (v) =>
     setVibes((prev) =>
@@ -27,7 +31,11 @@ export default function VerdictModal({ visible, initial, onSave, onClose }) {
       <View style={styles.backdrop}>
         <View style={styles.sheet}>
           <ScrollView showsVerticalScrollIndicator={false}>
-            <Text style={styles.title}>How was it?</Text>
+            {/* Voidmon asks one question at a time as you answer */}
+            <View style={styles.guide}>
+              <Voidmon pose={prompt.pose} size={72} />
+              <View style={styles.bubble}><Text style={styles.bubbleText}>{prompt.text}</Text></View>
+            </View>
             <Text style={styles.sub}>Your Void Verdict</Text>
 
             <View style={styles.grid}>
@@ -123,6 +131,9 @@ const makeStyles = (C) => StyleSheet.create({
     width: "100%", maxWidth: 520, alignSelf: "center",
   },
   title: { color: C.text, fontSize: 18, fontWeight: "800" },
+  guide: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 },
+  bubble: { flex: 1, backgroundColor: C.bg, borderColor: C.border, borderWidth: 1, borderRadius: 14, borderBottomLeftRadius: 4, paddingHorizontal: 12, paddingVertical: 9 },
+  bubbleText: { color: C.text, fontSize: 14, fontWeight: "700", lineHeight: 19 },
   sub: { color: C.sub, fontSize: 13, marginTop: 4, marginBottom: 12 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   option: {

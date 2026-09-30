@@ -84,6 +84,15 @@ export default function MoreScreen({ navigation }) {
               <Text style={styles.hint}>All time, or year by year</Text>
             </View>
           </Pressable>
+          {/* the first-run welcome screens, any time; nothing you've set up changes */}
+          <Pressable style={({ pressed }) => [styles.row, pressed && { backgroundColor: C.card }]} onPress={() => navigation.navigate("Onboarding")}
+            accessibilityHint="Opens the welcome screens again">
+            <View style={styles.icon}><Icon name="help" size={21} color={C.purple} /></View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Welcome tour</Text>
+              <Text style={styles.hint}>Voidmon shows you around again</Text>
+            </View>
+          </Pressable>
         </View>
         {GROUPS.map((group, i) => (
           <View key={i} style={styles.group}>

@@ -2,7 +2,7 @@
 // The pictures are the PNGs in assets/voidmon/ (see shared/voidmon.js).
 //
 //   <Voidmon pose="welcome" size={110} />
-//   poses: welcome, theme, import, alerts, loading, peeking, sleeping, celebrating
+//   poses: welcome, theme, import, alerts, loading, peeking, sleeping, celebrating, asking
 //
 //   <VoidmonLoading text="Bringing your list over…" />
 //     for waits with no layout to show (import, sync, Rewind). Rows and pages
@@ -37,6 +37,7 @@ const PICTURES = {
   peeking: require("../../assets/voidmon/voidmon-peeking.png"),
   sleeping: require("../../assets/voidmon/voidmon-sleeping.png"),
   celebrating: require("../../assets/voidmon/voidmon-celebrating.png"),
+  asking: require("../../assets/voidmon/voidmon-asking.png"),
 };
 const ORBIT = require("../../assets/voidmon/voidmon-loading-orbit.png");
 
