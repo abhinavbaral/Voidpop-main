@@ -1,11 +1,13 @@
-// Popup when marking Completed/Finished:
-// verdict (Peak / Dive In / One Time / Void It) + vibes + moods + comment.
+// Popup when marking Completed/Finished, in two steps with Voidmon asking:
+//   1. your Void Verdict (Peak / Dive In / One Time / Void It)
+//   2. moods (up to 3) and an optional note, in one speech bubble, then Save
+// Vibes aren't asked any more; any already on this verdict are kept as they are.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Modal, View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet,
 } from "react-native";
-import { VERDICTS, VIBES, MOODS } from "@voidation/shared/backend/store";
+import { VERDICTS, MOODS } from "@voidation/shared/backend/store";
 import { verdictPrompt } from "@voidation/shared/voidmon";
 import { useTheme } from "../context/ThemeContext.js";
 import Voidmon from "./Voidmon.js";
@@ -13,106 +15,83 @@ import Voidmon from "./Voidmon.js";
 export default function VerdictModal({ visible, initial, onSave, onClose }) {
   const { C } = useTheme();
   const styles = makeStyles(C);
+  const [step, setStep] = useState("verdict");
   const [verdict, setVerdict] = useState(initial?.verdict || null);
-  const [vibes, setVibes] = useState(initial?.vibes || []);
   const [moods, setMoods] = useState(initial?.moods || []);
   const [comment, setComment] = useState(initial?.comment || "");
+  // opening again starts at step 1 with what's saved (the window can stay mounted)
+  useEffect(() => {
+    if (!visible) return;
+    setStep("verdict"); setVerdict(initial?.verdict || null); setMoods(initial?.moods || []); setComment(initial?.comment || "");
+  }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps -- reset only when it opens
   const toggleMood = (m) => setMoods((prev) => (prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m].slice(-3)));
-
-  const prompt = verdictPrompt({ verdict, vibes, moods });
-
-  const toggleVibe = (v) =>
-    setVibes((prev) =>
-      prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v].slice(-3)
-    );
+  const prompt = verdictPrompt({ step, verdict, moods });
+  const pick = (key) => { setVerdict(key); setStep("feel"); };
+  const save = () => onSave({ verdict, vibes: initial?.vibes || [], moods, comment: comment.trim() });
 
   return (
-    <Modal visible={visible} transparent animationType="fade">
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <View style={styles.sheet}>
-          <ScrollView showsVerticalScrollIndicator={false}>
-            {/* Voidmon asks one question at a time as you answer */}
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <View style={styles.dots}>
+              <View style={[styles.dot, styles.dotOn]} />
+              <View style={[styles.dot, step === "feel" && styles.dotOn]} />
+            </View>
             <View style={styles.guide}>
               <Voidmon pose={prompt.pose} size={72} />
-              <View style={styles.bubble}><Text style={styles.bubbleText}>{prompt.text}</Text></View>
+              {step === "verdict" && <View style={styles.bubble}><Text style={styles.bubbleText}>{prompt.text}</Text></View>}
             </View>
-            <Text style={styles.sub}>Your Void Verdict</Text>
 
-            <View style={styles.grid}>
-              {VERDICTS.map((v) => {
-                const active = verdict === v.key;
-                return (
-                  <TouchableOpacity
-                    key={v.key}
-                    onPress={() => setVerdict(v.key)}
-                    style={[
-                      styles.option,
-                      active && { backgroundColor: v.color, borderColor: v.color },
-                    ]}
-                  >
-                    <Text style={[styles.optionText, active && { color: "#fff" }]}>
-                      {v.label}
-                    </Text>
+            {step === "verdict" ? (
+              <>
+                <View style={styles.grid}>
+                  {VERDICTS.map((v) => {
+                    const active = verdict === v.key;
+                    return (
+                      <TouchableOpacity key={v.key} onPress={() => pick(v.key)} accessibilityRole="button" accessibilityState={{ selected: active }}
+                        style={[styles.option, active && { backgroundColor: v.color, borderColor: v.color }]}>
+                        <Text style={[styles.optionText, active && { color: "#fff" }]}>{v.label}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                <View style={styles.actions}>
+                  <TouchableOpacity onPress={onClose} style={styles.cancel}><Text style={{ color: C.sub }}>Cancel</Text></TouchableOpacity>
+                  {verdict && (
+                    <TouchableOpacity onPress={() => setStep("feel")} style={styles.save}><Text style={{ color: "#fff", fontWeight: "700" }}>Next</Text></TouchableOpacity>
+                  )}
+                </View>
+              </>
+            ) : (
+              <>
+                {/* one speech bubble: the question, the moods and the note */}
+                <View style={[styles.bubble, styles.bigBubble]}>
+                  <Text style={styles.bubbleText}>{prompt.text}</Text>
+                  <View style={[styles.moodWrap, { marginTop: 10 }]}>
+                    {MOODS.map((m) => {
+                      const active = moods.includes(m);
+                      return (
+                        <TouchableOpacity key={m} onPress={() => toggleMood(m)} accessibilityRole="button" accessibilityState={{ selected: active }}
+                          style={[styles.mood, active && styles.moodActive]}>
+                          <Text style={[styles.moodText, active && { color: "#fff" }]}>{m}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                  <TextInput value={comment} onChangeText={setComment} multiline maxLength={2000}
+                    placeholder="A note about it (optional)" placeholderTextColor={C.faint} style={styles.input} />
+                </View>
+                <View style={styles.actions}>
+                  <TouchableOpacity onPress={() => setStep("verdict")} style={styles.cancel}>
+                    <Text style={{ color: C.sub }}>Back</Text>
                   </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            <Text style={[styles.sub, { marginTop: 16 }]}>
-              What was the vibe? (pick up to 3)
-            </Text>
-            <View style={styles.vibeWrap}>
-              {VIBES.map((v) => {
-                const active = vibes.includes(v);
-                return (
-                  <TouchableOpacity
-                    key={v}
-                    onPress={() => toggleVibe(v)}
-                    style={[styles.vibe, active && styles.vibeActive]}
-                  >
-                    <Text style={[styles.vibeText, active && { color: "#fff" }]}>
-                      {v}
-                    </Text>
+                  <TouchableOpacity onPress={save} style={styles.save} accessibilityRole="button">
+                    <Text style={{ color: "#fff", fontWeight: "700" }}>Save</Text>
                   </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            <Text style={[styles.sub, { marginTop: 16 }]}>
-              How did it make you feel? (pick up to 3)
-            </Text>
-            <View style={styles.vibeWrap}>
-              {MOODS.map((m) => {
-                const active = moods.includes(m);
-                return (
-                  <TouchableOpacity key={m} onPress={() => toggleMood(m)} style={[styles.vibe, active && styles.moodActive]}>
-                    <Text style={[styles.vibeText, active && { color: "#fff" }]}>{m}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            <TextInput
-              value={comment}
-              onChangeText={setComment}
-              placeholder="Tell people about the experience (optional)..."
-              placeholderTextColor={C.faint}
-              multiline
-              style={styles.input}
-            />
-
-            <View style={styles.actions}>
-              <TouchableOpacity onPress={onClose} style={styles.cancel}>
-                <Text style={{ color: C.sub }}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                disabled={!verdict}
-                onPress={() => onSave({ verdict, vibes, moods, comment: comment.trim() })}
-                style={[styles.save, !verdict && { opacity: 0.4 }]}
-              >
-                <Text style={{ color: "#fff", fontWeight: "700" }}>Save</Text>
-              </TouchableOpacity>
-            </View>
+                </View>
+              </>
+            )}
           </ScrollView>
         </View>
       </View>
@@ -121,46 +100,33 @@ export default function VerdictModal({ visible, initial, onSave, onClose }) {
 }
 
 const makeStyles = (C) => StyleSheet.create({
-  backdrop: {
-    flex: 1, backgroundColor: "rgba(0,0,0,0.75)",
-    justifyContent: "center", padding: 20,
-  },
+  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.75)", justifyContent: "center", padding: 20 },
   sheet: {
-    backgroundColor: C.card, borderRadius: 16, borderWidth: 1,
-    borderColor: C.border, padding: 20, maxHeight: "85%",
-    width: "100%", maxWidth: 520, alignSelf: "center",
+    backgroundColor: C.card, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 20,
+    maxHeight: "85%", width: "100%", maxWidth: 520, alignSelf: "center",
   },
-  title: { color: C.text, fontSize: 18, fontWeight: "800" },
-  guide: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 },
+  dots: { flexDirection: "row", gap: 6, alignSelf: "center", marginBottom: 8 },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: C.border },
+  dotOn: { width: 22, backgroundColor: C.purple },
+  guide: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 },
   bubble: { flex: 1, backgroundColor: C.bg, borderColor: C.border, borderWidth: 1, borderRadius: 14, borderBottomLeftRadius: 4, paddingHorizontal: 12, paddingVertical: 9 },
+  bigBubble: { flex: 0, borderBottomLeftRadius: 14, borderTopLeftRadius: 4, marginTop: -6 },
   bubbleText: { color: C.text, fontSize: 14, fontWeight: "700", lineHeight: 19 },
-  sub: { color: C.sub, fontSize: 13, marginTop: 4, marginBottom: 12 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   option: {
-    flexBasis: "47%", flexGrow: 1, height: 44, borderRadius: 10,
-    borderWidth: 2, borderColor: C.border,
+    flexBasis: "47%", flexGrow: 1, height: 48, borderRadius: 10, borderWidth: 2, borderColor: C.border,
     alignItems: "center", justifyContent: "center",
   },
-  optionText: { color: C.sub, fontWeight: "800", fontSize: 13 },
-  vibeWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  vibe: {
-    paddingHorizontal: 12, height: 32, borderRadius: 16, borderWidth: 1,
-    borderColor: C.border, justifyContent: "center",
-  },
-  vibeActive: { backgroundColor: C.purple, borderColor: C.purple },
+  optionText: { color: C.sub, fontWeight: "800", fontSize: 14 },
+  moodWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  mood: { paddingHorizontal: 12, height: 32, borderRadius: 16, borderWidth: 1, borderColor: C.border, justifyContent: "center", backgroundColor: C.card },
   moodActive: { backgroundColor: C.orange, borderColor: C.orange },
-  vibeText: { color: C.sub, fontSize: 12, fontWeight: "600" },
+  moodText: { color: C.sub, fontSize: 12, fontWeight: "600" },
   input: {
-    marginTop: 16, minHeight: 80, borderRadius: 10, borderWidth: 1,
-    borderColor: C.border, backgroundColor: C.inputBg,
-    color: C.text, padding: 12, textAlignVertical: "top",
+    marginTop: 12, minHeight: 70, borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.inputBg,
+    color: C.text, padding: 10, textAlignVertical: "top",
   },
-  actions: {
-    flexDirection: "row", justifyContent: "flex-end", gap: 12, marginTop: 14,
-  },
+  actions: { flexDirection: "row", justifyContent: "flex-end", gap: 12, marginTop: 14 },
   cancel: { paddingHorizontal: 14, paddingVertical: 10 },
-  save: {
-    backgroundColor: C.purple, borderRadius: 10,
-    paddingHorizontal: 20, paddingVertical: 10,
-  },
+  save: { backgroundColor: C.purple, borderRadius: 10, paddingHorizontal: 20, paddingVertical: 10 },
 });

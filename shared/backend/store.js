@@ -3,7 +3,9 @@
 //
 // There are no accounts. Everything lives in one JSON document on this device
 // (see storage.js):
-//   library  {"segment:id" -> { status, progress, cats, item snapshot, updatedAt, delay? }}
+//   library  {"segment:id" -> { status, progress, cats, item snapshot, updatedAt, delay?, rewindYear? }}
+//            rewindYear: the Rewind year a title counts in (new titles you add
+//            get the year you added them; imports get none, see wrapped.js)
 //   categories [{ id, name }]  your own groups, like Mihon's ("Favourites", "Rewatch"…)
 //   reviews  {"segment:id" -> { verdict, vibes, moods, comment, date }}
 //   excited  {"segment:id" -> { item, at }}
@@ -73,6 +75,21 @@ function logStatus(db, key, prevStatus, status) {
   if (prevStatus !== status) db.log.push([Date.now(), key, 0, `status:${status || "removed"}`]);
 }
 
+// Rewind's "Pick titles": put titles in a year's Rewind (year), or take them
+// out (null). keys: ["anime:123", …]
+export async function setRewindYear(keys, year) {
+  const db = await load();
+  let changed = 0;
+  keys.forEach((key) => {
+    const e = db.library[key];
+    if (!e || (e.rewindYear ?? null) === (year ?? null)) return;
+    if (year == null) delete e.rewindYear; else e.rewindYear = year;
+    changed++;
+  });
+  if (changed) await save();
+  return changed;
+}
+
 // The watch log (read-only copy), oldest first.
 export async function getLog() {
   return [...(await load()).log];
@@ -132,6 +149,7 @@ export async function setStatus(_user, segment, item, status) {
   logChange(db, key, progress - (prev?.progress || 0), "complete");
   logStatus(db, key, prev?.status, status);
   db.library[key] = {
+    ...(prev ? {} : { rewindYear: new Date().getFullYear() }), // added now: counts in this year's Rewind
     ...prev,
     status,
     progress,
@@ -252,6 +270,7 @@ export async function setProgress(_user, item, n, source = "plus") {
   logChange(db, key, progress - (prev?.progress || 0), source);
   logStatus(db, key, prev?.status, status);
   db.library[key] = {
+    ...(prev ? {} : { rewindYear: new Date().getFullYear() }), // added now: counts in this year's Rewind
     ...prev,
     status,
     progress,

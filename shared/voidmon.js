@@ -15,12 +15,14 @@ export const VOIDMON_POSES = {
   asking: { ratio: 1, label: "Voidmon asking" },
 };
 
-// What Voidmon asks in the verdict window, one question at a time as you
-// answer: verdict, then vibes, then moods (where the window has them), then
-// a cheer once everything is picked.
-export function verdictPrompt({ verdict, vibes = [], moods = [], withMoods = true }) {
-  if (!verdict) return { pose: "asking", text: "So... how was it? Give it your Void Verdict." };
-  if (!vibes.length) return { pose: "asking", text: "What was it like? Pick up to 3 vibes." };
-  if (withMoods && !moods.length) return { pose: "asking", text: "And how did it leave you feeling?" };
-  return { pose: "celebrating", text: "Got it. Add a note if you like, then save." };
+// What Voidmon says in the verdict window. It's two steps:
+//   1. "verdict": the Void Verdict (Peak / Dive In / One Time / Void It)
+//   2. "feel":    moods (up to 3) and an optional note, in one speech bubble
+// Vibes aren't asked any more (AniList's themes already say what kind of show
+// it was); vibes on older verdicts are kept and still shown.
+export function verdictPrompt({ step = "verdict", verdict = null, moods = [] }) {
+  if (step === "verdict") return { pose: "asking", text: verdict ? "Got it. Next: how it felt." : "So... how was it? Give it your Void Verdict." };
+  return moods.length
+    ? { pose: "celebrating", text: "Nice. Add a note if you like, then save." }
+    : { pose: "asking", text: "And how did it leave you feeling? Pick up to 3." };
 }

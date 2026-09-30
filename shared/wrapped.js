@@ -2,10 +2,15 @@
 // no "top 1% of fans" (that needs everyone's data); every comparison is with
 // yourself: your busiest month, your favourite day, this year vs last year.
 //
-// What counts: episodes and chapters you marked (+1, typed, History's "Mark
-// watched") during the year. Imports, AniList pulls and the progress filled in
-// by marking a title Completed don't count, so old viewing isn't mistaken for
-// this year's.
+// Years: only the current year gets its own Rewind; everything else goes in
+// "Before <this year>". A title counts in a year when its `rewindYear` says so:
+// titles you add get the year you added them, and "Pick titles" lets you put
+// older ones (imports, things added before) in this year or take them out.
+// Imports and AniList pulls get no year, so old viewing lands in "Before".
+//
+// What counts in a year: the episodes/chapters you marked that year for its
+// titles (+1, typed, History's "Mark watched"); a picked title you never
+// marked episode by episode counts in full (all of it if it's Completed).
 
 import { getLog, getLibrary, getReviews, getStats, tierFor, totalFor, VERDICTS, isDone } from "./backend/store.js";
 
@@ -17,12 +22,16 @@ const isProgress = ([, , change, source]) => change !== 0 && source !== "complet
 const dayKey = (t) => { const d = new Date(t); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; };
 const inYear = (t, year) => new Date(t).getFullYear() === year;
 
-// "all" (your whole library) plus every year that has anything logged, newest first.
-export async function wrappedYears() {
-  const years = new Set([new Date().getFullYear()]);
-  (await getLog()).forEach(([t]) => years.add(new Date(t).getFullYear()));
-  return ["all", ...[...years].sort((a, b) => b - a)];
+// The tabs, whatever year it is: All time · Before <this year> · <this year>.
+// Last year's picks move into "Before" when the year turns.
+export async function wrappedYears(now = Date.now()) {
+  const year = new Date(now).getFullYear();
+  return ["all", `before-${year}`, year];
 }
+
+// Tab label: "All time", "Before 2026", "2027"
+export const wrappedLabel = (which) =>
+  which === "all" ? "All time" : String(which).startsWith("before-") ? `Before ${String(which).slice(7)}` : String(which);
 
 // Wrapped opens on All time (your whole history); single years are one tap away.
 export async function defaultWrapped() {
@@ -36,11 +45,20 @@ function sumByKey(entries) {
   return per;
 }
 
+// how much of each title counts in `year`: marked that year, or in full for a
+// title picked for the year but never marked episode by episode
+const fullAmount = (e) => (isDone(e.status) ? Math.max(e.progress || 0, totalFor(e.item) || 0) : e.progress || 0);
+function yearAmounts(lib, log, year) {
+  const picked = new Set(Object.keys(lib).filter((k) => lib[k].rewindYear === year));
+  const prog = log.filter(([t, k]) => inYear(t, year) && picked.has(k)).filter(isProgress);
+  const per = sumByKey(prog);
+  picked.forEach((k) => { if (!per.has(k) && fullAmount(lib[k]) > 0) per.set(k, fullAmount(lib[k])); });
+  return { picked, prog, per };
+}
+
 export async function computeWrapped(year = new Date().getFullYear()) {
   const [log, lib, reviews, stats] = await Promise.all([getLog(), getLibrary(), getReviews(), getStats()]);
-  const yearLog = log.filter(([t]) => inYear(t, year));
-  const prog = yearLog.filter(isProgress);
-  const per = sumByKey(prog);
+  const { picked, prog, per } = yearAmounts(lib, log, year);
   const itemOf = (key) => lib[key]?.item || null;
   const seg = (key) => key.split(":")[0];
 
@@ -105,32 +123,30 @@ export async function computeWrapped(year = new Date().getFullYear()) {
   const busiestMonth = months.some(Boolean) ? MONTHS[months.indexOf(Math.max(...months))] : null;
   const favDay = weekdays.some(Boolean) ? DAYS[weekdays.indexOf(Math.max(...weekdays))] : null;
 
-  // completed this year, rank climb
-  // "finished this year" = marked Completed this year AND watched some of it this
-  // year; old shows added straight to Completed count toward All time only
-  const completedKeys = new Set(yearLog.filter(([, k, , s]) => s === "status:completed" && per.has(k)).map(([, k]) => k));
-  const completed = completedKeys.size;
+  // completed: this year's titles that are Completed / Finished; rank climb
+  const completed = [...picked].filter((k) => isDone(lib[k].status)).length;
   const tierNow = tierFor(stats.totalCompleted);
   const tierStart = tierFor(Math.max(0, stats.totalCompleted - completed));
 
-  // verdicts given this year
-  const yearReviews = reviews.filter((r) => r.date && inYear(new Date(r.date).getTime(), year));
+  // verdicts on this year's titles
+  const yearReviews = reviews.filter((r) => picked.has(`${r.segment}:${r.titleId}`));
   const verdicts = VERDICTS.map((v) => ({ ...v, count: yearReviews.filter((r) => r.verdict === v.key).length }));
   const latestPeak = yearReviews
     .filter((r) => r.verdict === "peak")
-    .sort((a, b) => b.date.localeCompare(a.date))
+    .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))
     .map((r) => lib[`${r.segment}:${r.titleId}`]?.item)
     .find(Boolean) || null;
 
   // you vs last year (only if last year has anything)
-  const lastYearEps = [...sumByKey(log.filter(([t]) => inYear(t, year - 1)).filter(isProgress)).entries()]
+  const lastYearEps = [...yearAmounts(lib, log, year - 1).per.entries()]
     .filter(([k]) => seg(k) === "anime").reduce((n, [, c]) => n + c, 0);
 
   const first = prog.length ? Math.min(...prog.map(([t]) => t)) : null;
   return {
     year,
     label: String(year),
-    empty: episodes + chapters === 0,
+    empty: episodes + chapters === 0 && !completed,
+    picked: picked.size,
     startedLogging: first && new Date(first).getMonth() > 0 ? first : null, // log began mid-year
     episodes, chapters, minutes, hours: Math.round(minutes / 60),
     topAnime, topManga,
@@ -150,16 +166,20 @@ const VERDICT_SCORE = { peak: 3, divein: 2, onetime: 1, voidit: -1 };
 // Built from the library itself, since years before Voidation have no log.
 // "Top" = what you rated highest (Peak, then Dive In, then One Time), then the
 // most episodes/chapters: without dates, your own verdicts are the fairest ranking.
-export async function computeAllTime() {
-  const [lib, reviews, stats] = await Promise.all([getLibrary(), getReviews(), getStats()]);
+//
+// With `before` (a year): "Before <year>" is the same, without the titles that
+// count in that year or later (see rewindYear at the top).
+export async function computeAllTime({ before = null } = {}) {
+  const [lib, allReviews, stats] = await Promise.all([getLibrary(), getReviews(), getStats()]);
+  const counts = (e) => !before || !(e.rewindYear >= before);
+  const reviews = allReviews.filter((r) => { const e = lib[`${r.segment}:${r.titleId}`]; return !e || counts(e); });
   const verdictOf = Object.fromEntries(reviews.map((r) => [`${r.segment}:${r.titleId}`, r.verdict]));
-  const entries = Object.entries(lib).map(([key, e]) => ({
+  const entries = Object.entries(lib).filter(([, e]) => counts(e)).map(([key, e]) => ({
     key, e, item: e.item,
-    // a completed title counts in full even if its progress was never filled in
-    amount: e.status === "completed" ? Math.max(e.progress || 0, totalFor(e.item) || 0) : e.progress || 0,
+    amount: fullAmount(e), // a completed title counts in full even if its progress was never filled in
     verdict: verdictOf[key] || null,
   }));
-  const touched = entries.filter((x) => x.amount > 0 || x.e.status === "completed");
+  const touched = entries.filter((x) => x.amount > 0 || isDone(x.e.status));
   const anime = touched.filter((x) => x.item.segment === "anime");
   const manga = touched.filter((x) => x.item.segment === "manga");
 
@@ -183,10 +203,14 @@ export async function computeAllTime() {
   anime.forEach((x) => x.item.creator && studios.set(x.item.creator, (studios.get(x.item.creator) || 0) + Math.max(1, x.amount)));
   const topStudio = [...studios.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || null;
 
-  const count = (seg, status) => entries.filter((x) => x.item.segment === seg && (status === "completed" ? isDone(x.e.status) : x.e.status === status)).length;
+  const count = (seg, status) => entries.filter((x) => x.item.segment === seg && (
+    status === "completed" ? isDone(x.e.status) : !before && x.e.status === status
+  )).length;
+  const done = count("anime", "completed") + count("manga", "completed");
   return {
-    year: "all",
-    label: "All time",
+    year: before ? `before-${before}` : "all",
+    label: before ? `Before ${before}` : "All time",
+    before,
     allTime: true,
     empty: !touched.length,
     titles: touched.length,
@@ -198,22 +222,29 @@ export async function computeAllTime() {
     completed: count("anime", "completed") + count("manga", "completed"),
     watchingNow: count("anime", "watching"),
     readingNow: count("manga", "watching"),
-    tierNow: tierFor(stats.totalCompleted),
+    tierNow: tierFor(before ? done : stats.totalCompleted),
     verdicts: VERDICTS.map((v) => ({ ...v, count: reviews.filter((r) => r.verdict === v.key).length })),
     verdictTotal: reviews.length,
   };
 }
 
-export const loadWrapped = (which) => (which === "all" ? computeAllTime() : computeWrapped(which));
+export const loadWrapped = (which) =>
+  which === "all" ? computeAllTime()
+    : String(which).startsWith("before-") ? computeAllTime({ before: Number(String(which).slice(7)) })
+      : computeWrapped(Number(which));
 
 function allTimeSlides(w) {
+  const eyebrow = `Voidation Rewind · ${w.label}`;
   if (w.empty) {
-    return [{ kind: "big", eyebrow: "Voidation Rewind · All time", big: "Nothing yet",
+    return [{ kind: "big", eyebrow, big: "Nothing yet",
       sub: "Add the anime and manga you've watched to your Library (or import them from AniList), and this fills in." }];
   }
   const slides = [
-    { kind: "big", eyebrow: "Voidation Rewind · All time", big: "Your anime life",
-      sub: "Everything in your library, however long ago you watched it." },
+    w.before
+      ? { kind: "big", eyebrow, big: `Before ${w.before}`,
+        sub: `Everything you'd watched and read before ${w.before}, plus anything not picked for your ${w.before} Rewind.` }
+      : { kind: "big", eyebrow, big: "Your anime life",
+        sub: "Everything in your library, however long ago you watched it." },
     { kind: "big", eyebrow: "All together", big: `${fmt(w.episodes)} episodes`,
       sub: [
         w.episodes ? (w.minutes < 90 ? `About ${fmt(Math.round(w.minutes))} minutes of anime.` : `About ${fmt(w.hours)} hours of anime${w.hours >= 48 ? `, or ${fmt(Math.round(w.hours / 24))} full days` : ""}.`) : null,
@@ -251,14 +282,14 @@ export function wrappedSlides(w) {
   if (w.allTime) return allTimeSlides(w);
   if (w.empty) {
     return [{
-      kind: "big", eyebrow: `Voidation Rewind ${w.year}`, big: "Nothing yet",
-      sub: "Your Rewind builds itself from the episodes and chapters you mark. Tap +1 as you watch and come back later.",
+      kind: "big", eyebrow: `Voidation Rewind ${w.year}`, big: "Nothing yet", pick: true,
+      sub: `Anime and manga you add in ${w.year} land here by themselves. Watched something this year that was already in your library? Tap Pick titles.`,
     }];
   }
   const slides = [];
   slides.push({
     kind: "big", eyebrow: `Voidation Rewind ${w.year}`, big: `Your ${w.year}`,
-    sub: w.startedLogging ? `Everything you marked since ${dateLabel(w.startedLogging)}, when Voidation started keeping track.` : "Everything you watched and read this year.",
+    sub: `${fmt(w.picked)} title${w.picked === 1 ? "" : "s"} you watched or read in ${w.year}: added this year, or picked with Pick titles.`,
   });
   slides.push({
     kind: "big", eyebrow: "You watched", big: `${fmt(w.episodes)} episodes`,

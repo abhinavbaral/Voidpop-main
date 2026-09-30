@@ -77,8 +77,8 @@ test("ranks: 15 in order; old 'seen' ranks map by titles needed; Voidmon's verdi
 
   const { verdictPrompt } = await import("../voidmon.js");
   assert.equal(verdictPrompt({}).pose, "asking");
-  assert.match(verdictPrompt({ verdict: "peak" }).text, /vibes/);
-  assert.match(verdictPrompt({ verdict: "peak", vibes: ["Cozy"] }).text, /feeling/);
-  assert.equal(verdictPrompt({ verdict: "peak", vibes: ["Cozy"], withMoods: false }).pose, "celebrating");
-  assert.equal(verdictPrompt({ verdict: "peak", vibes: ["Cozy"], moods: ["Happy"] }).pose, "celebrating");
+  assert.match(verdictPrompt({}).text, /Void Verdict/);
+  assert.match(verdictPrompt({ step: "feel" }).text, /feeling/);
+  assert.equal(verdictPrompt({ step: "feel", moods: ["Happy"] }).pose, "celebrating");
 });
+

@@ -1,10 +1,11 @@
 // VOIDATION WRAPPED — full-screen story slides of your year, ending on a card
 // you can share. Tap the right side for next, left side for back.
 // Everything comes from your own watch log (shared/wrapped.js).
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import { View, Text, Image, Pressable, TouchableOpacity, ScrollView, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { loadWrapped, wrappedSlides, wrappedYears, defaultWrapped } from "@voidation/shared/wrapped";
+import { loadWrapped, wrappedSlides, wrappedYears, defaultWrapped, wrappedLabel } from "@voidation/shared/wrapped";
 import { shareCardImage } from "../lib/shareCard";
 import { notify } from "../lib/notify";
 import { goBackOrHome } from "../lib/nav";
@@ -16,12 +17,18 @@ const PURPLE = "#a855f7";
 
 export default function WrappedScreen({ navigation }) {
   const [years, setYears] = useState(["all"]);
-  const [year, setYear] = useState(null); // "all" or a year number
+  const [year, setYear] = useState(null); // "all", "before-2026", or a year number
   const [w, setW] = useState(null);
   const [i, setI] = useState(0);
 
   useEffect(() => { wrappedYears().then(setYears); defaultWrapped().then(setYear); }, []);
   useEffect(() => { if (year === null) return; setW(null); setI(0); loadWrapped(year).then(setW); }, [year]);
+  // back from Pick titles: show the new picks
+  const back = useRef(false);
+  useFocusEffect(useCallback(() => {
+    if (back.current && year !== null) loadWrapped(year).then((x) => { setW(x); setI(0); });
+    back.current = true;
+  }, [year]));
   const slides = w ? wrappedSlides(w) : [];
   const last = slides.length - 1;
   const go = (d) => setI((x) => Math.max(0, Math.min(last, x + d)));
@@ -40,9 +47,15 @@ export default function WrappedScreen({ navigation }) {
       <View style={styles.years}>
         {years.map((y) => (
           <TouchableOpacity key={y} onPress={() => setYear(y)} style={[styles.yearBtn, y === year && { backgroundColor: "#fff" }]}>
-            <Text style={{ color: y === year ? "#0b0f19" : "#cbd5e1", fontWeight: "800", fontSize: 12 }}>{y === "all" ? "All time" : y}</Text>
+            <Text style={{ color: y === year ? "#0b0f19" : "#cbd5e1", fontWeight: "800", fontSize: 12 }}>{wrappedLabel(y)}</Text>
           </TouchableOpacity>
         ))}
+        {typeof year === "number" && (
+          <TouchableOpacity onPress={() => navigation.navigate("RewindPick", { year })} style={[styles.yearBtn, { borderWidth: 1, borderColor: ORANGE }]}
+            accessibilityHint={`Choose what counts in your ${year} Rewind`}>
+            <Text style={{ color: ORANGE, fontWeight: "800", fontSize: 12 }}>Pick titles</Text>
+          </TouchableOpacity>
+        )}
       </View>
       {!w ? <VoidmonLoading text="Putting your year together…" textColor="#cbd5e1" style={{ marginTop: 60 }} /> : slide.kind === "summary" ? (
         <Summary w={w} onBack={() => go(-1)} onRestart={() => setI(0)} />
@@ -163,7 +176,7 @@ const styles = StyleSheet.create({
   top: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingTop: 10 },
   bars: { flex: 1, flexDirection: "row", gap: 4 },
   bar: { flex: 1, height: 3, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.25)" },
-  years: { flexDirection: "row", gap: 6, paddingHorizontal: 16, paddingTop: 10 },
+  years: { flexDirection: "row", flexWrap: "wrap", gap: 6, paddingHorizontal: 16, paddingTop: 10 },
   yearBtn: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5, backgroundColor: "rgba(255,255,255,0.1)" },
   slide: { flexGrow: 1, justifyContent: "center", padding: 24, paddingBottom: 60 },
   eyebrow: { color: ORANGE, fontSize: 13, fontWeight: "800", letterSpacing: 2 },
