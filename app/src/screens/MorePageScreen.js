@@ -33,20 +33,21 @@ import { importMalFile, base64ToBytes } from "@voidation/shared/malImport";
 import { timeAgo } from "@voidation/shared/backend/store";
 import Icon from "../components/Icon.js";
 import { SkeletonList } from "../components/Skeleton.js";
-import { VoidmonLoading } from "../components/Voidmon.js";
-import { LOGOS, applyAppIcon, canChangeAppIcon } from "../components/Brand.js";
+import Voidmon, { VoidmonLoading } from "../components/Voidmon.js";
+import { LOGOS, applyAppIcon } from "../components/Brand.js";
 
 const NATIVE = Platform.OS !== "web";
 const AUTO_BACKUP = Platform.OS === "android"; // Android's folder picker (SAF)
 
 import appConfig from "../../app.json";
+import * as Updates from "expo-updates";
 import Chips from "../components/Chips.js";
 import { computeAchievements } from "@voidation/shared/achievements";
 import { loadPeopleStats, PEOPLE_KINDS } from "@voidation/shared/peopleStats";
 
 const VERSION = appConfig.expo.version;
 const TITLES = {
-  statistics: "Statistics", appearance: "Appearance and Others", settings: "Appearance and Others",
+  statistics: "Statistics", appearance: "Appearance and Settings", settings: "Appearance and Settings",
   data: "Data and storage", announced: "New announcements", badge: "Ranks and achievements", categories: "Categories", anilist: "AniList", help: "Help", about: "About",
 };
 
@@ -186,11 +187,6 @@ function LogoSettings({ styles, C }) {
   return (
     <View style={[styles.card, { marginTop: 12 }]}>
       <Text style={styles.cardTitle}>Logo</Text>
-      <Text style={styles.note}>
-        {canChangeAppIcon()
-          ? "Changes the logo in the app and your home-screen icon. On some phones the icon takes a moment to update, and you may need to add it to your home screen again."
-          : "Changes the logo in the app. The home-screen icon changes too once you install the next version of the app."}
-      </Text>
       <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
         {Object.entries(LOGOS).map(([key, l]) => {
           const on = current === key;
@@ -245,7 +241,7 @@ function ThemeSettings({ styles, C }) {
   );
 }
 
-function Settings({ styles, C }) {
+function Settings({ styles, C, navigation }) {
   const { settings, update } = useSettings();
   const row = (key, label, hint) => (
     <Pressable key={key} style={styles.toggleRow} onPress={() => update(key, !settings[key])}>
@@ -262,7 +258,7 @@ function Settings({ styles, C }) {
     <LogoSettings styles={styles} C={C} />
     <View style={styles.card}>
       {row("clock24", "24-hour clock", "Airing times as 16:30 instead of 4:30 PM")}
-      {row("posterBadges", "Badges on posters", '"Ep 7 · 3h 30m" countdowns on posters')}
+      {row("posterBadges", "Countdown badges", '"Ep 7 · 3h 30m" on posters')}
       {NATIVE && (
         <Pressable style={styles.toggleRow} onPress={() => toggleAlerts(!settings.notifyEpisodes)}>
           <View style={{ flex: 1 }}>
@@ -275,6 +271,15 @@ function Settings({ styles, C }) {
         </Pressable>
       )}
     </View>
+    {/* the first-run welcome screens, any time; nothing you've set up changes */}
+    <Pressable style={[styles.card, styles.toggleRow]} onPress={() => navigation.navigate("Onboarding")} accessibilityRole="button"
+      accessibilityHint="Opens the welcome screens again">
+      <View style={{ flex: 1 }}>
+        <Text style={styles.cardTitle}>Welcome tour</Text>
+        <Text style={styles.note}>Voidmon shows you around again</Text>
+      </View>
+      <Text style={{ color: C.faint, fontSize: 20 }}>›</Text>
+    </Pressable>
     </>
   );
 
@@ -739,20 +744,66 @@ function Help({ styles, navigation }) {
   );
 }
 
-function About({ styles }) {
+// About: what the app is, which version and which update is running (so you
+// can tell at a glance whether the latest update reached this phone), who
+// made it, where the data comes from, and where your data lives.
+function About({ styles, C }) {
+  const updateLine = () => {
+    if (!Updates || Platform.OS === "web") return "Website";
+    if (Updates.isEmbeddedLaunch || !Updates.updateId) return "Running the version built into this APK (no update downloaded yet)";
+    const when = Updates.createdAt ? new Date(Updates.createdAt) : null;
+    return `Update from ${when ? `${when.toLocaleDateString()} ${when.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "unknown date"} · ${String(Updates.updateId).slice(0, 8)}`;
+  };
+  const [checking, setChecking] = useState(null);
+  const check = async () => {
+    if (!Updates || Platform.OS === "web") return;
+    setChecking("Checking…");
+    try {
+      const r = await Updates.checkForUpdateAsync();
+      if (!r.isAvailable) { setChecking("You're on the latest update."); return; }
+      setChecking("Downloading the update…");
+      await Updates.fetchUpdateAsync();
+      setChecking("Update downloaded. Restarting…");
+      await Updates.reloadAsync();
+    } catch {
+      setChecking("Couldn't check right now. Try again when you're online.");
+    }
+  };
+  const line = (title, body, onPress) => (
+    <Pressable onPress={onPress} disabled={!onPress} style={[styles.trackerRow, { flexDirection: "column", alignItems: "flex-start", gap: 2 }]}>
+      <Text style={[styles.cardTitle, onPress && { color: C.purple }]}>{title}{onPress ? " ›" : ""}</Text>
+      {!!body && <Text style={styles.note}>{body}</Text>}
+    </Pressable>
+  );
   return (
-    <View style={styles.card}>
-      <Text style={styles.cardTitle}>Voidation <Text style={styles.note}>version {VERSION}</Text></Text>
-      <Text style={[styles.note, { marginTop: 8 }]}>
-        An anime and manga tracker with live countdowns to the next episode. Website and Android app, one codebase, no sign-up.
-      </Text>
-      <Text style={[styles.note, { marginTop: 8 }]} onPress={() => Linking.openURL("https://abhinavbaral.com.np")}>
-        Made by Abhinav Baral in Jhapa, Nepal →
-      </Text>
-      <Text style={[styles.note, { marginTop: 8 }]} onPress={() => Linking.openURL("https://anilist.co")}>
-        Anime and manga data from AniList. Voidation is not affiliated with AniList.
-      </Text>
-    </View>
+    <>
+      <View style={[styles.card, { alignItems: "center" }]}>
+        <Voidmon pose="welcome" size={96} />
+        <Text style={[styles.cardTitle, { fontSize: 18, marginTop: 6 }]}>Voidation</Text>
+        <Text style={styles.note}>Version {VERSION}</Text>
+        <Text style={[styles.note, { textAlign: "center", marginTop: 8 }]}>
+          An anime and manga tracker with live countdowns to the next episode, Void Verdicts instead of scores, and a Rewind of your year.
+        </Text>
+      </View>
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>This copy</Text>
+        {line("Version", `${VERSION} (Android app)`)}
+        {line("Running", updateLine())}
+        {Platform.OS !== "web" && line("Check for updates", checking || "Downloads the newest update if there is one", check)}
+      </View>
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Credits</Text>
+        {line("Made by Abhinav Baral", "www.abhinavbaral.com.np · Jhapa, Nepal", () => Linking.openURL("https://www.abhinavbaral.com.np/").catch(() => {}))}
+        {line("Voidmon", "Voidation's mascot, an original character by Abhinav Baral")}
+        {line("Anime and manga data: AniList", "Voidation is not affiliated with AniList", () => Linking.openURL("https://anilist.co").catch(() => {}))}
+      </View>
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Your data</Text>
+        <Text style={[styles.note, { marginTop: 6 }]}>
+          Your library, verdicts, notes and Rewind are saved on this phone only. There's no Voidation account and no server. The app talks to AniList to look up shows, and to your AniList account only if you sign in there to sync. Back up or move your data in Data and storage.
+        </Text>
+      </View>
+    </>
   );
 }
 

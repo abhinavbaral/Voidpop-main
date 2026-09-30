@@ -16,6 +16,13 @@ export function shiftSeason({ season, year }, by) {
 
 export const seasonTitle = (s) => `${SEASON_LABEL[s.season]} ${s.year}`;
 
+// the months a season covers: "October 2026 – December 2026"
+const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+export function seasonMonths({ season, year }) {
+  const first = ORDER.indexOf(season) * 3;
+  return `${MONTH_NAMES[first]} ${year} – ${MONTH_NAMES[first + 2]} ${year}`;
+}
+
 export const FORMAT_GROUPS = [
   { key: "tv", label: "TV", formats: ["TV"] },
   { key: "short", label: "TV Short", formats: ["TV_SHORT"] },

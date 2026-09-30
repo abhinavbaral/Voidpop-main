@@ -7,7 +7,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import { useAuth } from "@voidation/shared/backend/AuthContext";
 import { getLibrary, setStatus, statusesFor } from "@voidation/shared/backend/store";
-import { seasonOf, shiftSeason, seasonTitle, FORMAT_GROUPS, groupOf, fetchSeason } from "@voidation/shared/season";
+import { seasonOf, shiftSeason, seasonTitle, seasonMonths, FORMAT_GROUPS, groupOf, fetchSeason } from "@voidation/shared/season";
 import Chips from "../components/Chips.js";
 import FilterChips from "../components/FilterChips.js";
 import { applyFilters } from "@voidation/shared/filters";
@@ -90,7 +90,10 @@ export default function SeasonScreen({ navigation }) {
           <TouchableOpacity style={styles.arrow} onPress={() => { setGroup("all"); setSeason((s) => shiftSeason(s, -1)); }} accessibilityLabel="Previous season">
             <Text style={styles.arrowText}>‹</Text>
           </TouchableOpacity>
-          <Text style={styles.title}>{seasonTitle(season)}</Text>
+          <View style={{ alignItems: "center" }}>
+            <Text style={{ color: C.faint, fontSize: 11, fontWeight: "600" }}>{seasonMonths(season)}</Text>
+            <Text style={styles.title}>{seasonTitle(season)} Anime</Text>
+          </View>
           <TouchableOpacity style={styles.arrow} onPress={() => { setGroup("all"); setSeason((s) => shiftSeason(s, 1)); }} accessibilityLabel="Next season">
             <Text style={styles.arrowText}>›</Text>
           </TouchableOpacity>

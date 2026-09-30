@@ -1,10 +1,10 @@
-// MORE — laid out like the "More" tab in reader apps: the logo on top, quick
-// toggles, then menu rows that open Statistics, Data and storage, Appearance
-// and Others, Help and About (MorePageScreen). Categories shows at 500+ completed.
+// MORE — laid out like the "More" tab in reader apps: Voidmon on top, your
+// badge, Rewind, then menu rows that open Statistics, Data and storage,
+// Appearance and Settings (24-hour clock, countdown badges, welcome tour…),
+// Help and About (MorePageScreen). Categories shows at 500+ completed.
 
-import { ScrollView, View, Text, Pressable, Switch, StyleSheet } from "react-native";
+import { ScrollView, View, Text, Pressable, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useSettings } from "@voidation/shared/backend/SettingsContext";
 import { useCallback, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import { getUserTier, TIERS, categoriesUnlocked } from "@voidation/shared/backend/store";
@@ -17,13 +17,12 @@ const GROUPS = [
   [["statistics", "stats", "Statistics"], ["data", "storage", "Data and storage"]],
   [["announced", "bell", "New announcements"]],
   [["categories", "browse", "Categories"], ["anilist", "sync", "AniList"]],
-  [["settings", "palette", "Appearance and Others"], ["help", "help", "Help"], ["about", "info", "About"]],
+  [["settings", "palette", "Appearance and Settings"], ["help", "help", "Help"], ["about", "info", "About"]],
 ];
 
 export default function MoreScreen({ navigation }) {
   const { C, dark } = useTheme();
   const styles = makeStyles(C);
-  const { settings, update } = useSettings();
   const [rank, setRank] = useState(null);
   const [catsOpen, setCatsOpen] = useState(false); // Categories unlock at 500 completed anime
   useFocusEffect(useCallback(() => {
@@ -32,21 +31,6 @@ export default function MoreScreen({ navigation }) {
   }, []));
   const next = rank && TIERS.find((t) => t.min > rank.stats.totalCompleted);
 
-  const toggle = (icon, label, hint, key) => (
-    <Pressable style={styles.row} onPress={() => update(key, !settings[key])}>
-      <View style={styles.icon}><Icon name={icon} size={21} color={C.purple} /></View>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.label}>{label}</Text>
-        <Text style={styles.hint}>{hint}</Text>
-      </View>
-      <Switch
-        value={settings[key]}
-        onValueChange={(v) => update(key, v)}
-        trackColor={{ false: C.border, true: C.purple }}
-        thumbColor="#fff"
-      />
-    </Pressable>
-  );
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -55,10 +39,6 @@ export default function MoreScreen({ navigation }) {
           <View style={StyleSheet.absoluteFill}><AnimatedBanner accent={C.purple} dark={dark} height={190} /></View>
           {/* Voidmon peeks over the bottom edge of the banner */}
           <Voidmon pose="peeking" size={220} />
-        </View>
-        <View style={styles.group}>
-          {toggle("clock", "24-hour clock", "Airing times as 16:30", "clock24")}
-          {toggle("badge", "Countdown badges", "Next episode on posters", "posterBadges")}
         </View>
         {rank && (
           <Pressable onPress={() => navigation.navigate("MorePage", { page: "badge" })}
@@ -82,15 +62,6 @@ export default function MoreScreen({ navigation }) {
             <View style={{ flex: 1 }}>
               <Text style={[styles.label, { color: C.orange }]}>Voidation Rewind</Text>
               <Text style={styles.hint}>All time, or year by year</Text>
-            </View>
-          </Pressable>
-          {/* the first-run welcome screens, any time; nothing you've set up changes */}
-          <Pressable style={({ pressed }) => [styles.row, pressed && { backgroundColor: C.card }]} onPress={() => navigation.navigate("Onboarding")}
-            accessibilityHint="Opens the welcome screens again">
-            <View style={styles.icon}><Icon name="help" size={21} color={C.purple} /></View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Welcome tour</Text>
-              <Text style={styles.hint}>Voidmon shows you around again</Text>
             </View>
           </Pressable>
         </View>
