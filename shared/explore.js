@@ -89,7 +89,13 @@ export function buildExplore(pools, known = new Set(), seed = daySeed()) {
     .filter((it) => !seenComing.has(it.id) && seenComing.add(it.id))
     .sort((a, b) => (a.date ? 0 : 1) - (b.date ? 0 : 1) || (a.date || "").localeCompare(b.date || ""))
     .slice(0, 20);
+  // the Billboard at the top of Explore (Netflix-style): a trending anime with
+  // a wide banner picture, different each day and on every refresh. Library
+  // titles are allowed; the billboard just says they're on your list.
+  const featuredPool = (pools.trA || []).filter((it) => it.banner && !it.unreleased).slice(0, 10);
+  const featured = rotate(featuredPool, seed * 13)[0] || null;
   return {
+    featured,
     coming,
     comingTitle: pools.comingTitle,
     comingChip: pools.comingChip,

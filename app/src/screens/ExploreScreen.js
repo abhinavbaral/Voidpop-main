@@ -16,6 +16,7 @@ import Icon from "../components/Icon.js";
 import AnimatedBanner from "../components/AnimatedBanner.js";
 import { NewEpisodeCards, Countdowns } from "../components/ExploreCards.js";
 import RankedRow from "../components/RankedRow.js";
+import Billboard from "../components/Billboard.js";
 import { COUNTRIES } from "./TrendsScreen.js";
 import { fetchAniList } from "@voidation/shared/api/anilist";
 
@@ -98,6 +99,7 @@ export default function ExploreScreen({ navigation }) {
   // Explore's rows in order. Each one renders only when it's near the screen.
   const row = (key, render) => ({ key, render });
   const sections = [
+    data.featured && row("billboard", () => <Billboard item={data.featured} onOpen={open} />),
     row("new-eps", () => <NewEpisodeCards onOpen={open} />),
     ...catRows.map((r) => row(`cat-${r.id}`, () => <PosterRow title={r.title} items={r.items} onOpen={open} />)),
     row("coming-up", () => <Countdowns onOpen={open} />),
