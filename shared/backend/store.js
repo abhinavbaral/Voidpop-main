@@ -460,7 +460,26 @@ export function yourShows(lib, fresh = {}, now = Date.now()) {
       };
     })
     .filter((x) => x.next || x.pending > 0)
-    .sort((a, b) => (a.next?.airingAt ?? Infinity) - (b.next?.airingAt ?? Infinity) || b.pending - a.pending);
+    .sort(scheduleOrder);
+}
+
+// Schedule's order:
+//   1. shows with episodes to catch up on come first, fewest first
+//      (1 pending, then 2, then 3…): the ones you can finish fastest
+//   2. then, and among shows with the same number pending (including all
+//      caught up), by the weekday the next episode airs, Sunday → Saturday,
+//      then by time of day
+//   3. shows with nothing scheduled go last in their group
+const weekSlot = (next) => {
+  if (!next) return Infinity;
+  const d = new Date(next.airingAt * 1000);
+  return d.getDay() * 1440 + d.getHours() * 60 + d.getMinutes();
+};
+export function scheduleOrder(a, b) {
+  const pa = a.pending > 0 ? a.pending : Infinity;
+  const pb = b.pending > 0 ? b.pending : Infinity;
+  if (pa !== pb) return pa - pb;
+  return weekSlot(a.next) - weekSlot(b.next) || (a.next?.airingAt ?? Infinity) - (b.next?.airingAt ?? Infinity);
 }
 
 /* ---------- Categories: a reward for 500+ completed anime ---------- */
