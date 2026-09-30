@@ -42,6 +42,23 @@ test("where to watch merges languages per service", () => {
   assert.deepEqual(w.map((x) => [x.site, x.languages]), [["Crunchyroll", ["English", "Hindi"]]]);
 });
 
+test("other links: official, social, AniList and MAL pages; streaming and readers left out", () => {
+  const l = a.otherLinks([
+    { site: "Official Site", url: "https://show.jp", type: "INFO", language: "Japanese" },
+    { site: "Official Site", url: "https://show.jp", type: "INFO", language: "Japanese" },
+    { site: "Twitter", url: "https://x.com/show", type: "SOCIAL" },
+    { site: "YouTube", url: "https://youtube.com/x", type: "SOCIAL", isDisabled: true },
+    { site: "Bad", url: "javascript:alert(1)", type: "SOCIAL" },
+    { site: "Crunchyroll", url: "https://cr.com", type: "STREAMING" },
+    { site: "MANGA Plus", url: "https://mangaplus", type: "INFO" },
+    null,
+  ], { segment: "manga", idMal: 13, siteUrl: "https://anilist.co/manga/30013", exclude: ["https://mangaplus"] });
+  assert.deepEqual(l.official.map((x) => x.site), ["Official Site"]);
+  assert.deepEqual(l.social.map((x) => x.site), ["Twitter"]);
+  assert.deepEqual(l.databases.map((x) => x.url), ["https://anilist.co/manga/30013", "https://myanimelist.net/manga/13"]);
+  assert.deepEqual(a.otherLinks(undefined), { official: [], social: [], databases: [] });
+});
+
 test("where to read: readers (even filed as INFO), stores, search fallback", () => {
   const r = readingLinks([
     { site: "MANGA Plus", url: "m", type: "INFO", language: "English" },

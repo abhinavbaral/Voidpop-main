@@ -13,6 +13,7 @@ import { formatCountdown, airTime, hypeLabel } from "@voidation/shared/format";
 import PosterRow from "./PosterRow.js";
 import { useTheme } from "../context/ThemeContext.js";
 import { openDetail } from "../lib/nav";
+import { SkeletonList } from "./Skeleton.js";
 
 const WEEKDAYS = ["M", "T", "W", "T", "F", "S", "S"];
 
@@ -92,7 +93,7 @@ export default function OutThisWeek({ navigation, refreshKey = 0 }) {
           })}
         </View>
 
-        {byDay === null ? <Text style={styles.empty}>Loading…</Text> : picked ? (
+        {byDay === null ? <SkeletonList rows={2} /> : picked ? (
           <>
             <Text style={styles.dayTitle}>{new Date(`${picked}T00:00`).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}</Text>
             {dayItems.length ? dayItems.map((item) => {
@@ -118,7 +119,7 @@ export default function OutThisWeek({ navigation, refreshKey = 0 }) {
         ) : <Text style={styles.empty}>No premieres with a set date this month yet.</Text>}
 
         <Text style={[styles.section, { paddingHorizontal: 14, marginTop: 22 }]}>Airing soon <Text style={{ color: C.faint, fontSize: 12, fontWeight: "600" }}>next 24 hours</Text></Text>
-        {soon === null ? <Text style={styles.empty}>Loading…</Text> : !soon.length ? <Text style={styles.empty}>Nothing airs in the next 24 hours.</Text> : soon.map((s) => (
+        {soon === null ? <SkeletonList rows={3} /> : !soon.length ? <Text style={styles.empty}>Nothing airs in the next 24 hours.</Text> : soon.map((s) => (
           <TouchableOpacity key={`${s.item.id}-${s.episode}`} style={styles.row} onPress={() => open(s.item)}>
             <Text style={styles.time}>{airTime(s.airingAt, clock24)}</Text>
             {s.item.image ? <Image source={{ uri: s.item.image }} style={styles.thumbSm} /> : <View style={styles.thumbSm} />}

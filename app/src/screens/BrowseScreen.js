@@ -17,6 +17,8 @@ import { useTheme } from "../context/ThemeContext.js";
 import { useGridColumns } from "../lib/layout";
 import { openDetail } from "../lib/nav";
 import Icon from "../components/Icon.js";
+import { SkeletonGrid } from "../components/Skeleton.js";
+import { VoidmonEmpty, VoidmonTrouble } from "../components/Voidmon.js";
 
 const SEGMENTS = [
   { key: "anime", label: "Anime" },
@@ -87,6 +89,7 @@ export default function BrowseScreen({ navigation }) {
     },
     [segment, sort, origin, season, year, genre]
   );
+  const retryFirst = useCallback(() => load(1, true), [load]);
 
   useEffect(() => {
     setItems([]);
@@ -160,12 +163,7 @@ export default function BrowseScreen({ navigation }) {
       </View>
 
       {error ? (
-        <View style={styles.errorBox}>
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity onPress={() => load(1, true)} style={styles.retry}>
-            <Text style={{ color: "#fff", fontWeight: "700" }}>Retry</Text>
-          </TouchableOpacity>
-        </View>
+        <VoidmonTrouble what="Browse" onRetry={retryFirst} navigation={navigation} />
       ) : (
         <FlatList
           data={items}
@@ -182,7 +180,7 @@ export default function BrowseScreen({ navigation }) {
             loading ? <ActivityIndicator color={C.orange} style={{ margin: 20 }} /> : null
           }
           ListEmptyComponent={
-            !loading ? <Text style={styles.empty}>No results found.</Text> : null
+            !loading ? <VoidmonEmpty pose="peeking" text="No results found. Try fewer filters." /> : <SkeletonGrid columns={cols} rows={3} />
           }
         />
       )}

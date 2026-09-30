@@ -2,7 +2,7 @@
 // with countdown badges and one-tap Plan to Watch. ‹ › moves between seasons.
 // Sort by hype (most followed), trending, soonest or A–Z; grid or list view.
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { View, Text, Image, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator } from "react-native";
+import { View, Text, Image, FlatList, TouchableOpacity, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import { useAuth } from "@voidation/shared/backend/AuthContext";
@@ -18,6 +18,8 @@ import Card from "../components/Card.js";
 import { useTheme } from "../context/ThemeContext.js";
 import { useGridColumns } from "../lib/layout";
 import { openDetail, goBackOrHome } from "../lib/nav";
+import { SkeletonList, SkeletonGrid } from "../components/Skeleton.js";
+import { VoidmonTrouble } from "../components/Voidmon.js";
 
 export default function SeasonScreen({ navigation }) {
   const { C } = useTheme();
@@ -28,6 +30,8 @@ export default function SeasonScreen({ navigation }) {
   const [items, setItems] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const retry = useCallback(() => setAttempt((n) => n + 1), []);
   const [group, setGroup] = useState("all");
   const [lib, setLib] = useState({});
   const [filters, setFilters] = useState({ genre: "", studio: "" });
@@ -47,7 +51,7 @@ export default function SeasonScreen({ navigation }) {
       .catch(() => alive && setError(true))
       .finally(() => alive && setLoading(false));
     return () => { alive = false; };
-  }, [season]);
+  }, [season, attempt]);
 
   const counts = useMemo(() => {
     const c = {};
@@ -105,9 +109,8 @@ export default function SeasonScreen({ navigation }) {
         </View>
       </View>
       {items === null ? (
-        <View style={{ padding: 40, alignItems: "center" }}>
-          {error ? <Text style={styles.empty}>Couldn't load this season. Check your connection.</Text> : <ActivityIndicator color={C.orange} />}
-        </View>
+        error ? <VoidmonTrouble what="The season chart" onRetry={retry} navigation={navigation} />
+          : list ? <SkeletonList rows={8} /> : <SkeletonGrid columns={cols} rows={3} />
       ) : (
         <FlatList
           data={shown}

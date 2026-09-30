@@ -1,7 +1,7 @@
 {
   "name": "voidation",
   "private": true,
-  "description": "Voidation \u2014 anime & manga tracker with airing countdowns. Website (web/), mobile app (app/), shared logic (shared/). No accounts, no keys.",
+  "description": "Voidation — anime & manga tracker with airing countdowns. Website (web/), mobile app (app/), shared logic (shared/). No accounts, no keys.",
   "workspaces": [
     "app",
     "web",
@@ -24,6 +24,7 @@
     "eslint": "^9.39.5",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^5.2.0",
-    "globals": "^15.15.0"
+    "globals": "^15.15.0",
+    "sharp": "^0.34.5"
   }
 }

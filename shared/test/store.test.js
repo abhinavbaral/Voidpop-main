@@ -95,3 +95,11 @@ test("CSV export quotes fields and has a header", async () => {
 test("updatedAt helper sanity", () => {
   assert.ok(daysAgo(1) < new Date().toISOString());
 });
+
+test("welcome screens: shown until marked done", async () => {
+  assert.equal(await s.isOnboarded(), false);
+  await s.setOnboarded(true);
+  assert.equal(await s.isOnboarded(), true);
+  await s.setOnboarded(false);
+  assert.equal(await s.isOnboarded(), false);
+});

@@ -1,7 +1,7 @@
 // Universal search with LIVE suggestions (Netflix-style).
 // As you type, matching anime and manga appear grouped.
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   View, Text, TextInput, SectionList, TouchableOpacity, Image, StyleSheet,
 } from "react-native";
@@ -10,6 +10,7 @@ import { fetchAniList } from "@voidation/shared/api/anilist";
 import { useTheme } from "../context/ThemeContext.js";
 import { openDetail, goBackOrHome } from "../lib/nav";
 import { releaseLabel } from "@voidation/shared/format";
+import { VoidmonEmpty, VoidmonLoading, VoidmonTrouble } from "../components/Voidmon.js";
 
 function CreatorText({ item, style }) {
   const creator = item.creator;
@@ -26,32 +27,44 @@ export default function SearchScreen({ navigation, route }) {
     if (route.params?.q) setQ(route.params.q);
   }, [route.params?.q]);
   const [sections, setSections] = useState([]);
-  const [loading, setLoading] = useState(false);
+  // idle (under 2 letters) → loading → done, or failed when AniList didn't
+  // answer. "loading" starts as you type, so "No matches" never flashes up
+  // while the search is still on its way.
+  const [status, setStatus] = useState("idle");
+  const [attempt, setAttempt] = useState(0);
+  const retry = useCallback(() => setAttempt((n) => n + 1), []);
 
   useEffect(() => {
     const query = q.trim();
     if (query.length < 2) {
       setSections([]);
-      return;
+      setStatus("idle");
+      return undefined;
     }
+    let alive = true;
+    setStatus("loading");
     const t = setTimeout(async () => {
-      setLoading(true);
-      const jobs = [
-        fetchAniList("anime", { search: query, perPage: 5 }).catch(() => ({ items: [] })),
-        fetchAniList("manga", { search: query, perPage: 5 }).catch(() => ({ items: [] })),
-      ];
-      const [anime, manga] = await Promise.all(jobs);
-
+      const [anime, manga] = await Promise.allSettled([
+        fetchAniList("anime", { search: query, perPage: 5 }),
+        fetchAniList("manga", { search: query, perPage: 5 }),
+      ]);
+      if (!alive) return; // you kept typing; a newer search owns the screen
+      if (anime.status === "rejected" && manga.status === "rejected") {
+        setSections([]);
+        setStatus("failed");
+        return;
+      }
+      const items = (r) => (r.status === "fulfilled" ? r.value.items.slice(0, 5) : []);
       setSections(
         [
-          { title: "Anime", data: anime.items.slice(0, 5) },
-          { title: "Manga", data: manga.items.slice(0, 5) },
+          { title: "Anime", data: items(anime) },
+          { title: "Manga", data: items(manga) },
         ].filter((s) => s.data.length > 0)
       );
-      setLoading(false);
+      setStatus("done");
     }, 350);
-    return () => clearTimeout(t);
-  }, [q]);
+    return () => { alive = false; clearTimeout(t); };
+  }, [q, attempt]);
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -96,13 +109,10 @@ export default function SearchScreen({ navigation, route }) {
           </TouchableOpacity>
         )}
         ListEmptyComponent={
-          <Text style={styles.hint}>
-            {loading
-              ? "Searching..."
-              : q.trim().length >= 2
-              ? "No matches found."
-              : "Type at least 2 characters to search anime and manga."}
-          </Text>
+          status === "loading" ? <VoidmonLoading text="Searching AniList…" style={{ marginTop: 28 }} />
+          : status === "failed" ? <VoidmonTrouble what="Search" onRetry={retry} navigation={navigation} />
+          : status === "done" ? <VoidmonEmpty pose="peeking" text="No matches found. Try the English or Japanese title." />
+          : <Text style={styles.hint}>Type at least 2 characters to search anime and manga.</Text>
         }
         contentContainerStyle={{ paddingBottom: 30 }}
       />

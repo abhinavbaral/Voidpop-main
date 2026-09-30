@@ -15,6 +15,8 @@ import { dayLabel, airedAgo } from "@voidation/shared/format";
 import { useNow } from "@voidation/shared/hooks/useNow";
 import { useTheme } from "../context/ThemeContext.js";
 import { openDetail } from "../lib/nav";
+import { SkeletonList } from "../components/Skeleton.js";
+import { VoidmonEmpty, VoidmonTrouble } from "../components/Voidmon.js";
 
 const FOLLOWING = { watching: "Watching", plan: "Plan to Watch", onhold: "On Hold" };
 const DAYS = 14;
@@ -93,16 +95,19 @@ export default function HistoryScreen({ navigation }) {
       >
         <Text style={styles.title}>History</Text>
         <Text style={styles.sub}>Episodes from the last {DAYS} days for the anime you follow.</Text>
-        {error && <Text style={styles.error}>Couldn't reach AniList. Pull down to retry.</Text>}
         {episodes === null ? (
-          <Text style={styles.empty}>Loading…</Text>
+          <SkeletonList rows={6} style={{ paddingHorizontal: 0 }} />
+        ) : error ? (
+          <VoidmonTrouble what="History" onRetry={load} navigation={navigation} />
         ) : !following ? (
-          <Text style={styles.empty}>
-            Nothing to show yet. Mark anime as Watching, Plan to Watch, On Hold or Excited and their new episodes
-            collect here.
-          </Text>
+          <VoidmonEmpty pose="peeking" text="Nothing to show yet. Mark anime as Watching, Plan to Watch, On Hold or Excited and their new episodes collect here.">
+            <TouchableOpacity onPress={() => navigation.navigate("Main", { screen: "Schedule" })} accessibilityRole="button"
+              style={{ marginTop: 14, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 9, borderWidth: 1, borderColor: C.border, backgroundColor: C.card }}>
+              <Text style={{ color: C.text, fontWeight: "800" }}>See what's airing</Text>
+            </TouchableOpacity>
+          </VoidmonEmpty>
         ) : !days.length ? (
-          <Text style={styles.empty}>No new episodes in the last {DAYS} days for the shows you follow.</Text>
+          <VoidmonEmpty pose="sleeping" text={`No new episodes in the last ${DAYS} days for the shows you follow.`} />
         ) : (
           days.map((g) => (
             <View key={g.label}>

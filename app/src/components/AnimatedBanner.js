@@ -16,7 +16,7 @@ const mixHex = (a, b, t) => {
 // deterministic "random" so stars don't jump around between renders
 const rand = (i) => { const x = Math.sin(i * 999.13) * 10000; return x - Math.floor(x); };
 
-function useReduceMotion() {
+export function useReduceMotion() {
   const [reduce, setReduce] = useState(false);
   useEffect(() => {
     AccessibilityInfo.isReduceMotionEnabled?.().then(setReduce).catch(() => {});

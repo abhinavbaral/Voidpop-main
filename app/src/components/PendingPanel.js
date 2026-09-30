@@ -8,6 +8,7 @@ import { getPending, setProgress, setStatus, addReview, onDataChange, totalFor }
 import { formatCountdown } from "@voidation/shared/format";
 import VerdictModal from "./VerdictModal.js";
 import { useTheme } from "../context/ThemeContext.js";
+import { VoidmonCheer } from "./Voidmon.js";
 
 export default function PendingPanel({ now, refreshKey, onOpen }) {
   const { C } = useTheme();
@@ -42,6 +43,7 @@ export default function PendingPanel({ now, refreshKey, onOpen }) {
           {data.total ? `${data.total} pending` : "All caught up"}
         </Text>
       </View>
+      {!data.total && data.items.length > 0 && <VoidmonCheer sub="New episodes show up here the moment they air." style={{ marginBottom: 8 }} />}
       {data.items.map(({ entry, pending }) => {
         const it = entry.item;
         const next = it.nextEpisode && it.nextEpisode.airingAt > now / 1000 ? it.nextEpisode : null;

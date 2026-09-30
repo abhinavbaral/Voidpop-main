@@ -31,6 +31,8 @@ import * as DocumentPicker from "expo-document-picker";
 import { importMalFile, base64ToBytes } from "@voidation/shared/malImport";
 import { timeAgo } from "@voidation/shared/backend/store";
 import Icon from "../components/Icon.js";
+import { SkeletonList } from "../components/Skeleton.js";
+import { VoidmonLoading } from "../components/Voidmon.js";
 
 const NATIVE = Platform.OS !== "web";
 const AUTO_BACKUP = Platform.OS === "android"; // Android's folder picker (SAF)
@@ -65,7 +67,7 @@ export default function MorePageScreen({ route, navigation }) {
 function Statistics({ styles, C }) {
   const [data, setData] = useState(null);
   useFocusEffect(useCallback(() => { getUserTier().then(setData).catch(() => {}); }, []));
-  if (!data) return <Text style={styles.note}>Loading…</Text>;
+  if (!data) return <SkeletonList rows={4} thumb={false} style={{ paddingHorizontal: 0 }} />;
   const { stats } = data;
   const fmt = (n) => (n || 0).toLocaleString();
   const block = (title, cells) => (
@@ -179,6 +181,7 @@ function DataStorage({ styles, C }) {
   const [offlineSize, setOfflineSize] = useState(null);
   const [cfg, setCfg] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [message, setMessage] = useState("");
   const [freqOpen, setFreqOpen] = useState(false);
   const measure = useCallback(() => {
@@ -232,6 +235,7 @@ function DataStorage({ styles, C }) {
   const importMal = () => run(async () => {
     const res = await DocumentPicker.getDocumentAsync({ type: "*/*", copyToCacheDirectory: true });
     if (res.canceled || !res.assets?.[0]) return;
+    setImporting(true);
     try {
       const b64 = await readAsStringAsync(res.assets[0].uri, { encoding: "base64" });
       const r = await importMalFile(base64ToBytes(b64));
@@ -240,7 +244,7 @@ function DataStorage({ styles, C }) {
       reload(); rescheduleEpisodeAlerts();
     } catch (e) {
       setMessage(e?.message?.includes("MyAnimeList") ? e.message : "Couldn't read that file. Pick the .xml or .xml.gz from MAL's Export page.");
-    }
+    } finally { setImporting(false); }
   });
   const clear = () => Alert.alert("Clear library?", "Deletes every tracked title, verdict and Excited mark. This can't be undone.", [
     { text: "Cancel", style: "cancel" },
@@ -311,6 +315,7 @@ function DataStorage({ styles, C }) {
 
       <Section>Danger zone</Section>
       <Row title="Clear library" sub="Removes every tracked title, verdict and Excited mark from this phone" onPress={clear} danger />
+      {importing && <VoidmonLoading text="Bringing your MyAnimeList list over…" />}
       {!!message && <Text style={[styles.note, { marginTop: 12 }]}>{message}</Text>}
 
       <OptionsSheet
@@ -359,6 +364,7 @@ function AniListImport({ styles, C, onDone }) {
           <Text style={[styles.btnText, { color: "#fff" }]}>{busy ? "Importing…" : "Import"}</Text>
         </TouchableOpacity>
       </View>
+      {busy && <VoidmonLoading text="Bringing your AniList list over…" />}
       {!!result && <Text style={[styles.note, { marginTop: 8 }]}>{result}</Text>}
     </View>
   );
@@ -369,7 +375,7 @@ function AniListImport({ styles, C, onDone }) {
 function BadgePage({ styles, C }) {
   const [data, setData] = useState(null);
   useFocusEffect(useCallback(() => { getUserTier().then(setData).catch(() => {}); }, []));
-  if (!data) return <Text style={styles.note}>Loading…</Text>;
+  if (!data) return <SkeletonList rows={4} thumb={false} style={{ paddingHorizontal: 0 }} />;
   const { tier, stats } = data;
   const n = stats.totalCompleted;
   const next = TIERS.find((t) => t.min > n);
@@ -423,7 +429,7 @@ function Announced({ styles, C, navigation }) {
     loadAnnounced().then(setList).catch(() => setList([]));
     getExcited().then(setExcited);
   }, []));
-  if (!list) return <Text style={styles.note}>Loading…</Text>;
+  if (!list) return <SkeletonList rows={5} style={{ paddingHorizontal: 0 }} />;
   if (!list.length) return <Text style={styles.note}>No new announcements in the last {ANNOUNCED_DAYS} days.</Text>;
   return (
     <>
@@ -477,7 +483,7 @@ function Categories({ styles, C }) {
     { text: "Cancel", style: "cancel" },
     { text: "Delete", style: "destructive", onPress: async () => { await deleteCategory(c.id); refresh(); } },
   ]);
-  if (!cats || !access) return <Text style={styles.note}>Loading…</Text>;
+  if (!cats || !access) return <SkeletonList rows={3} thumb={false} style={{ paddingHorizontal: 0 }} />;
   if (!access.unlocked) {
     return (
       <View style={[styles.card, { borderColor: C.amber, opacity: 0.85 }]}>
@@ -558,14 +564,22 @@ const FAQ = [
   ["Why no movies or web series?", "Voidation focuses on anime and manga, which AniList provides for free."],
 ];
 
-function Help({ styles }) {
+function Help({ styles, navigation }) {
   const [open, setOpen] = useState(null);
-  return FAQ.map(([q, a], i) => (
-    <Pressable key={q} style={styles.card} onPress={() => setOpen(open === i ? null : i)}>
-      <Text style={styles.cardTitle}>{q}</Text>
-      {open === i && <Text style={[styles.note, { marginTop: 6 }]}>{a}</Text>}
-    </Pressable>
-  ));
+  return (
+    <>
+      {FAQ.map(([q, a], i) => (
+        <Pressable key={q} style={styles.card} onPress={() => setOpen(open === i ? null : i)}>
+          <Text style={styles.cardTitle}>{q}</Text>
+          {open === i && <Text style={[styles.note, { marginTop: 6 }]}>{a}</Text>}
+        </Pressable>
+      ))}
+      <Pressable style={styles.card} onPress={() => navigation?.navigate("Onboarding")}>
+        <Text style={styles.cardTitle}>Show the welcome screens again</Text>
+        <Text style={[styles.note, { marginTop: 4 }]}>Theme, importing your list, and episode alerts.</Text>
+      </Pressable>
+    </>
+  );
 }
 
 function About({ styles }) {

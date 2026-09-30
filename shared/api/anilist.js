@@ -6,7 +6,7 @@ import { CRUNCHYROLL_AOTY } from "../awards.js";
 import { readingLinks } from "../readLinks.js";
 import { formatDateParts } from "../format.js";
 import { cacheKey, cacheGet, cachePut, isDeviceOnline, noteSavedShown } from "./cache.js";
-export { onNetState, cacheClear, cacheSize, setDeviceOnline } from "./cache.js";
+export { onNetState, cacheClear, cacheSize, setDeviceOnline, isDeviceOnline } from "./cache.js";
 
 const URL = "https://graphql.anilist.co";
 
@@ -474,6 +474,7 @@ export async function fetchAniListDetail(segment, id) {
   const query = `query ($id: Int, $type: MediaType) {
     Media(id: $id, type: $type) {
       trailer { id site }
+      idMal siteUrl
       countryOfOrigin
       source(version: 3)
       title { english romaji }
@@ -518,6 +519,7 @@ export async function fetchAniListDetail(segment, id) {
     }));
 
   const m = data.Media;
+  const read = segment === "manga" ? readingLinks(m.externalLinks, { title: m.title?.english || m.title?.romaji, country: m.countryOfOrigin }) : null;
   return {
     trailer, related,
     ...castAndCrew(m, segment),
@@ -527,7 +529,13 @@ export async function fetchAniListDetail(segment, id) {
     source: segment === "anime" ? sourceInfo(m.source, m.relations?.edges || []) : null,
     whereToWatch: watchLinks(m.externalLinks),
     // manga: official readers, stores, or search boxes (shared/readLinks.js)
-    whereToRead: segment === "manga" ? readingLinks(m.externalLinks, { title: m.title?.english || m.title?.romaji, country: m.countryOfOrigin }) : null,
+    whereToRead: read,
+    // official site, socials, and the title's AniList / MyAnimeList pages
+    // (for manga, minus anything already under Where to read)
+    links: otherLinks(m.externalLinks, {
+      segment, idMal: m.idMal, siteUrl: m.siteUrl,
+      exclude: read ? [...read.read, ...read.buy].map((l) => l.url) : [],
+    }),
   };
 }
 
@@ -689,6 +697,25 @@ export function watchLinks(links) {
       }
     });
   return [...bySite.values()];
+}
+
+// Everything AniList links that isn't a streaming service: the official site
+// (INFO), social accounts (SOCIAL), plus the title's own AniList and
+// MyAnimeList pages. One entry per site, disabled and blank links dropped.
+export function otherLinks(links, { segment = "anime", idMal = null, siteUrl = null, exclude = [] } = {}) {
+  const seen = new Set(exclude.map((u) => `url:${u}`));
+  const pick = (type) => (Array.isArray(links) ? links : [])
+    .filter((l) => l && l.type === type && !l.isDisabled && typeof l.url === "string" && /^https?:\/\//.test(l.url))
+    .filter((l) => {
+      const k = `${type}:${l.site}:${l.language || ""}`;
+      if (seen.has(k) || seen.has(`url:${l.url}`)) return false;
+      seen.add(k); seen.add(`url:${l.url}`); return true;
+    })
+    .map((l) => ({ site: String(l.site || "Link"), url: l.url, color: l.color || null, language: l.language || null }));
+  const databases = [];
+  if (siteUrl) databases.push({ site: "AniList", url: siteUrl, color: "#02a9ff", language: null });
+  if (idMal) databases.push({ site: "MyAnimeList", url: `https://myanimelist.net/${segment === "manga" ? "manga" : "anime"}/${idMal}`, color: "#2e51a2", language: null });
+  return { official: pick("INFO"), social: pick("SOCIAL"), databases };
 }
 
 // Every episode airing in the next `days` days, soonest first (Schedule page).

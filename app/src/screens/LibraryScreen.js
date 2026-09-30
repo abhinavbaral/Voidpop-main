@@ -22,6 +22,7 @@ import LibraryCard from "../components/LibraryCard.js";
 import { useTheme } from "../context/ThemeContext.js";
 import { useGridColumns } from "../lib/layout";
 import { openDetail } from "../lib/nav";
+import { VoidmonEmpty } from "../components/Voidmon.js";
 
 
 export default function LibraryScreen({ navigation }) {
@@ -168,9 +169,8 @@ export default function LibraryScreen({ navigation }) {
           />
         )}
         ListEmptyComponent={
-          <Text style={styles.empty}>
-            {q ? `No ${tabLabel} titles match "${query.trim()}".` : `Nothing in ${tabLabel} yet. ${list === "read" ? "Find some manga to read!" : "Tag some titles!"}`}
-          </Text>
+          <VoidmonEmpty pose="peeking"
+            text={q ? `No ${tabLabel} titles match "${query.trim()}".` : `Nothing in ${tabLabel} yet. ${list === "read" ? "Find some manga to read!" : "Tag some titles!"}`} />
         }
       />
       <OptionsSheet

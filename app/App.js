@@ -12,13 +12,14 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import { AppState, Platform } from "react-native";
 import { createNavigationContainerRef } from "@react-navigation/native";
-import { onDataChange, getPending } from "@voidation/shared/backend/store";
+import { onDataChange, getPending, isOnboarded } from "@voidation/shared/backend/store";
 import { AuthProvider } from "@voidation/shared/backend/AuthContext";
 import { SettingsProvider } from "@voidation/shared/backend/SettingsContext";
 import { ThemeProvider, useTheme } from "./src/context/ThemeContext.js";
 import ExploreScreen from "./src/screens/ExploreScreen.js";
 import BrowseScreen from "./src/screens/BrowseScreen.js";
 import PersonScreen from "./src/screens/PersonScreen.js";
+import OnboardingScreen from "./src/screens/OnboardingScreen.js";
 import ScheduleScreen from "./src/screens/ScheduleScreen.js";
 import HistoryScreen from "./src/screens/HistoryScreen.js";
 import MoreScreen from "./src/screens/MoreScreen.js";
@@ -148,7 +149,9 @@ function ThemedApp() {
   };
 
   return (
-    <NavigationContainer ref={navRef} theme={navTheme} linking={linking}>
+    <NavigationContainer ref={navRef} theme={navTheme} linking={linking}
+      // first run: the welcome screens, once
+      onReady={() => { isOnboarded().then((done) => { if (!done) navRef.navigate("Onboarding"); }).catch(() => {}); }}>
       <StatusBar style={dark ? "light" : "dark"} />
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Main" component={MainTabs} />
@@ -163,6 +166,7 @@ function ThemedApp() {
         <Stack.Screen name="MorePage" component={MorePageScreen} />
         <Stack.Screen name="Season" component={SeasonScreen} />
         <Stack.Screen name="Browse" component={BrowseScreen} />
+        <Stack.Screen name="Onboarding" component={OnboardingScreen} options={{ animation: "fade", gestureEnabled: false }} />
         <Stack.Screen name="Person" component={PersonScreen} getId={({ params }) => (params ? String(params.id) : undefined)} />
         <Stack.Screen name="Wrapped" component={WrappedScreen} options={{ animation: "fade" }} />
       </Stack.Navigator>

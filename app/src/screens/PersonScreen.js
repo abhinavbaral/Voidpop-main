@@ -2,12 +2,13 @@
 // character they voiced (newest first) and their staff work. Tap a poster to
 // open that title.
 import { useEffect, useState } from "react";
-import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from "react-native";
+import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { fetchPerson } from "@voidation/shared/api/anilist";
 import { yearOf } from "@voidation/shared/format";
 import { useTheme } from "../context/ThemeContext.js";
 import { openDetail, goBackOrHome } from "../lib/nav";
+import { SkeletonHeader, SkeletonList } from "../components/Skeleton.js";
 
 export default function PersonScreen({ route, navigation }) {
   const { C } = useTheme();
@@ -28,9 +29,8 @@ export default function PersonScreen({ route, navigation }) {
           <Text style={{ color: C.purple }}>← Back</Text>
         </TouchableOpacity>
         {!p ? (
-          <View style={{ padding: 40, alignItems: "center" }}>
-            {error ? <Text style={styles.note}>Couldn't load {name || "this person"}. Check your connection.</Text> : <ActivityIndicator color={C.orange} />}
-          </View>
+          error ? <Text style={[styles.note, { marginTop: 30 }]}>Couldn't load {name || "this person"}. Check your connection.</Text>
+            : <View style={{ marginTop: 14 }}><SkeletonHeader /><SkeletonList rows={6} style={{ paddingHorizontal: 0, marginTop: 24 }} /></View>
         ) : (
           <>
             <View style={styles.head}>

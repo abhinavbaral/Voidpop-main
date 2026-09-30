@@ -2,12 +2,13 @@
 // you can share. Tap the right side for next, left side for back.
 // Everything comes from your own watch log (shared/wrapped.js).
 import { useEffect, useRef, useState } from "react";
-import { View, Text, Image, Pressable, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from "react-native";
+import { View, Text, Image, Pressable, TouchableOpacity, ScrollView, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { loadWrapped, wrappedSlides, wrappedYears, defaultWrapped } from "@voidation/shared/wrapped";
 import { shareCardImage } from "../lib/shareCard";
 import { notify } from "../lib/notify";
 import { goBackOrHome } from "../lib/nav";
+import { VoidmonLoading } from "../components/Voidmon.js";
 
 const BACKGROUNDS = ["#1e0b38", "#361508", "#0b1f3a", "#2e0b22"];
 const ORANGE = "#ee8f2e";
@@ -43,7 +44,7 @@ export default function WrappedScreen({ navigation }) {
           </TouchableOpacity>
         ))}
       </View>
-      {!w ? <ActivityIndicator color="#fff" style={{ marginTop: 80 }} /> : slide.kind === "summary" ? (
+      {!w ? <VoidmonLoading text="Putting your year together…" textColor="#cbd5e1" style={{ marginTop: 60 }} /> : slide.kind === "summary" ? (
         <Summary w={w} onBack={() => go(-1)} onRestart={() => setI(0)} />
       ) : (
         <View style={{ flex: 1 }}>

@@ -42,6 +42,11 @@ web/            website (React + Vite), kept locally, frozen
   widget and alerts all hear about it via `onDataChange`).
 - **The demo API must export the same names** as `api/anilist.js`.
 - **No emoji in the UI** — icons come from `shared/iconPaths.js`.
+- **Voidmon, the mascot,** lives in `app/assets/voidmon/`: an `.svg` drawing of
+  each pose (the design source) and the `.png` the app and website show.
+  After editing a drawing, `node app/scripts/voidmon-art.mjs` remakes the PNGs.
+  `shared/voidmon.js` lists the poses. Skeletons stay for anything with a
+  layout; `VoidmonLoading` is only for waits with nothing to lay out.
 - Comments explain *why*, in plain words.
 
 ## Checks

@@ -6,6 +6,7 @@ import { View, Text, Image, TouchableOpacity, Alert } from "react-native";
 import * as WebBrowser from "expo-web-browser";
 import { onSyncState, authUrl, finishSignIn, syncNow, signOut, redirectUri } from "@voidation/shared/sync/anilist";
 import { timeAgo } from "@voidation/shared/backend/store";
+import { VoidmonLoading } from "./Voidmon.js";
 
 export default function AniListSync({ styles, C, onChange }) {
   const [s, setS] = useState(null);
@@ -84,6 +85,7 @@ export default function AniListSync({ styles, C, onChange }) {
           </Text>
         </View>
       </View>
+      {s.busy && <VoidmonLoading text="Syncing with AniList…" size={90} />}
       {!!s.error && <Text style={{ color: C.rose, fontSize: 12, marginTop: 8 }}>{s.error}</Text>}
       {!!result && <Text style={[styles.note, { marginTop: 8 }]}>{result}</Text>}
       <View style={[styles.modeRow, { marginTop: 12 }]}>

@@ -7,6 +7,7 @@ import { readingLinks } from "../readLinks.js";
 export { SORTS, SEASONS, GENRES, ANIME_ORIGINS, MANGA_ORIGINS } from "../api/anilist.js";
 // the demo is always "online"; these keep the same exports as the real module
 export const onNetState = (fn) => { fn({ offline: false, since: null }); return () => {}; };
+export const isDeviceOnline = () => true;
 export const cacheClear = async () => {};
 export const cacheSize = async () => 0;
 export const setDeviceOnline = () => {};
@@ -109,7 +110,16 @@ export async function fetchAniListDetail(segment, id) {
   const episodes = segment === "anime" && it ? Array.from({ length: 4 }, (_, i) => ({
     number: i + 1, name: `Demo episode ${i + 1}`, thumbnail: it.banner || it.image, url: "https://www.crunchyroll.com", site: "Crunchyroll",
   })) : [];
-  return { trailer: null, related, whereToWatch, whereToRead, source, characters, staff, themes, episodes }; // trailers can't be embedded in the demo
+  // sample "Links" section: official site, socials, database pages
+  const links = {
+    official: [{ site: "Official Site", url: "https://example.com", color: null, language: "Japanese" }],
+    social: [{ site: "Twitter", url: "https://x.com", color: "#1DA1F2", language: null }],
+    databases: [
+      { site: "AniList", url: `https://anilist.co/${segment}/${id}`, color: "#02a9ff", language: null },
+      { site: "MyAnimeList", url: `https://myanimelist.net/${segment}`, color: "#2e51a2", language: null },
+    ],
+  };
+  return { trailer: null, related, whereToWatch, whereToRead, source, characters, staff, themes, episodes, links }; // trailers can't be embedded in the demo
 }
 
 // Every episode airing in the next `days` days: each airing demo title gets its

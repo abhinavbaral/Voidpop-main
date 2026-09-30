@@ -10,6 +10,9 @@ import Skeleton from "./Skeleton.js";
 import { useTheme } from "../context/ThemeContext.js";
 import { useIsWide } from "../lib/layout";
 
+// A row with fewer titles than this looks empty, so it isn't shown at all.
+export const MIN_ROW = 4;
+
 export default function PosterRow({ title, items, loading, onOpen, dot }) {
   const { C } = useTheme();
   const styles = makeStyles(C);
@@ -26,6 +29,7 @@ export default function PosterRow({ title, items, loading, onOpen, dot }) {
   };
   const canLeft = x > 4;
   const canRight = x + viewW < contentW - 4;
+  if (!loading && (items?.length || 0) < MIN_ROW) return null;
 
   return (
     <View style={{ marginTop: wide ? 26 : 18 }}>

@@ -40,7 +40,7 @@
           "widgets": [
             {
               "name": "NextEpisodes",
-              "label": "Voidation · Next episodes",
+              "label": "Voidation \u00b7 Next episodes",
               "description": "Countdowns for up to 30 anime you follow",
               "minWidth": "250dp",
               "minHeight": "180dp",

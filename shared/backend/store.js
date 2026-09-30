@@ -686,6 +686,17 @@ export async function getMyReview(_user, segment, id) {
   return (await load()).reviews[keyOf(segment, id)] ?? null;
 }
 
+/* ---------- first-run welcome ---------- */
+// The welcome screens show once. More > Help can show them again.
+export async function isOnboarded() {
+  return !!(await load()).meta?.onboarded;
+}
+export async function setOnboarded(done = true) {
+  const db = await load();
+  db.meta = { ...(db.meta || {}), onboarded: done ? new Date().toISOString() : null };
+  await save();
+}
+
 /* ---------- personal notes ("stopped at the tournament arc") ---------- */
 // One private note per title, any title (in your library or not). Kept in
 // backups; never synced to AniList.

@@ -12,6 +12,7 @@ import TrailerPlayer from "../components/TrailerPlayer";
 import WhereToWatch from "../components/WhereToWatch";
 import WhereToRead from "../components/WhereToRead";
 import SourceLine from "../components/SourceLine.js";
+import TitleLinks from "../components/TitleLinks.js";
 import CastCrew from "../components/CastCrew.js";
 import EpisodeList from "../components/EpisodeList.js";
 import { NoteBox, WatchOrder, Discussions } from "../components/TitleExtras.js";
@@ -38,6 +39,7 @@ import Card from "../components/Card.js";
 import { useTheme } from "../context/ThemeContext.js";
 import Icon from "../components/Icon.js";
 import AnimatedBanner from "../components/AnimatedBanner.js";
+import Voidmon from "../components/Voidmon.js";
 
 const SEGMENTS = ["anime", "manga"];
 const CREATOR_LABEL = { manga: "Mangaka", anime: "Studio" };
@@ -129,6 +131,7 @@ function DetailBody({ item, navigation }) {
   const [source, setSource] = useState(null); // anime: { label, items }
   const [cast, setCast] = useState({}); // { characters, staff, themes }
   const [episodes, setEpisodes] = useState([]); // anime: official episode list
+  const [links, setLinks] = useState(null); // official site, socials, AniList/MAL pages
 
   const refresh = useCallback(async () => {
     await fillCompleted(item); // completed = all watched, once the count is known
@@ -152,7 +155,7 @@ function DetailBody({ item, navigation }) {
   useEffect(() => {
     let alive = true;
     fetchAniListDetail(item.segment, item.id)
-      .then((d) => { if (alive) { setTrailer(d.trailer); setRelated(d.related); setWatch(d.whereToWatch || []); setRead(d.whereToRead || null); setSource(d.source || null); setCast({ characters: d.characters || [], staff: d.staff || [], themes: d.themes || [] }); setEpisodes(d.episodes || []); } })
+      .then((d) => { if (alive) { setTrailer(d.trailer); setRelated(d.related); setWatch(d.whereToWatch || []); setRead(d.whereToRead || null); setSource(d.source || null); setCast({ characters: d.characters || [], staff: d.staff || [], themes: d.themes || [] }); setEpisodes(d.episodes || []); setLinks(d.links || null); } })
       .catch(() => {});
     if (item.segment === "anime" && !item.finished) {
       fetchNextEpisodes([item.id])
@@ -359,8 +362,9 @@ function DetailBody({ item, navigation }) {
           )}
 
           {status === "completed" && (
-            <View style={[styles.box, { marginTop: 16 }]}>
-              <Text style={{ color: C.green, fontWeight: "800", fontSize: 15 }}>{doneLabel(item)}</Text>
+            <View style={[styles.box, { marginTop: 16, flexDirection: "row", alignItems: "center", gap: 12 }]}>
+              <Voidmon pose="celebrating" size={64} />
+              <Text style={{ color: C.green, fontWeight: "800", fontSize: 15, flex: 1 }}>{doneLabel(item)}</Text>
             </View>
           )}
           {!unreleased && status !== "completed" && (status || progress > 0) && (
@@ -373,6 +377,7 @@ function DetailBody({ item, navigation }) {
           {item.segment === "anime" && <WatchOrder item={item} navigation={navigation} />}
           <CastCrew {...cast} segment={item.segment} navigation={navigation} />
           <Discussions item={item} />
+          <TitleLinks links={links} />
 
           {/* your verdict */}
           {myReview && (

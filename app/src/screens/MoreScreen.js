@@ -2,14 +2,14 @@
 // toggles, then menu rows that open Statistics, Data and storage, Appearance
 // and Others, Help and About (MorePageScreen). Categories shows at 500+ completed.
 
-import { ScrollView, View, Text, Image, Pressable, Switch, StyleSheet } from "react-native";
+import { ScrollView, View, Text, Pressable, Switch, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSettings } from "@voidation/shared/backend/SettingsContext";
 import { useCallback, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import { getUserTier, TIERS, categoriesUnlocked } from "@voidation/shared/backend/store";
 import { useTheme } from "../context/ThemeContext.js";
-import { LOGO } from "../components/Brand.js";
+import Voidmon from "../components/Voidmon.js";
 import AnimatedBanner from "../components/AnimatedBanner.js";
 import Icon from "../components/Icon.js";
 
@@ -53,9 +53,8 @@ export default function MoreScreen({ navigation }) {
       <ScrollView contentContainerStyle={{ paddingBottom: 30 }}>
         <View style={styles.logoWrap}>
           <View style={StyleSheet.absoluteFill}><AnimatedBanner accent={C.purple} dark={dark} height={190} /></View>
-          <View style={[styles.logoDisc, { backgroundColor: C.bg }]}>
-            <Image source={dark ? LOGO.dark : LOGO.light} style={styles.logo} resizeMode="contain" accessibilityLabel="Voidation" />
-          </View>
+          {/* Voidmon peeks over the bottom edge of the banner */}
+          <Voidmon pose="peeking" size={220} />
         </View>
         <View style={styles.group}>
           {toggle("clock", "24-hour clock", "Airing times as 16:30", "clock24")}
@@ -109,9 +108,7 @@ const makeStyles = (C) => StyleSheet.create({
   badgeRow: { flexDirection: "row", alignItems: "center", gap: 12, marginHorizontal: 14, marginTop: 6, marginBottom: 4, padding: 12, borderRadius: 14, borderWidth: 1, backgroundColor: C.card },
   miniMedal: { width: 44, height: 44, borderRadius: 22, borderWidth: 4, alignItems: "center", justifyContent: "center", backgroundColor: "#171226" },
   safe: { flex: 1, backgroundColor: C.bg },
-  logoWrap: { height: 190, alignItems: "center", justifyContent: "center", marginBottom: 8 },
-  logoDisc: { borderRadius: 999, padding: 10, opacity: 0.95 },
-  logo: { width: 72, height: 72 },
+  logoWrap: { height: 190, alignItems: "center", justifyContent: "flex-end", marginBottom: 8, overflow: "hidden" },
   group: { borderTopWidth: 1, borderTopColor: C.border, paddingVertical: 6 },
   row: { flexDirection: "row", alignItems: "center", gap: 22, paddingHorizontal: 22, paddingVertical: 16 },
   icon: { width: 24, alignItems: "center" },

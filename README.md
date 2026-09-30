@@ -137,7 +137,11 @@ Install that APK. From then on, after changing code (from `app/`):
 Open Voidation, close it completely, open it again: the update is in.
 
 A new APK is only needed when a native library is added or changed (a new
-`expo-*` or `react-native-*` package, or app.json plugins/permissions). The
-runtime version is a "fingerprint" of the native code, so an update is never
-sent to an APK that can't run it; if a new build is needed, the update simply
-won't appear until you install the new APK.
+`expo-*` or `react-native-*` package, or app.json plugins/permissions).
+
+The runtime version is the app version (`"version"` in app/app.json). An
+update only reaches APKs with the same version. **Whenever a native change
+needs a new APK, raise the version first** (1.0.0 → 1.0.1), then build; old
+APKs keep getting updates for their own version until people install the new
+one. (A native-code "fingerprint" was tried first, but it came out different
+on Windows and on EAS's servers, which broke builds.)

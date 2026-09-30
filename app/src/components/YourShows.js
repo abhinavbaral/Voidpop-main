@@ -14,6 +14,8 @@ import { useSettings } from "@voidation/shared/backend/SettingsContext";
 import CountdownCard from "./CountdownCard.js";
 import VerdictModal from "./VerdictModal.js";
 import { useTheme } from "../context/ThemeContext.js";
+import { MIN_ROW } from "./PosterRow.js";
+import { VoidmonEmpty, VoidmonCheer } from "./Voidmon.js";
 
 const FOLLOWING = new Set(["watching", "plan", "onhold"]);
 
@@ -54,9 +56,12 @@ export default function YourShows({ now, layout = "stack", title = "Your shows",
       )}
     </View>
   );
+  // as a row (Explore's Up next) it follows the same rule as other rows:
+  // fewer than 4 shows → no row (Schedule still lists them all)
+  if (layout === "row" && shows.length < MIN_ROW) return null;
   if (!shows.length) {
     return layout === "stack" && emptyText ? (
-      <View>{head}<Text style={{ color: C.faint, fontSize: 13, paddingHorizontal: 14, lineHeight: 19 }}>{emptyText}</Text></View>
+      <View>{head}<VoidmonEmpty pose="sleeping" text={emptyText} style={{ marginTop: 8 }} /></View>
     ) : null;
   }
 
@@ -74,6 +79,7 @@ export default function YourShows({ now, layout = "stack", title = "Your shows",
   return (
     <View style={{ marginTop: 14 }}>
       {head}
+      {!pending && layout === "stack" && <VoidmonCheer sub="New episodes show up here the moment they air." style={{ marginHorizontal: 14, marginBottom: 10 }} />}
       {layout === "row" ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingHorizontal: 14 }}>
           {shows.map((s) => card(s, Math.min(340, width * 0.86)))}
