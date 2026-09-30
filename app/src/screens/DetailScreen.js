@@ -15,7 +15,7 @@ import SourceLine from "../components/SourceLine.js";
 import TitleLinks from "../components/TitleLinks.js";
 import CastCrew from "../components/CastCrew.js";
 import EpisodeList from "../components/EpisodeList.js";
-import { NoteBox, WatchOrder, Discussions } from "../components/TitleExtras.js";
+import { NoteBox, WatchOrder, Discussions, RewindToggle } from "../components/TitleExtras.js";
 import { addToCalendar } from "../lib/calendar";
 import { completeEarlierSeasons, undoEarlierSeasons } from "@voidation/shared/seasons";
 import { getCachedItem, cacheItem, openDetail, goBackOrHome } from "../lib/nav";
@@ -373,6 +373,7 @@ function DetailBody({ item, navigation }) {
 
           {item.segment === "manga" ? <WhereToRead links={read} /> : <WhereToWatch links={watch} segment={item.segment} />}
           <NoteBox item={item} />
+          <RewindToggle item={item} />
           {item.segment === "anime" && <EpisodeList episodes={episodes} progress={progress} />}
           {item.segment === "anime" && <WatchOrder item={item} navigation={navigation} />}
           <CastCrew {...cast} segment={item.segment} navigation={navigation} />

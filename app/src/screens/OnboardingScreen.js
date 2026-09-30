@@ -15,7 +15,7 @@ import { useTheme } from "../context/ThemeContext.js";
 import { ensurePermission, rescheduleEpisodeAlerts } from "../lib/episodeAlerts";
 import AnimatedBanner from "../components/AnimatedBanner.js";
 import Icon from "../components/Icon.js";
-import { LOGO } from "../components/Brand.js";
+import { useLogo } from "../components/Brand.js";
 import Voidmon, { VoidmonLoading } from "../components/Voidmon.js";
 
 const STEPS = 4;
@@ -23,6 +23,7 @@ const STEPS = 4;
 export default function OnboardingScreen({ navigation }) {
   const { C, dark, pref, setPref, pureBlack, setPureBlack } = useTheme();
   const styles = makeStyles(C);
+  const logo = useLogo();
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -76,7 +77,7 @@ export default function OnboardingScreen({ navigation }) {
       <View style={styles.hero}>
         <AnimatedBanner accent={C.purple} dark={dark} height={220} />
         <View style={[styles.logoDisc, { backgroundColor: C.bg }]}>
-          <Image source={dark ? LOGO.dark : LOGO.light} style={{ width: 76, height: 76 }} accessibilityLabel="Voidation" />
+          <Image source={logo} style={{ width: 76, height: 76 }} accessibilityLabel="Voidation" />
         </View>
       </View>
       <Guide pose="welcome" says="Hi, I'm Voidmon. I'll show you around." />

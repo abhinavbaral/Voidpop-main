@@ -33,6 +33,7 @@ import { timeAgo } from "@voidation/shared/backend/store";
 import Icon from "../components/Icon.js";
 import { SkeletonList } from "../components/Skeleton.js";
 import { VoidmonLoading } from "../components/Voidmon.js";
+import { LOGOS } from "../components/Brand.js";
 
 const NATIVE = Platform.OS !== "web";
 const AUTO_BACKUP = Platform.OS === "android"; // Android's folder picker (SAF)
@@ -104,6 +105,31 @@ function Statistics({ styles, C }) {
   );
 }
 
+// Which logo the app shows (the home-screen icon needs a new build to change).
+function LogoSettings({ styles, C }) {
+  const { settings, update } = useSettings();
+  const { dark } = useTheme();
+  const current = settings.logo || "classic";
+  return (
+    <View style={[styles.card, { marginTop: 12 }]}>
+      <Text style={styles.cardTitle}>Logo</Text>
+      <Text style={styles.note}>The logo inside the app. The home-screen icon stays the same.</Text>
+      <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
+        {Object.entries(LOGOS).map(([key, l]) => {
+          const on = current === key;
+          return (
+            <TouchableOpacity key={key} onPress={() => update("logo", key)} accessibilityRole="radio" accessibilityState={{ selected: on }}
+              style={{ flex: 1, alignItems: "center", gap: 6, padding: 10, borderRadius: 12, borderWidth: 2, borderColor: on ? C.purple : C.border }}>
+              <Image source={dark ? l.dark : l.light} style={{ width: 56, height: 56 }} resizeMode="contain" />
+              <Text style={[styles.note, { textAlign: "center" }, on && { color: C.purple, fontWeight: "800" }]}>{l.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 // Theme, like Mihon: System / Light / Dark, plus Pure black for dark.
 function ThemeSettings({ styles, C }) {
   const { pref, setPref, pureBlack, setPureBlack, dark } = useTheme();
@@ -142,6 +168,7 @@ function Settings({ styles, C }) {
   return (
     <>
     <ThemeSettings styles={styles} C={C} />
+    <LogoSettings styles={styles} C={C} />
     <View style={styles.card}>
       {row("clock24", "24-hour clock", "Airing times as 16:30 instead of 4:30 PM")}
       {row("posterBadges", "Countdown badges on posters", 'Shows "Ep 7 · 3h 30m" on airing anime')}
