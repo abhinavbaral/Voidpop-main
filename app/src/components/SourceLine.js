@@ -1,13 +1,14 @@
-// "Source: Manga · One Piece · Reading" under an anime's title. Tapping the
-// source opens its page, where you can track it. Your status updates when you
-// come back. Sources that aren't on AniList (Original, Video game…) are plain text.
+// "Source: Light novel · Re:Zero · Reading" under an anime's title. The
+// source (manga, manhwa, manhua, light novel or web novel) opens its page here
+// in the app, where you can track it; your status shows after the title.
+// Sources that aren't on AniList (Original, Video game…) are plain text.
 import { useCallback, useState } from "react";
 import { View, Text, TouchableOpacity } from "react-native";
+import { openDetail } from "../lib/nav";
 import { useFocusEffect } from "@react-navigation/native";
 import { getStatus, statusesFor } from "@voidation/shared/backend/store";
 import { useAuth } from "@voidation/shared/backend/AuthContext";
 import { useTheme } from "../context/ThemeContext.js";
-import { openDetail } from "../lib/nav";
 
 export default function SourceLine({ source, navigation }) {
   const { C } = useTheme();

@@ -3,9 +3,9 @@
 //   WatchOrder    the franchise in release order (anime), with your status
 //   Discussions   AniList forum threads, opening in the browser
 import { useCallback, useEffect, useState } from "react";
-import { View, Text, TextInput, Image, TouchableOpacity, Linking, StyleSheet } from "react-native";
+import { View, Text, TextInput, Image, TouchableOpacity, StyleSheet } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
-import { fetchWatchOrder, fetchDiscussions } from "@voidation/shared/api/anilist";
+import { fetchWatchOrder } from "@voidation/shared/api/anilist";
 import { getNote, setNote, getLibrary, statusesFor } from "@voidation/shared/backend/store";
 import { yearOf } from "@voidation/shared/format";
 import { useTheme } from "../context/ThemeContext.js";
@@ -47,20 +47,23 @@ export function NoteBox({ item }) {
   );
 }
 
-export function WatchOrder({ item, navigation }) {
+// Watch order on every anime's page (and in Browse → Watch order, where
+// `finder` makes every row tappable and drops "You're here").
+export function WatchOrder({ item, navigation, finder = false }) {
   const { C } = useTheme();
   const styles = makeStyles(C);
   const [list, setList] = useState(null);
   const [lib, setLib] = useState({});
   useEffect(() => { let alive = true; fetchWatchOrder(item.id).then((l) => alive && setList(l)).catch(() => alive && setList([])); return () => { alive = false; }; }, [item.id]);
   useFocusEffect(useCallback(() => { getLibrary().then(setLib).catch(() => {}); }, []));
-  if (!list || list.length < 2) return null;
+  if (!list) return null;
   const label = (k) => statusesFor("anime").find((s) => s.key === k)?.label;
   return (
     <View style={{ marginTop: 20 }}>
       <Text style={styles.title}>Watch order</Text>
+      {list.length < 2 && <Text style={styles.faint}>Just this one so far: no other seasons, movies or specials on AniList.</Text>}
       {list.map((it, i) => {
-        const here = it.id === item.id;
+        const here = !finder && it.id === item.id;
         const status = lib[`anime:${it.id}`]?.status;
         return (
           <TouchableOpacity key={it.id} disabled={here} onPress={() => openDetail(navigation, it)} style={[styles.row, here && { backgroundColor: C.card }]}>
@@ -68,34 +71,13 @@ export function WatchOrder({ item, navigation }) {
             {it.image ? <Image source={{ uri: it.image }} style={styles.thumb} /> : <View style={[styles.thumb, { backgroundColor: C.border }]} />}
             <View style={{ flex: 1 }}>
               <Text style={[styles.rowTitle, here && { color: C.purple }]} numberOfLines={2}>{it.title}</Text>
-              <Text style={styles.faint}>{[FORMAT[it.format] || it.format, yearOf(it), here ? "You're here" : null].filter(Boolean).join(" · ")}</Text>
+              <Text style={styles.faint}>{[it.orderLabel, FORMAT[it.format] || it.format, yearOf(it), here ? "You're here" : null].filter(Boolean).join(" · ")}</Text>
             </View>
             {status ? <Text style={styles.status}>{label(status)}</Text> : null}
           </TouchableOpacity>
         );
       })}
       <Text style={[styles.faint, { marginTop: 6 }]}>In release order, from AniList. Recaps and remakes are left out.</Text>
-    </View>
-  );
-}
-
-export function Discussions({ item }) {
-  const { C } = useTheme();
-  const styles = makeStyles(C);
-  const [threads, setThreads] = useState(null);
-  useEffect(() => { let alive = true; fetchDiscussions(item.id).then((t) => alive && setThreads(t)).catch(() => alive && setThreads([])); return () => { alive = false; }; }, [item.id]);
-  if (!threads?.length) return null;
-  return (
-    <View style={{ marginTop: 20 }}>
-      <Text style={styles.title}>Discussions</Text>
-      {threads.map((t) => (
-        <TouchableOpacity key={t.id} style={styles.row} onPress={() => Linking.openURL(t.url).catch(() => {})} accessibilityRole="link">
-          <Icon name="comment" size={16} color={C.purple} />
-          <Text style={[styles.rowTitle, { flex: 1 }]} numberOfLines={2}>{t.title}</Text>
-          <Text style={styles.faint}>{t.replies} {t.replies === 1 ? "reply" : "replies"}</Text>
-        </TouchableOpacity>
-      ))}
-      <Text style={[styles.faint, { marginTop: 6 }]}>Opens on AniList. Watch out for spoilers.</Text>
     </View>
   );
 }

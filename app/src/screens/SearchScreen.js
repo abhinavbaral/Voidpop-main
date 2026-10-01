@@ -49,13 +49,14 @@ export default function SearchScreen({ navigation, route }) {
     const t = setTimeout(async () => {
       const n = kind === "all" ? 5 : 20;
       const none = Promise.resolve(null);
-      const [anime, manga, people] = await Promise.allSettled([
+      const [anime, manga, novels, people] = await Promise.allSettled([
         kind === "all" || kind === "anime" ? fetchAniList("anime", { search: query, perPage: n }) : none,
         kind === "all" || kind === "manga" ? fetchAniList("manga", { search: query, perPage: n }) : none,
+        kind === "all" || kind === "novel" ? fetchAniList("novel", { search: query, perPage: n }) : none,
         kind === "all" || kind === "people" ? fetchPeople(query, n) : none,
       ]);
       if (!alive) return; // you kept typing; a newer search owns the screen
-      const asked = [anime, manga, people].filter((r) => r.status === "rejected" || r.value !== null);
+      const asked = [anime, manga, novels, people].filter((r) => r.status === "rejected" || r.value !== null);
       if (asked.every((r) => r.status === "rejected")) {
         setSections([]);
         setStatus("failed");
@@ -67,6 +68,7 @@ export default function SearchScreen({ navigation, route }) {
         [
           { title: "Anime", data: items(anime) },
           { title: "Manga", data: items(manga) },
+          { title: "Novels", data: items(novels) },
           { title: "People", data: folks },
         ].filter((s) => s.data.length > 0)
       );
@@ -92,7 +94,7 @@ export default function SearchScreen({ navigation, route }) {
       </View>
       <View style={{ paddingHorizontal: 14, paddingBottom: 6 }}>
         <Chips value={kind} onChange={setKind}
-          options={[{ key: "all", label: "All" }, { key: "anime", label: "Anime" }, { key: "manga", label: "Manga" }, { key: "people", label: "People" }]} />
+          options={[{ key: "all", label: "All" }, { key: "anime", label: "Anime" }, { key: "manga", label: "Manga" }, { key: "novel", label: "Novels" }, { key: "people", label: "People" }]} />
       </View>
 
       <SectionList

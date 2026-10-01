@@ -789,7 +789,7 @@ function About({ styles, C }) {
         {line("Made by Abhinav Baral", "www.abhinavbaral.com.np · Jhapa, Nepal", () => Linking.openURL("https://www.abhinavbaral.com.np/").catch(() => {}))}
         {line("Voidmon", "Voidation's mascot, a character by Abhinav Baral")}
         {line("Voidmon on YouTube", "youtube.com/@voidmonreal", () => Linking.openURL("https://www.youtube.com/@voidmonreal").catch(() => {}))}
-        {line("Anime and manga data: AniList", "Voidation is not affiliated with AniList", () => Linking.openURL("https://anilist.co").catch(() => {}))}
+        {line("Anime and manga data: AniList", "Voidation is not affiliated with AniList")}
       </View>
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Your data</Text>

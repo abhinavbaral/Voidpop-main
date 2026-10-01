@@ -1,6 +1,7 @@
 // LIBRARY — two separate lists, because watching and reading are different:
-//   Watch list: anime  → Watching / Completed / Plan to Watch …
-//   Read list:  manga (incl. manhwa, manhua, comics) → Reading / Finished / Plan to Read …
+//   one kind at a time, picked from a dropdown: Anime (Watching / Completed /
+//   Plan to Watch …), Manga (incl. manhwa, manhua) or Novels (light and web
+//   novels) (Reading / Finished / Plan to Read …)
 // Saved on this phone. Airing anime get a fresh next-episode countdown on open.
 // Search, sort, four layouts (compact, comfortable, covers, list), and
 // "Pick for me" for a random title from the list you're on.
@@ -11,13 +12,13 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import { useAuth } from "@voidation/shared/backend/AuthContext";
 import {
-  getLibrary, statusesFor, LIBRARY_LISTS as LISTS, inLibraryList as inList,
+  getLibrary, statusesFor, LIBRARY_KINDS as KINDS, kindOf, kindsMissing, fillKinds,
   setStatus, addReview, noteAiring, LIBRARY_SORTS, LIBRARY_LAYOUTS, sortEntries, getLibraryDates,
   getCategories, categoriesUnlocked, bulkSetStatus, bulkCategory, bulkRemove,
 } from "@voidation/shared/backend/store";
 import OptionsSheet from "../components/OptionsSheet.js";
 import VerdictModal from "../components/VerdictModal.js";
-import { fetchNextEpisodes } from "@voidation/shared/api/anilist";
+import { fetchNextEpisodes, fetchKinds } from "@voidation/shared/api/anilist";
 import Chips from "../components/Chips.js";
 import LibraryCard from "../components/LibraryCard.js";
 import { useTheme } from "../context/ThemeContext.js";
@@ -39,7 +40,7 @@ export default function LibraryScreen({ navigation }) {
   const [dates, setDates] = useState({});
   const [picking, setPicking] = useState(false);
   const { user } = useAuth();
-  const [list, setList] = useState("watch");
+  const [kind, setKind] = useState("anime");
   const [tab, setTab] = useState("watching");
   const [entries, setEntries] = useState([]);
   const [query, setQuery] = useState("");
@@ -47,7 +48,7 @@ export default function LibraryScreen({ navigation }) {
   const [finishing, setFinishing] = useState(null); // item whose last episode you just marked
   const [cats, setCats] = useState([]);
   const [selected, setSelected] = useState(null); // null = not selecting; Set of keys while selecting
-  const [sheet, setSheet] = useState(null); // "status" | "category" | "sort" | "layout"
+  const [sheet, setSheet] = useState(null); // "status" | "category" | "sort" | "layout" | "kind"
 
   const reload = useCallback(async () => {
     setEntries(Object.values(await getLibrary(user).catch(() => ({}))));
@@ -65,6 +66,12 @@ export default function LibraryScreen({ navigation }) {
         const airing = lib.filter((e) => e.item.segment === "anime" && !e.item.finished && e.status !== "completed");
         const fresh = await fetchNextEpisodes(airing.map((e) => e.item.id)).catch(() => ({}));
         if (alive && (await noteAiring(fresh))) reload();
+        // manga saved without a format: look it up once so novels move to Novels
+        const missing = await kindsMissing();
+        if (alive && missing.length) {
+          const found = await fetchKinds(missing.map((k) => k.split(":")[1])).catch(() => ({}));
+          if (alive && (await fillKinds(found))) reload();
+        }
       })();
       return () => { alive = false; };
     }, [user, reload])
@@ -86,14 +93,14 @@ export default function LibraryScreen({ navigation }) {
     reload();
   };
 
-  const current = LISTS.find((l) => l.key === list);
+  const current = KINDS.find((k) => k.key === kind);
   const q = query.trim().toLowerCase();
   // search narrows every status, so the chip counts show where the matches are
   const listEntries = useMemo(
-    () => entries.filter((e) => inList(e, list)
+    () => entries.filter((e) => kindOf(e.item) === kind
       && (!q || e.item.title.toLowerCase().includes(q))
 ),
-    [entries, list, q]
+    [entries, kind, q]
   );
   const sorts = LIBRARY_SORTS.filter((s) => !s.anime || current.segment === "anime");
 
@@ -112,29 +119,20 @@ export default function LibraryScreen({ navigation }) {
         <Text style={styles.title}>Library</Text>
       </View>
 
-      {/* Anime | Manga */}
-      <View style={styles.switcher}>
-        {LISTS.map((l) => {
-          const active = l.key === list;
-          const count = entries.filter((e) => inList(e, l.key)).length;
-          return (
-            <TouchableOpacity
-              key={l.key}
-              onPress={() => { setList(l.key); setSelected(null); if (sort === "airing" || sort === "behind") setSort("updated"); }}
-              style={[styles.switchBtn, active && styles.switchActive]}
-            >
-              <Text style={[styles.switchLabel, active && { color: "#fff" }]}>
-                {l.segment === "anime" ? "Anime" : "Manga"} <Text style={styles.switchCount}>{count}</Text>
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+      {/* which kind: a dropdown (Japanese Animation, Manhwa, Light Novel…) */}
+      <TouchableOpacity onPress={() => setSheet("kind")} style={styles.kindBtn} accessibilityRole="button"
+        accessibilityLabel={`Showing ${current.label}. Change`}>
+        <Icon name={{ anime: "tv", manga: "book", novel: "novel" }[kind]} size={17} color={C.purple} />
+        <Text style={styles.kindText}>{current.label}</Text>
+        <Text style={[styles.switchCount, { color: C.sub }]}>{entries.filter((e) => kindOf(e.item) === kind).length}</Text>
+        <View style={{ flex: 1 }} />
+        <Icon name="down" size={16} color={C.sub} />
+      </TouchableOpacity>
 
       <TextInput
         value={query}
         onChangeText={setQuery}
-        placeholder={`Search your ${current.segment}`}
+        placeholder={`Search in ${current.label}`}
         placeholderTextColor={C.faint}
         style={styles.search}
         returnKeyType="search"
@@ -198,7 +196,7 @@ export default function LibraryScreen({ navigation }) {
         )}
         ListEmptyComponent={
           <VoidmonEmpty pose="peeking"
-            text={q ? `No ${tabLabel} titles match "${query.trim()}".` : `Nothing in ${tabLabel} yet. ${list === "read" ? "Find some manga to read!" : "Tag some titles!"}`} />
+            text={q ? `No ${tabLabel} titles match "${query.trim()}".` : `Nothing in ${tabLabel} yet. ${current.segment === "manga" ? "Find something to read!" : "Tag some titles!"}`} />
         }
       />
       <OptionsSheet
@@ -215,6 +213,17 @@ export default function LibraryScreen({ navigation }) {
           ...cats.map((c) => ({ key: `+${c.id}`, label: `Add to ${c.name}` })),
         ]}
         onPick={(k) => bulk((keys) => bulkCategory(keys, k.slice(1), k[0] === "+"))}
+        onClose={() => setSheet(null)}
+      />
+      <OptionsSheet
+        visible={sheet === "kind"}
+        title="Show"
+        options={KINDS.map((k) => ({ key: k.key, label: `${k.label}  ${entries.filter((e) => kindOf(e.item) === k.key).length}${k.key === kind ? "  (now)" : ""}` }))}
+        onPick={(k) => {
+          const next = KINDS.find((x) => x.key === k);
+          if (next.segment !== current.segment) { setTab("watching"); if (sort === "airing" || sort === "behind") setSort("updated"); }
+          setKind(k); setSelected(null); setSheet(null);
+        }}
         onClose={() => setSheet(null)}
       />
       <OptionsSheet
@@ -247,6 +256,11 @@ const makeStyles = (C) => StyleSheet.create({
     paddingHorizontal: 14, paddingTop: 8,
   },
   title: { color: C.text, fontSize: 20, fontWeight: "800" },
+  kindBtn: {
+    flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: 14, marginTop: 14, marginBottom: 4,
+    paddingHorizontal: 14, height: 46, backgroundColor: C.card, borderRadius: 12, borderWidth: 1, borderColor: C.border,
+  },
+  kindText: { color: C.text, fontWeight: "800", fontSize: 15 },
   switcher: {
     flexDirection: "row", gap: 4, marginHorizontal: 14, marginTop: 14, marginBottom: 4, padding: 4,
     backgroundColor: C.card, borderRadius: 12, borderWidth: 1, borderColor: C.border,

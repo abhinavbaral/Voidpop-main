@@ -651,10 +651,43 @@ export async function getStats() {
 
 export const LIBRARY_LISTS = [
   { key: "watch", label: "Watch list", hint: "Anime · Donghua · Korean animation", segment: "anime" },
-  { key: "read", label: "Read list", hint: "Manga · Manhwa · Manhua · Comics", segment: "manga" },
+  { key: "read", label: "Read list", hint: "Manga · Manhwa · Manhua · Novels", segment: "manga" },
 ];
 export const inLibraryList = (entry, list) =>
   list === "read" ? entry.item.segment === "manga" : entry.item.segment !== "manga";
+
+// Library kinds: Anime, Manga (manga, manhwa, manhua) and Novels (light and
+// web novels). Novels are "manga" to AniList; their format says NOVEL.
+export const LIBRARY_KINDS = [
+  { key: "anime", label: "Anime", hint: "Japanese, Chinese and Korean animation", segment: "anime" },
+  { key: "manga", label: "Manga", hint: "Manga, manhwa and manhua", segment: "manga" },
+  { key: "novel", label: "Novels", hint: "Light novels and web novels", segment: "manga" },
+];
+export function kindOf(item) {
+  if (item.segment !== "manga") return "anime";
+  return item.format === "NOVEL" ? "novel" : "manga";
+}
+export const kindLabel = (item) => LIBRARY_KINDS.find((k) => k.key === kindOf(item))?.label;
+
+// keys of library manga that don't know their format yet (so a novel
+// can't be told apart from a manga)
+export async function kindsMissing() {
+  const db = await load();
+  return Object.keys(db.library).filter((k) => db.library[k].item.segment === "manga" && !db.library[k].item.format);
+}
+// fills in format (and country) from fetchKinds; returns how many changed
+export async function fillKinds(found) {
+  const db = await load();
+  let n = 0;
+  for (const [key, f] of Object.entries(found)) {
+    const e = db.library[key];
+    if (!e || !f.format || e.item.format) continue;
+    e.item = { ...e.item, format: f.format, country: e.item.country || f.country };
+    n++;
+  }
+  if (n) await save();
+  return n;
+}
 
 /* ---------- tiers ---------- */
 

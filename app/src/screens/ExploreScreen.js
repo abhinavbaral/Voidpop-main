@@ -44,6 +44,7 @@ export default function ExploreScreen({ navigation }) {
   }, []));
 
   const [pools, setPools] = useState(null);
+  const [known, setKnown] = useState(new Set()); // library + Excited keys
   const [seed, setSeed] = useState(undefined); // undefined = today's picks; a number after pull-to-refresh
   const [aoty, setAoty] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -57,7 +58,7 @@ export default function ExploreScreen({ navigation }) {
   // anything you add to your library disappears from Explore when you come back
   useFocusEffect(useCallback(() => {
     if (!pools) return;
-    knownKeys().then((known) => { setData(buildExplore(pools, known, seed)); setLoading(false); }).catch(() => {});
+    knownKeys().then((k) => { setKnown(k); setData(buildExplore(pools, k, seed)); setLoading(false); }).catch(() => {});
   }, [pools, seed]));
 
   // pull to refresh: different pages from AniList and a new mix
@@ -86,42 +87,53 @@ export default function ExploreScreen({ navigation }) {
   // "Top rated": the highest-scored anime on AniList
   const [topRated, setTopRated] = useState(null);
   useEffect(() => {
-    fetchAniList("anime", { sort: "score", perPage: 10 }).then((r) => setTopRated(r.items)).catch(() => setTopRated([]));
+    fetchAniList("anime", { sort: "score", perPage: 30 }).then((r) => setTopRated(r.items)).catch(() => setTopRated([]));
   }, []);
   useEffect(() => {
     let alive = true;
     setTrend(null);
-    fetchAniList("anime", { sort: "trending", origin: country, perPage: 15 }).then((r) => alive && setTrend(r.items)).catch(() => alive && setTrend([]));
+    fetchAniList("anime", { sort: "trending", origin: country, perPage: 30 }).then((r) => alive && setTrend(r.items)).catch(() => alive && setTrend([]));
     return () => { alive = false; };
   }, [country]);
 
+
+  // discovery rows never show what's in your library or on your Excited list
+  const unmarked = (items) => (items ? items.filter((it) => !known.has(`${it.segment}:${it.id}`)) : items);
+
+  // Coming soon: new titles of this and next season, including sequels of
+  // shows you haven't watched. Sequels of shows you HAVE watched never show
+  // here; they live in "New seasons of shows you watched". Nothing marked.
+  const yourSequels = new Set(newSeasons.map((it) => it.id));
+  const comingSoon = (data.coming || []).filter((it) => !yourSequels.has(it.id));
 
   // Explore's rows in order. Each one renders only when it's near the screen.
   const row = (key, render) => ({ key, render });
   const sections = [
     data.featured && row("billboard", () => <Billboard item={data.featured} onOpen={open} />),
     row("new-eps", () => <NewEpisodeCards onOpen={open} />),
-    ...catRows.map((r) => row(`cat-${r.id}`, () => <PosterRow title={r.title} items={r.items} onOpen={open} />)),
+    ...catRows.map((r) => ({ ...r, items: r.items.filter((it) => it.segment === "anime") })).filter((r) => r.items.length)
+      .map((r) => row(`cat-${r.id}`, () => <PosterRow title={r.title} items={r.items} onOpen={open} />)),
     row("coming-up", () => <Countdowns onOpen={open} />),
     // right under Coming up on purpose: mark one of these Excited and it
     // leaves this row and starts counting down in Coming up
-    data.coming?.length > 0 && row("coming-soon", () => <PosterRow title={data.comingTitle} chip={data.comingChip} items={data.coming} onOpen={open} />),
-    jump.anime.length > 0 && row("jump-anime", () => <PosterRow title="Jump back in: Anime" items={jump.anime} onOpen={open} />),
-    jump.manga.length > 0 && row("jump-manga", () => <PosterRow title="Jump back in: Manga" items={jump.manga} onOpen={open} />),
+    comingSoon.length > 0 && row("coming-soon", () => <PosterRow title={data.comingTitle} chip={data.comingChip} items={comingSoon} onOpen={open} />),
+    // the one row that may include shows you've watched
+    aoty.length > 0 && row("aoty", () => <PosterRow title="Anime of the Year (Crunchyroll Awards)" items={aoty} onOpen={open} />),
+    jump.anime.length > 0 && row("jump-anime", () => <PosterRow title="Jump back in" items={jump.anime} onOpen={open} />),
     newSeasons.length > 0 && row("new-seasons", () => <PosterRow title="New seasons of shows you watched" items={newSeasons} onOpen={open} />),
     ...verdictRows.map((r) => row(`verdict-${r.verdict}`, () => <PosterRow title={r.title} dot={r.color} items={r.items} onOpen={open} />)),
     row("talk", () => <PosterRow title="Talk of the Week" items={data.talk} loading={loading} onOpen={open} onMore={() => navigation.navigate("Trends")} />),
-    row("top-rated", () => <RankedRow title="Top rated" subtitle="The highest-scored anime on AniList" items={topRated} loading={topRated === null} onOpen={open}
+    row("top-rated", () => <RankedRow title="Top rated" subtitle="The highest-scored anime on AniList" items={unmarked(topRated)?.slice(0, 10)} loading={topRated === null} onOpen={open}
       onMore={() => navigation.navigate("Browse", { sort: "score" })} />),
-    row("trending-in", () => <PosterRow title="Trending in" items={trend} loading={trend === null} onOpen={open}
+    row("trending-in", () => <PosterRow title="Trending in" items={unmarked(trend)?.slice(0, 15)} loading={trend === null} onOpen={open}
       chip={{ label: COUNTRIES.find((c) => c.key === country)?.label, onPress: nextCountry, a11y: "Change country" }}
       onMore={() => navigation.navigate("Trends", { country })} />),
     row("dont-miss-anime", () => <PosterRow title="Don't Miss This — Anime" items={data.dontMissAnime} loading={loading} onOpen={open} />),
     row("dont-miss-manga", () => <PosterRow title="Don't Miss This — Manga" items={data.dontMissManga} loading={loading} onOpen={open} />),
+    row("dont-miss-novels", () => <PosterRow title="Don't Miss This — Novels" items={data.dontMissNovels} loading={loading} onOpen={open} />),
     row("isekai", () => <PosterRow title="Isekai Heaven" items={data.isekai} loading={loading} onOpen={open} />),
     row("shonen", () => <PosterRow title="Shonen Feast" items={data.shonen} loading={loading} onOpen={open} />),
     row("angles", () => <PosterRow title="Voidation Angles" items={data.voidpicks} loading={loading} onOpen={open} />),
-    aoty.length > 0 && row("aoty", () => <PosterRow title="Anime of the Year (Crunchyroll Awards)" items={aoty} onOpen={open} />),
   ].filter(Boolean);
 
   const header = !wide && (

@@ -40,6 +40,7 @@ export const ICON_PATHS = {
   lock: "M6 11h12v9H6zM8 11V8a4 4 0 0 1 8 0v3",
   coffee: "M5 9h11v6a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4zM16 11h1.5a2.5 2.5 0 0 1 0 5H16M8 3v3M11 3v3M14 3v3",
   menu: "M4 7h16M4 12h16M4 17h16",
+  novel: "M6 3h9l4 4v14H6zM14 3v5h5M9 12h7M9 16h7",
   list: "M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01",
   sort: "M7 4v16M4 17l3 3l3-3M17 20V4M14 7l3-3l3 3",
   shuffle: "M16 4h4v4M4 20L20 4M20 16v4h-4M15 15l5 5M4 4l5 5",

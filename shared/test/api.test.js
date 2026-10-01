@@ -19,7 +19,7 @@ test("normalize: title, colour, hype fields come through", async () => {
 test("source line: comics before novels, labels by country and format", () => {
   const edge = (id, format, country) => ({ relationType: "SOURCE", node: { ...media(id), type: "MANGA", format, countryOfOrigin: country } });
   const s = a.sourceInfo("WEB_NOVEL", [edge(1, "NOVEL", "KR"), edge(2, "MANGA", "KR"), { relationType: "SEQUEL", node: { type: "ANIME" } }]);
-  assert.deepEqual(s.items.map((i) => i.kindLabel), ["Manhwa", "Novel"]);
+  assert.deepEqual(s.items.map((i) => [i.kindLabel, i.novel]), [["Manhwa", false], ["Web novel", true]]);
   assert.equal(a.sourceInfo("ORIGINAL", []).label, "Original");
   assert.equal(a.sourceKindLabel({ format: "NOVEL", countryOfOrigin: "JP" }), "Light novel");
   assert.equal(a.sourceInfo(null, []), null);
@@ -91,4 +91,9 @@ test("watch order follows prequel/sequel links and sorts by date", async () => {
   fakeAniList((q, v) => ({ Page: { media: v.ids.map((id) => graph[id]).filter(Boolean) } }));
   const order = await a.fetchWatchOrder(2);
   assert.deepEqual(order.map((x) => x.id), [1, 3, 2]); // alternative (remake) left out
+});
+
+test("watch order labels: seasons, movies and specials counted in order", () => {
+  const out = a.labelOrder([{ format: "TV" }, { format: "OVA" }, { format: "TV" }, { format: "MOVIE" }, { format: "SPECIAL" }, { format: "ONA" }, { format: "MOVIE" }]);
+  assert.deepEqual(out.map((x) => x.orderLabel), ["Season 1", "OVA", "Season 2", "Movie 1", "Special", "Season 3", "Movie 2"]);
 });

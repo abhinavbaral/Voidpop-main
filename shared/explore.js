@@ -1,7 +1,9 @@
 // Explore (home) sections — the same picks on the app and the website.
-// Talk of the Week, Don't Miss This (Anime / Manga), Isekai Heaven, Shonen
-// Feast, Voidation Angles (6 anime, 4 manga), and Anime of the Year. Picks are
-// the same all day; pulling to refresh shuffles everything except Anime of the Year.
+// Explore is anime only, except "Don't Miss This — Manga" and "Don't Miss
+// This — Novels". Nothing in your library or on your Excited list shows in
+// the discovery rows; only Anime of the Year (Crunchyroll Awards) may include
+// shows you've watched. Picks are the same all day; pulling to refresh
+// shuffles everything except Anime of the Year.
 
 import { fetchAniList, fetchAnimeOfTheYear, fetchRecommendations, fetchSequels } from "./api/anilist.js";
 import { readKey, writeKey } from "./backend/storage.js";
@@ -15,7 +17,7 @@ const rotate = (arr, by) =>
   arr.length ? [...arr.slice(by % arr.length), ...arr.slice(0, by % arr.length)] : [];
 
 // Explore is for finding NEW things: anything already in your library (any
-// status) or marked Excited is left out of the rows, except Talk of the Week. Pools are fetched larger
+// status) or marked Excited is left out of the rows. Pools are fetched larger
 // than the rows so they stay full after that.
 // shuffle: a pull-to-refresh asks for different pages, so the rows change.
 // Without it (first load of the day) the picks are the same all day.
@@ -31,16 +33,17 @@ export async function loadExplorePools({ shuffle = false } = {}) {
     fetchAniList("anime", { season: s.season, year: s.year, unreleasedOnly: true, sort: "popular", perPage: 25 })
       .then((r) => r.items).catch(() => []);
   const popPage = page(4);
-  const [trA, trM, popA1, popA2, popM1, popM2, comingNow, comingNext, isekai, shonen] = await Promise.all([
-    get("anime", "trending", page(2)), get("manga", "trending", page(2)),
+  const [trA, popA1, popA2, popM1, popM2, popN1, popN2, comingNow, comingNext, isekai, shonen] = await Promise.all([
+    get("anime", "trending", page(2)),
     get("anime", "popular", popPage), get("anime", "popular", popPage + 1),
     get("manga", "popular", popPage), get("manga", "popular", popPage + 1),
+    get("novel", "popular", popPage), get("novel", "popular", popPage + 1),
     coming(now), coming(next),
     get("anime", "popular", page(4), { tag: "Isekai" }),
     get("anime", "popular", page(6), { tag: "Shounen" }),
   ]);
   return {
-    trA, trM, popA: [...popA1, ...popA2], popM: [...popM1, ...popM2],
+    trA, popA: [...popA1, ...popA2], popM: [...popM1, ...popM2], popN: [...popN1, ...popN2],
     coming: [...comingNow, ...comingNext],
     comingTitle: "Coming soon",
     // shown as a pill next to the title, with the season's icon
@@ -79,8 +82,9 @@ export function buildExplore(pools, known = new Set(), seed = daySeed()) {
   const popM = fresh(pools.popM);
   const dontMissAnime = rotate(popA, seed).slice(0, 10);
   const dontMissManga = rotate(popM, seed).slice(0, 10);
+  const dontMissNovels = rotate(fresh(pools.popN || []), seed).slice(0, 10);
   // Voidation picks never repeat what "Don't miss this" already shows
-  const shown = new Set([...dontMissAnime, ...dontMissManga].map((it) => `${it.segment}:${it.id}`));
+  const shown = new Set(dontMissAnime.map((it) => `${it.segment}:${it.id}`));
   // prefer titles no other row shows; if that leaves nothing, allow repeats
   const notShown = (items) => { const left = items.filter((it) => !shown.has(`${it.segment}:${it.id}`)); return left.length ? left : items; };
   // soonest premiere first; titles without a date yet go last, most popular first
@@ -90,25 +94,24 @@ export function buildExplore(pools, known = new Set(), seed = daySeed()) {
     .sort((a, b) => (a.date ? 0 : 1) - (b.date ? 0 : 1) || (a.date || "").localeCompare(b.date || ""))
     .slice(0, 20);
   // the Billboard at the top of Explore (Netflix-style): a trending anime with
-  // a wide banner picture, different each day and on every refresh. Library
-  // titles are allowed; the billboard just says they're on your list.
-  const featuredPool = (pools.trA || []).filter((it) => it.banner && !it.unreleased).slice(0, 10);
+  // a wide banner picture, different each day and on every refresh. Never one
+  // that's in your library or on your Excited list (a sequel of a show you
+  // watched can still appear, as long as the sequel itself isn't marked).
+  const featuredPool = fresh(pools.trA || []).filter((it) => it.banner && !it.unreleased).slice(0, 10);
   const featured = rotate(featuredPool, seed * 13)[0] || null;
   return {
     featured,
     coming,
     comingTitle: pools.comingTitle,
     comingChip: pools.comingChip,
-    // Talk of the Week is what everyone's talking about, so it includes shows you've seen
-    talk: [...pools.trA.slice(0, 7), ...pools.trM.slice(0, 5)],
+    // Talk of the Week: what everyone's watching that you haven't marked yet
+    talk: fresh(pools.trA).slice(0, 12),
     dontMissAnime,
     dontMissManga,
+    dontMissNovels,
     isekai: rotate(fresh(pools.isekai || []), seed * 7).slice(0, 12),
     shonen: rotate(fresh(pools.shonen || []), seed * 11).slice(0, 12),
-    voidpicks: [
-      ...rotate(notShown(popA), seed * 3).slice(0, 6),
-      ...rotate(notShown(popM), seed * 5).slice(0, 4),
-    ],
+    voidpicks: rotate(notShown(popA), seed * 3).slice(0, 10),
   };
 }
 
@@ -131,7 +134,7 @@ export async function loadVerdictRows() {
   const rows = [];
   for (const verdict of ["peak", "divein", "onetime"]) {
     const mine = reviews
-      .filter((r) => r.verdict === verdict && lib[`${r.segment}:${r.titleId}`])
+      .filter((r) => r.verdict === verdict && r.segment === "anime" && lib[`${r.segment}:${r.titleId}`])
       .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
     if (!mine.length) continue;
     const pick = mine[seed % mine.length];
@@ -231,5 +234,5 @@ export async function loadJumpBackIn(now = Date.now()) {
     .filter((e) => { const left = leftToWatch(e); return left === null ? e.item.segment === "manga" : left > 0; })
     .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
   const pick = (seg) => entries.filter((e) => e.item.segment === seg).slice(0, 12).map((e) => e.item);
-  return { anime: pick("anime"), manga: pick("manga") };
+  return { anime: pick("anime"), manga: [] }; // Explore is anime only
 }

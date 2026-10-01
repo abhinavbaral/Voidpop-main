@@ -11,7 +11,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Sidebar from "../components/Sidebar.js";
 import Card from "../components/Card.js";
 import {
-  fetchAniList, SORTS, SEASONS, GENRES, ANIME_ORIGINS, MANGA_ORIGINS,
+  fetchAniList, SORTS, SEASONS, GENRES, ANIME_ORIGINS, MANGA_ORIGINS, NOVEL_ORIGINS,
 } from "@voidation/shared/api/anilist";
 import { useTheme } from "../context/ThemeContext.js";
 import { useGridColumns } from "../lib/layout";
@@ -19,15 +19,18 @@ import { openDetail } from "../lib/nav";
 import Icon from "../components/Icon.js";
 import { SkeletonGrid } from "../components/Skeleton.js";
 import { VoidmonEmpty, VoidmonTrouble } from "../components/Voidmon.js";
+import WatchOrderFinder from "../components/WatchOrderFinder.js";
 
 const SEGMENTS = [
   { key: "anime", label: "Anime" },
   { key: "manga", label: "Manga" },
+  { key: "novel", label: "Novels" },
 ];
 
 const ORIGIN_MAP = {
   anime: ANIME_ORIGINS,
   manga: MANGA_ORIGINS,
+  novel: NOVEL_ORIGINS,
 };
 
 const THIS_YEAR = new Date().getFullYear();
@@ -44,6 +47,7 @@ export default function BrowseScreen({ navigation, route }) {
   const styles = makeStyles(C);
   const cols = useGridColumns();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [orderMode, setOrderMode] = useState(false); // the "Watch order" toggle
 
   const [segment, setSegment] = useState("anime");
   const [origin, setOrigin] = useState("");
@@ -156,13 +160,24 @@ export default function BrowseScreen({ navigation, route }) {
             <Text style={styles.filterBtnText}>‹</Text>
           </TouchableOpacity>
         )}
-        <TouchableOpacity onPress={() => setSidebarOpen(true)} style={styles.filterBtn}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}><Icon name="menu" size={15} color={C.text} /><Text style={styles.filterBtnText}>Filters</Text></View>
+        {!orderMode && (
+          <TouchableOpacity onPress={() => setSidebarOpen(true)} style={styles.filterBtn}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}><Icon name="menu" size={15} color={C.text} /><Text style={styles.filterBtnText}>Filters</Text></View>
+          </TouchableOpacity>
+        )}
+        <Text style={styles.summary} numberOfLines={1}>{orderMode ? "Any anime's full watch order" : summary}</Text>
+        <TouchableOpacity onPress={() => setOrderMode(!orderMode)} accessibilityRole="switch" accessibilityState={{ checked: orderMode }}
+          style={[styles.filterBtn, orderMode && { backgroundColor: C.purple, borderColor: C.purple }]}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Icon name="list" size={15} color={orderMode ? "#fff" : C.text} />
+            <Text style={[styles.filterBtnText, orderMode && { color: "#fff" }]}>Watch order</Text>
+          </View>
         </TouchableOpacity>
-        <Text style={styles.summary} numberOfLines={1}>{summary}</Text>
       </View>
 
-      {error ? (
+      {orderMode ? (
+        <WatchOrderFinder navigation={navigation} />
+      ) : error ? (
         <VoidmonTrouble what="Browse" onRetry={retryFirst} navigation={navigation} />
       ) : (
         <FlatList

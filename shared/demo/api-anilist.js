@@ -4,7 +4,8 @@
 import { CATALOG, findItem, toAppItem } from "./catalog.js";
 import { CRUNCHYROLL_AOTY } from "../awards.js";
 import { readingLinks } from "../readLinks.js";
-export { SORTS, SEASONS, GENRES, ANIME_ORIGINS, MANGA_ORIGINS } from "../api/anilist.js";
+export { SORTS, SEASONS, GENRES, ANIME_ORIGINS, MANGA_ORIGINS, NOVEL_ORIGINS, labelOrder } from "../api/anilist.js";
+import { labelOrder } from "../api/anilist.js";
 // the demo is always "online"; these keep the same exports as the real module
 export const onNetState = (fn) => { fn({ offline: false, since: null }); return () => {}; };
 export const isDeviceOnline = () => true;
@@ -33,7 +34,9 @@ export async function fetchAniList(segment, opts = {}) {
     season = "", year = null, unreleasedOnly = false, perPage = 24, genre = "", tag = "",
   } = opts;
   await wait();
-  let items = CATALOG[segment] || [];
+  // the demo catalog has no novels; "manga" leaves them out like the real API
+  let items = segment === "novel" ? (CATALOG.manga || []).filter((i) => i.format === "NOVEL")
+    : segment === "manga" ? (CATALOG.manga || []).filter((i) => i.format !== "NOVEL") : CATALOG[segment] || [];
   if (genre) items = items.filter((i) => i.genres.includes(genre));
   // the demo has no tags: Isekai → Fantasy/Adventure, Shounen → Action
   if (tag) items = items.filter((i) => i.genres.some((g) => ({ Isekai: ["Fantasy", "Adventure"], Shounen: ["Action"] }[tag] || [tag]).includes(g)));
@@ -291,7 +294,7 @@ export async function fetchWatchOrder(id) {
   const it = findItem("anime", id);
   if (!it) return [];
   const all = [it, ...(it.related || []).map((r) => findItem("anime", r)).filter(Boolean)];
-  return all.map(toAppItem).sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  return labelOrder(all.map(toAppItem).sort((a, b) => (a.date || "").localeCompare(b.date || "")));
 }
 export async function fetchDiscussions(id) {
   await wait(150);
@@ -301,6 +304,8 @@ export async function fetchDiscussions(id) {
 }
 
 // Statistics → "Your people": the demo only knows each title's studio or mangaka.
+export async function fetchKinds() { return {}; }
+
 export async function fetchCredits(ids) {
   await wait(150);
   const out = {};

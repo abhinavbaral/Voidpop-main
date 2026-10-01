@@ -13,7 +13,7 @@ import { useTheme } from "../context/ThemeContext.js";
 import Icon from "./Icon.js";
 
 const W = Math.min(Dimensions.get("window").width * 0.86, 340);
-const TYPE_ICON = { anime: "play", manga: "book" };
+const TYPE_ICON = { anime: "play", manga: "book", novel: "novel" };
 
 function Section({ sec, C }) {
   const layout = sec.layout || "chips";

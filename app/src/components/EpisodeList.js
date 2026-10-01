@@ -1,7 +1,7 @@
-// Official episodes (thumbnail, number, title) from AniList's streaming links.
-// Tapping one opens it on the streaming service. Episodes up to your progress
-// are marked watched.
-import { View, Text, Image, ScrollView, TouchableOpacity, Linking, StyleSheet } from "react-native";
+// Official episodes (thumbnail, number, title) from AniList's streaming links,
+// shown as information (they don't open the streaming service). Episodes up to
+// your progress are marked watched.
+import { View, Text, Image, ScrollView, StyleSheet } from "react-native";
 import { useTheme } from "../context/ThemeContext.js";
 
 export default function EpisodeList({ episodes = [], progress = 0 }) {
@@ -16,17 +16,17 @@ export default function EpisodeList({ episodes = [], progress = 0 }) {
         {episodes.map((e, i) => {
           const watched = e.number != null && e.number <= progress;
           return (
-            <TouchableOpacity key={e.url} style={styles.card} onPress={() => Linking.openURL(e.url).catch(() => {})}
-              accessibilityRole="link" accessibilityLabel={`Episode ${e.number ?? i + 1}${e.name ? `, ${e.name}` : ""}${watched ? ", watched" : ""}, opens ${e.site}`}>
+            <View key={e.url} style={styles.card}
+              accessibilityLabel={`Episode ${e.number ?? i + 1}${e.name ? `, ${e.name}` : ""}${watched ? ", watched" : ""}, on ${e.site}`}>
               {e.thumbnail ? <Image source={{ uri: e.thumbnail }} style={styles.thumb} /> : <View style={[styles.thumb, { backgroundColor: C.border }]} />}
               {watched && <View style={styles.watched}><Text style={styles.watchedText}>Watched</Text></View>}
               <Text style={styles.num}>{e.number != null ? `Episode ${e.number}` : `Episode ${i + 1}`}</Text>
               {!!e.name && <Text style={styles.name} numberOfLines={2}>{e.name}</Text>}
-            </TouchableOpacity>
+            </View>
           );
         })}
       </ScrollView>
-      {!!site && <Text style={styles.note}>Opens on {site}. Availability depends on your country.</Text>}
+      {!!site && <Text style={styles.note}>On {site}. Availability depends on your country.</Text>}
     </View>
   );
 }

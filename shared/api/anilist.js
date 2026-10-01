@@ -41,6 +41,14 @@ export const ANIME_ORIGINS = [
   { key: "CN", label: "Chinese Donghua" },
 ];
 
+// light novels from Japan, web novels from Korea and China
+export const NOVEL_ORIGINS = [
+  { key: "", label: "All" },
+  { key: "JP", label: "Light novels" },
+  { key: "KR", label: "Korean web novels" },
+  { key: "CN", label: "Chinese web novels" },
+];
+
 export const MANGA_ORIGINS = [
   { key: "", label: "All" },
   { key: "JP", label: "Japanese Manga" },
@@ -62,6 +70,7 @@ const MEDIA_FIELDS = `
   siteUrl
   status
   format
+  countryOfOrigin
   duration
   popularity
   trending
@@ -113,7 +122,8 @@ function normalize(m, segment) {
     url: m.siteUrl,
     unreleased: m.status === "NOT_YET_RELEASED",
     finished: m.status === "FINISHED",
-    format: m.format || null, // TV, TV_SHORT, ONA, MOVIE, OVA, SPECIAL…
+    format: m.format || null, // TV, TV_SHORT, ONA, MOVIE, OVA, SPECIAL… / MANGA, NOVEL, ONE_SHOT
+    country: m.countryOfOrigin || null, // JP, KR, CN, TW (sorts titles into Library kinds)
     duration: m.duration ?? null, // minutes per episode (anime)
     // hype: people with it on their AniList list, and recent list activity
     popularity: m.popularity ?? null,
@@ -217,13 +227,20 @@ async function request(body, k, save, token = null) {
 }
 
 // Browse/search list. opts: { page, sort, search, origin, season, year, unreleasedOnly }
+// segment: "anime", "manga" (manga, manhwa, manhua; no novels) or "novel"
+// (light and web novels). Novels are type MANGA on AniList, so their items
+// come back with segment "manga" and track like manga.
 export async function fetchAniList(segment, opts = {}) {
+  const novel = segment === "novel";
+  const kind = novel ? "manga" : segment;
   const {
     page = 1, sort = "popular", search = "", origin = "",
     season = "", year = null, unreleasedOnly = false, perPage = 24, genre = "", tag = "",
   } = opts;
 
   const args = ["type: $type", "isAdult: false", "sort: $sort"];
+  if (novel) args.push("format_in: [NOVEL]");
+  else if (kind === "manga") args.push("format_not_in: [NOVEL]");
   const varDefs = ["$page: Int", "$perPage: Int", "$type: MediaType", "$sort: [MediaSort]"];
   const variables = {
     page, perPage,
@@ -246,13 +263,13 @@ export async function fetchAniList(segment, opts = {}) {
   const query = `query (${varDefs.join(", ")}) {
     Page(page: $page, perPage: $perPage) {
       pageInfo { hasNextPage }
-      media(${args.join(", ")}) { ${fieldsFor(segment)} }
+      media(${args.join(", ")}) { ${fieldsFor(kind)} }
     }
   }`;
 
   const data = await gql(query, variables);
   return {
-    items: data.Page.media.map((m) => normalize(m, segment)),
+    items: data.Page.media.map((m) => normalize(m, kind)),
     hasMore: data.Page.pageInfo.hasNextPage,
   };
 }
@@ -263,7 +280,7 @@ export async function fetchAniList(segment, opts = {}) {
 // creator load the first time its page is opened (item.partial).
 const LIST_FIELDS = `
   id title { english romaji } coverImage { large extraLarge color } bannerImage
-  startDate { year month day } genres siteUrl status format duration
+  startDate { year month day } genres siteUrl status format countryOfOrigin duration
   episodes chapters nextAiringEpisode { episode airingAt }
 `;
 // Pass a username (public lists), or { userId, token } when signed in (then
@@ -628,19 +645,22 @@ export async function fetchPerson(id) {
   };
 }
 
-// Watch order for a franchise: follows AniList's prequel / sequel / side
-// story / parent links from this title, one request per step outwards (at most
-// 6 steps, 30 titles), anime only, recaps and remakes left out. Sorted by
-// release date, which is the usual watch order.
+// Watch order for a whole franchise, from the first entry to the last, no
+// matter which entry you start from: follows AniList's prequel / sequel / side
+// story / parent links outwards (at most 15 steps, 120 titles), anime only,
+// recaps and remakes left out. Sorted by release date, which is the usual
+// watch order. Each entry gets a label: Season 1, Season 2, Movie 1, Special…
 const ORDER_LINKS = new Set(["PREQUEL", "SEQUEL", "SIDE_STORY", "PARENT"]);
 export async function fetchWatchOrder(id) {
   const light = `id type ${LIST_FIELDS} relations { edges { relationType node { id type format } } }`;
   const query = `query ($ids: [Int]) { Page(page: 1, perPage: 50) { media(id_in: $ids, type: ANIME) { ${light} } } }`;
   const seen = new Map();
   let frontier = [Number(id)];
-  for (let step = 0; step < 6 && frontier.length && seen.size < 30; step++) {
-    const data = await gql(query, { ids: frontier });
+  for (let step = 0; step < 15 && frontier.length && seen.size < 120; step++) {
     const next = [];
+    const pages = [];
+    for (let i = 0; i < frontier.length; i += 50) pages.push(await gql(query, { ids: frontier.slice(i, i + 50) }));
+    for (const data of pages)
     for (const m of data.Page.media) {
       if (seen.has(m.id)) continue;
       seen.set(m.id, normalize(m, "anime"));
@@ -648,9 +668,22 @@ export async function fetchWatchOrder(id) {
         if (ORDER_LINKS.has(e.relationType) && e.node?.type === "ANIME" && e.node.format !== "MUSIC" && !seen.has(e.node.id)) next.push(e.node.id);
       });
     }
-    frontier = [...new Set(next)].filter((x) => !seen.has(x)).slice(0, 30 - seen.size);
+    frontier = [...new Set(next)].filter((x) => !seen.has(x)).slice(0, 120 - seen.size);
   }
-  return [...seen.values()].sort((a, b) => (a.date || "9999").localeCompare(b.date || "9999"));
+  return labelOrder([...seen.values()].sort((a, b) => (a.date || "9999").localeCompare(b.date || "9999")));
+}
+
+// "Season 1", "Season 2", "Movie 1", "Special", "OVA"… in watch order
+export function labelOrder(list) {
+  let season = 0;
+  let movie = 0;
+  return list.map((it) => {
+    const f = it.format;
+    const orderLabel = f === "TV" || f === "TV_SHORT" || f === "ONA" ? `Season ${++season}`
+      : f === "MOVIE" ? `Movie ${++movie}`
+      : f === "OVA" ? "OVA" : f === "SPECIAL" ? "Special" : "Extra";
+    return { ...it, orderLabel };
+  });
 }
 
 // AniList forum threads about a title (episode discussions and more), newest
@@ -675,7 +708,7 @@ const SOURCE_KIND = {
   ANIME: "Anime", LIVE_ACTION: "Live action", MULTIMEDIA_PROJECT: "Multimedia project", PICTURE_BOOK: "Picture book", OTHER: "Other",
 };
 export function sourceKindLabel(node) {
-  if (node.format === "NOVEL") return node.countryOfOrigin === "JP" ? "Light novel" : "Novel";
+  if (node.format === "NOVEL") return node.countryOfOrigin === "JP" ? "Light novel" : "Web novel";
   if (node.format === "ONE_SHOT") return "One-shot";
   if (node.countryOfOrigin === "KR") return "Manhwa";
   if (node.countryOfOrigin === "CN" || node.countryOfOrigin === "TW") return "Manhua";
@@ -684,7 +717,7 @@ export function sourceKindLabel(node) {
 export function sourceInfo(kind, edges) {
   const items = edges
     .filter((e) => e.relationType === "SOURCE" && e.node?.type === "MANGA")
-    .map((e) => ({ ...normalize(e.node, "manga"), kindLabel: sourceKindLabel(e.node) }))
+    .map((e) => ({ ...normalize(e.node, "manga"), kindLabel: sourceKindLabel(e.node), novel: e.node.format === "NOVEL" }))
     .sort((a, b) => /novel/i.test(a.kindLabel) - /novel/i.test(b.kindLabel))
     .slice(0, 2);
   const label = items[0]?.kindLabel || SOURCE_KIND[kind] || null;
@@ -815,6 +848,18 @@ export async function fetchCredits(ids) {
         voices: [...vas.values()],
       };
     });
+  }
+  return out;
+}
+
+// Format (and country) for titles saved without it (Library kinds need the
+// format to tell novels from manga). Light query, 50 titles a request, anime and manga mixed.
+export async function fetchKinds(ids) {
+  const out = {};
+  const query = `query ($ids: [Int]) { Page(page: 1, perPage: 50) { media(id_in: $ids) { id type format countryOfOrigin } } }`;
+  for (let i = 0; i < ids.length; i += 50) {
+    const data = await gql(query, { ids: ids.slice(i, i + 50).map(Number) });
+    data.Page.media.forEach((m) => { out[`${m.type === "ANIME" ? "anime" : "manga"}:${m.id}`] = { format: m.format || null, country: m.countryOfOrigin || null }; });
   }
   return out;
 }

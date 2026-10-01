@@ -70,3 +70,11 @@ test("schedule order: Sunday to Saturday, pending first within a day", async () 
   assert.deepEqual([...shows].sort(scheduleOrder).map((x) => x.id),
     ["sun-1", "sun-caught", "mon-caught", "tue-1", "tue-3", "tue-caught", "done-2"]);
 });
+
+test("library kinds: anime, manga (incl. manhwa, manhua), novels", async () => {
+  const { kindOf } = await import("../backend/store.js");
+  const k = (segment, format, country) => kindOf({ segment, format, country });
+  assert.deepEqual(
+    [k("anime", "TV", "JP"), k("anime", "ONA", "CN"), k("manga", "MANGA", "JP"), k("manga", "MANGA", "KR"), k("manga", "NOVEL", "JP"), k("manga", "NOVEL", "KR"), k("manga", null, null)],
+    ["anime", "anime", "manga", "manga", "novel", "novel", "manga"]);
+});

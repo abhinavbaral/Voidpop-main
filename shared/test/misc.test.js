@@ -21,7 +21,7 @@ const { readableAccent, contrast, parseHex } = await import("../color.js");
 test("Jump back in: started, left 3+ days, something left; most recent first", async () => {
   const r = await loadJumpBackIn(now);
   assert.deepEqual(r.anime.map((x) => x.id), [3, 1]);
-  assert.deepEqual(r.manga.map((x) => x.id), [6]);
+  assert.deepEqual(r.manga, []); // Explore is anime only
 });
 
 test("MAL export: words and numbers, rewatching flag, gzip", () => {
