@@ -18,7 +18,7 @@ shared/         everything that isn't drawing (plain JavaScript, no UI)
   backend/      store.js (your library, verdicts, notes, stats…) and the
                 storage adapter — the only place that reads/writes data
   sync/         two-way AniList sync
-  explore.js, upcoming.js, seasons.js, wrapped.js, …  feature logic
+  explore.js, upcoming.js, seasons.js, …  feature logic
   format.js, color.js, filters.js  small pure helpers
   demo/         fake API + data for demo builds (same exports as api/)
   test/         automated tests (node:test), run with `npm test`
@@ -47,10 +47,6 @@ web/            website (React + Vite), kept locally, frozen
   After editing a drawing, `node app/scripts/voidmon-art.mjs` remakes the PNGs.
   `shared/voidmon.js` lists the poses. Skeletons stay for anything with a
   layout; `VoidmonLoading` is only for waits with nothing to lay out.
-- **Rewind story video:** `shared/storyVideo.js` encodes the story images as an
-  MP4 with the browser's WebCodecs. The website runs it directly; the app runs
-  it in a hidden WebView (`StoryVideoMaker.js`) from `app/src/lib/storyVideoHtml.js`,
-  which `node app/scripts/story-video-html.mjs` rebuilds after that file changes.
 - Comments explain *why*, in plain words.
 
 ## Checks

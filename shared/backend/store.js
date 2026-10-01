@@ -3,18 +3,14 @@
 //
 // There are no accounts. Everything lives in one JSON document on this device
 // (see storage.js):
-//   library  {"segment:id" -> { status, progress, cats, item snapshot, updatedAt, delay?, rewindYear? }}
-//            rewindYear: the Rewind year a title counts in; 0 = "Before" on
-//            purpose (switched off). Anything you're Watching counts in the
-//            current year by itself (not Rewatching). (New titles you add
-//            get the year you added them; imports get none, see wrapped.js)
+//   library  {"segment:id" -> { status, progress, cats, item snapshot, updatedAt, addedAt?, delay? }}
 //   categories [{ id, name }]  your own groups, like Mihon's ("Favourites", "Rewatch"…)
 //   reviews  {"segment:id" -> { verdict, vibes, moods, comment, date }}
 //   excited  {"segment:id" -> { item, at }}
 //   settings { clock24, posterBadges, notifyEpisodes }
 //   log      [[time ms, "segment:id", change, source], …] every progress change
 //            (source: plus / typed / history / complete) and status change
-//            (change 0, source "status:completed" etc.). Powers Wrapped;
+//            (change 0, source "status:completed" etc.). Powers stats and History;
 //            imports and AniList pulls are never logged.
 //
 // Functions still take `user` as their first argument, so screens written for
@@ -31,16 +27,6 @@ const EMPTY = () => ({ library: {}, reviews: {}, excited: {}, notes: {}, log: []
 let cache = null;
 let writing = Promise.resolve();
 
-// Watching something (not a rewatch) puts it in this year's Rewind, unless you
-// already chose a year for it (or switched it off, rewindYear 0). Runs on load
-// and before every save, so imports and AniList pulls are covered too.
-function stampWatching(db) {
-  const year = new Date().getFullYear();
-  Object.values(db.library || {}).forEach((e) => {
-    if (e && e.status === "watching" && e.rewindYear == null) e.rewindYear = year;
-  });
-}
-
 async function load() {
   if (cache) return cache;
   try {
@@ -51,7 +37,6 @@ async function load() {
   } catch {
     cache = EMPTY(); // corrupt or unreadable storage: start clean rather than crash
   }
-  stampWatching(cache);
   return cache;
 }
 
@@ -65,7 +50,6 @@ export function onDataChange(fn) {
 
 // Writes are queued so two quick taps can't save an older copy over a newer one.
 function save() {
-  stampWatching(cache);
   const snapshot = JSON.stringify(cache);
   writing = writing.then(() => writeKey(DB_KEY, snapshot)).catch(() => {});
   listeners.forEach((fn) => { try { fn(); } catch { /* a listener must never break saving */ } });
@@ -90,23 +74,6 @@ function logStatus(db, key, prevStatus, status) {
   if (prevStatus !== status) db.log.push([Date.now(), key, 0, `status:${status || "removed"}`]);
 }
 
-// Rewind's "Pick titles": put titles in a year's Rewind (year), or take them
-// out (null → 0, "Before" on purpose, so Watching doesn't put it back).
-// keys: ["anime:123", …]
-export async function setRewindYear(keys, year) {
-  const db = await load();
-  let changed = 0;
-  keys.forEach((key) => {
-    const e = db.library[key];
-    const next = year == null ? 0 : year;
-    if (!e || e.rewindYear === next) return;
-    e.rewindYear = next;
-    changed++;
-  });
-  if (changed) await save();
-  return changed;
-}
-
 // The watch log (read-only copy), oldest first.
 export async function getLog() {
   return [...(await load()).log];
@@ -115,7 +82,7 @@ export async function getLog() {
 /* ---------- tracking ---------- */
 
 // Rewatching / Rereading: a finished title you've started again. It still
-// counts as finished everywhere (stats, ranks, Rewind); progress starts from 0,
+// counts as finished everywhere (stats, ranks); progress starts from 0,
 // and reaching the end puts it back in Completed with one more rewatch counted.
 export const isDone = (status) => status === "completed" || status === "rewatching";
 
@@ -166,7 +133,7 @@ export async function setStatus(_user, segment, item, status) {
   logChange(db, key, progress - (prev?.progress || 0), "complete");
   logStatus(db, key, prev?.status, status);
   db.library[key] = {
-    ...(prev ? {} : { rewindYear: new Date().getFullYear(), addedAt: new Date().toISOString() }), // added now: counts in this year's Rewind
+    ...(prev ? {} : { addedAt: new Date().toISOString() }), // when it joined your library (Library → Date added)
     ...prev,
     status,
     progress,
@@ -287,7 +254,7 @@ export async function setProgress(_user, item, n, source = "plus") {
   logChange(db, key, progress - (prev?.progress || 0), source);
   logStatus(db, key, prev?.status, status);
   db.library[key] = {
-    ...(prev ? {} : { rewindYear: new Date().getFullYear(), addedAt: new Date().toISOString() }), // added now: counts in this year's Rewind
+    ...(prev ? {} : { addedAt: new Date().toISOString() }), // when it joined your library (Library → Date added)
     ...prev,
     status,
     progress,
@@ -463,23 +430,24 @@ export function yourShows(lib, fresh = {}, now = Date.now()) {
     .sort(scheduleOrder);
 }
 
-// Schedule's order:
-//   1. shows with episodes to catch up on come first, fewest first
-//      (1 pending, then 2, then 3…): the ones you can finish fastest
-//   2. then, and among shows with the same number pending (including all
-//      caught up), by the weekday the next episode airs, Sunday → Saturday,
-//      then by time of day
-//   3. shows with nothing scheduled go last in their group
-const weekSlot = (next) => {
+// Schedule's order: by the weekday the next episode airs, Sunday → Saturday.
+// Within one day, shows with episodes to catch up on come first (fewest
+// pending first), then the caught-up ones; ties go by time of day.
+//   Sun · 1 pending, Sun · caught up, Mon · caught up, Tue · 3 pending, Tue · caught up
+// Shows with nothing scheduled (finished airing, you're still behind) go last.
+const weekDay = (next) => (next ? new Date(next.airingAt * 1000).getDay() : 7);
+const dayMinute = (next) => {
   if (!next) return Infinity;
   const d = new Date(next.airingAt * 1000);
-  return d.getDay() * 1440 + d.getHours() * 60 + d.getMinutes();
+  return d.getHours() * 60 + d.getMinutes();
 };
 export function scheduleOrder(a, b) {
+  const day = weekDay(a.next) - weekDay(b.next);
+  if (day) return day;
   const pa = a.pending > 0 ? a.pending : Infinity;
   const pb = b.pending > 0 ? b.pending : Infinity;
   if (pa !== pb) return pa - pb;
-  return weekSlot(a.next) - weekSlot(b.next) || (a.next?.airingAt ?? Infinity) - (b.next?.airingAt ?? Infinity);
+  return dayMinute(a.next) - dayMinute(b.next) || (a.next?.airingAt ?? Infinity) - (b.next?.airingAt ?? Infinity);
 }
 
 /* ---------- Categories: a reward for 500+ completed anime ---------- */

@@ -9,7 +9,7 @@ import { notify } from "./notify";
 export async function shareCardImage(viewRef, { story = false } = {}) {
   const uri = await captureRef(viewRef, { format: "png", quality: 1, ...(story ? { width: 1080, height: 1920 } : {}) });
   if (await Sharing.isAvailableAsync()) {
-    await Sharing.shareAsync(uri, { mimeType: "image/png", dialogTitle: story ? "Share your Rewind story" : undefined });
+    await Sharing.shareAsync(uri, { mimeType: "image/png", dialogTitle: story ? "Share your story" : undefined });
   } else {
     notify("Saved", "Card image captured.");
   }

@@ -26,7 +26,7 @@ Android app, built from one codebase. No sign-up and no API keys: open it and us
 - **Explore only shows new things:** titles in your library or marked Excited are left out
 - **Watching this season + Pending:** aired-but-unwatched episodes of your Watching anime; new episodes add
   to it automatically, +1 takes one off; a count badge on the Schedule tab
-- **Watch log:** every progress change is saved with its date (for a future Wrapped); imports don't count
+- **Watch log:** every progress change is saved with its date (for stats and History); imports don't count
 - **Type your progress** (tap the number); you can't go past what's out: aired episodes, or a finished manga's chapter count
 - **Works offline:** the latest AniList answers are kept on the device (size-capped) and used when there's no internet
 - **Season chart:** a season's anime grouped by format, with countdowns and one-tap Plan to Watch

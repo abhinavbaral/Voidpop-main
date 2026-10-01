@@ -11,8 +11,7 @@
     "react": "*"
   },
   "dependencies": {
-    "fflate": "^0.8.3",
-    "mp4-muxer": "^5.2.2"
+    "fflate": "^0.8.3"
   },
   "scripts": {
     "test": "node --test \"test/*.test.js\""

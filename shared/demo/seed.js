@@ -37,8 +37,6 @@ export function seedDemoDb() {
     if (it) {
       db.library[`${segment}:${it.id}`] = {
         status, progress: PROGRESS[`${segment}:${title}`] || 0, item: toAppItem(it), updatedAt: ago(10 + i * 17),
-        // every other title counts in this year's Rewind, the rest in "Before"
-        ...(i % 2 === 0 ? { rewindYear: new Date().getFullYear() } : {}),
       };
     }
   });

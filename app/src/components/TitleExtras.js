@@ -3,41 +3,16 @@
 //   WatchOrder    the franchise in release order (anime), with your status
 //   Discussions   AniList forum threads, opening in the browser
 import { useCallback, useEffect, useState } from "react";
-import { View, Text, TextInput, Image, TouchableOpacity, Linking, StyleSheet, Switch } from "react-native";
+import { View, Text, TextInput, Image, TouchableOpacity, Linking, StyleSheet } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { fetchWatchOrder, fetchDiscussions } from "@voidation/shared/api/anilist";
-import { getNote, setNote, getLibrary, statusesFor, getEntry, setRewindYear, onDataChange } from "@voidation/shared/backend/store";
+import { getNote, setNote, getLibrary, statusesFor } from "@voidation/shared/backend/store";
 import { yearOf } from "@voidation/shared/format";
 import { useTheme } from "../context/ThemeContext.js";
 import { openDetail } from "../lib/nav";
 import Icon from "./Icon.js";
 
 const FORMAT = { TV: "TV", TV_SHORT: "TV short", MOVIE: "Movie", OVA: "OVA", ONA: "ONA", SPECIAL: "Special" };
-
-// "In your 2026 Rewind": whether this title counts in this year's Rewind or in
-// "Before 2026". Titles you add this year start on; imports start off.
-export function RewindToggle({ item }) {
-  const { C } = useTheme();
-  const styles = makeStyles(C);
-  const year = new Date().getFullYear();
-  const [entry, setEntry] = useState(null);
-  const read = useCallback(() => { getEntry(item.segment, item.id).then(setEntry).catch(() => {}); }, [item.segment, item.id]);
-  useEffect(() => { read(); return onDataChange(read); }, [read]);
-  if (!entry || entry.status === "plan") return null;
-  const on = entry.rewindYear === year;
-  const flip = async (v) => { await setRewindYear([`${item.segment}:${item.id}`], v ? year : null); read(); };
-  return (
-    <View style={[styles.box, { flexDirection: "row", alignItems: "center", gap: 10 }]}>
-      <Icon name="rewind" size={16} color={C.orange} />
-      <View style={{ flex: 1 }}>
-        <Text style={styles.label}>In your {year} Rewind</Text>
-        <Text style={styles.faint}>{on ? `Counts in Rewind ${year}.` : `Counts in Before ${year}. Turn on if you watched it this year.`}</Text>
-      </View>
-      <Switch value={on} onValueChange={flip} trackColor={{ false: C.border, true: C.orange }} thumbColor="#fff"
-        accessibilityLabel={`In your ${year} Rewind`} />
-    </View>
-  );
-}
 
 export function NoteBox({ item }) {
   const { C } = useTheme();

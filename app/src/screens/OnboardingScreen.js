@@ -82,7 +82,7 @@ export default function OnboardingScreen({ navigation }) {
       </View>
       <Guide pose="welcome" says="Hi, I'm Voidmon. I'll show you around." />
       <Text style={styles.h1}>Find your next anime.{"\n"}Never miss an episode.</Text>
-      <Text style={styles.p}>Live countdowns, your own Void Verdicts, picks made from them, and a yearly Rewind. Everything stays on your phone.</Text>
+      <Text style={styles.p}>Live countdowns, your own Void Verdicts and picks made from them. Everything stays on your phone.</Text>
     </View>,
     // 2. look
     <View key="t">

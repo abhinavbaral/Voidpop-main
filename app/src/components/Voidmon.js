@@ -5,7 +5,7 @@
 //   poses: welcome, theme, import, alerts, loading, peeking, sleeping, celebrating, asking
 //
 //   <VoidmonLoading text="Bringing your list over…" />
-//     for waits with no layout to show (import, sync, Rewind). Rows and pages
+//     for waits with no layout to show (import, sync). Rows and pages
 //     keep their skeletons. Appears only after `delay` ms so quick loads never
 //     flash it; the orbit stops spinning when Reduce motion is on.
 //

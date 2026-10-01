@@ -28,8 +28,6 @@ import DetailScreen from "./src/screens/DetailScreen.js";
 import SearchScreen from "./src/screens/SearchScreen.js";
 import LibraryScreen from "./src/screens/LibraryScreen.js";
 import SeasonScreen from "./src/screens/SeasonScreen.js";
-import WrappedScreen from "./src/screens/WrappedScreen.js";
-import RewindPickScreen from "./src/screens/RewindPickScreen.js";
 import TrendsScreen from "./src/screens/TrendsScreen.js";
 import OfflineBanner from "./src/components/OfflineBanner.js";
 import RankUp from "./src/components/RankUp.js";
@@ -47,7 +45,6 @@ const linking = Platform.OS === "web" ? undefined : {
       Main: { screens: { Schedule: "schedule", Library: "library", History: "history" } },
       Detail: "title/:segment/:id",
       Season: "season",
-      Wrapped: "wrapped",
     },
   },
 };
@@ -170,8 +167,6 @@ function ThemedApp() {
         <Stack.Screen name="Browse" component={BrowseScreen} />
         <Stack.Screen name="Onboarding" component={OnboardingScreen} options={{ animation: "fade", gestureEnabled: false }} />
         <Stack.Screen name="Person" component={PersonScreen} getId={({ params }) => (params ? String(params.id) : undefined)} />
-        <Stack.Screen name="Wrapped" component={WrappedScreen} options={{ animation: "fade" }} />
-        <Stack.Screen name="RewindPick" component={RewindPickScreen} />
         <Stack.Screen name="Trends" component={TrendsScreen} />
       </Stack.Navigator>
       <OfflineBanner />

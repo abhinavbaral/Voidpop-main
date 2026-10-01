@@ -1,5 +1,5 @@
 // MORE — laid out like the "More" tab in reader apps: Voidmon on top, your
-// badge, Rewind, then menu rows that open Statistics, Data and storage,
+// badge, then menu rows that open Statistics, Data and storage,
 // Appearance and Settings (24-hour clock, countdown badges, welcome tour…),
 // Help and About (MorePageScreen). Categories shows at 500+ completed.
 
@@ -56,15 +56,6 @@ export default function MoreScreen({ navigation }) {
             <Text style={{ color: C.faint, fontSize: 20 }}>›</Text>
           </Pressable>
         )}
-        <View style={styles.group}>
-          <Pressable style={({ pressed }) => [styles.row, pressed && { backgroundColor: C.card }]} onPress={() => navigation.navigate("Wrapped")}>
-            <View style={styles.icon}><Icon name="rewind" size={21} color={C.orange} /></View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.label, { color: C.orange }]}>Voidation Rewind</Text>
-              <Text style={styles.hint}>All time, or year by year</Text>
-            </View>
-          </Pressable>
-        </View>
         {GROUPS.map((group, i) => (
           <View key={i} style={styles.group}>
             {group.filter(([page]) => page !== "categories" || catsOpen).map(([page, icon, label]) => (

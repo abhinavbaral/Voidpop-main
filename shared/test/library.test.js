@@ -54,19 +54,19 @@ test("your people: counts titles, skips Plan to Watch, groups roles", async () =
   assert.deepEqual(t.creators.map((d) => d.name), ["Mangaka"]);
 });
 
-test("schedule order: fewest pending first, then Sunday to Saturday", async () => {
+test("schedule order: Sunday to Saturday, pending first within a day", async () => {
   const { scheduleOrder } = await import("../backend/store.js");
   // local-time dates in one week: Sun 4 Oct 2026 … Sat 10 Oct 2026
   const at = (day, h) => ({ airingAt: new Date(2026, 9, day, h).getTime() / 1000 });
   const shows = [
-    { id: "wed-caught", pending: 0, next: at(7, 20) },
-    { id: "two-pending", pending: 2, next: at(4, 9) },
-    { id: "sun-caught", pending: 0, next: at(4, 18) },
-    { id: "one-pending-sat", pending: 1, next: at(10, 9) },
-    { id: "one-pending-mon", pending: 1, next: at(5, 9) },
-    { id: "one-pending-done", pending: 1, next: null },
-    { id: "mon-caught", pending: 0, next: at(5, 22) },
+    { id: "tue-caught", pending: 0, next: at(6, 8) },
+    { id: "sun-caught", pending: 0, next: at(4, 9) },
+    { id: "tue-3", pending: 3, next: at(6, 22) },
+    { id: "mon-caught", pending: 0, next: at(5, 20) },
+    { id: "sun-1", pending: 1, next: at(4, 23) },
+    { id: "tue-1", pending: 1, next: at(6, 23) },
+    { id: "done-2", pending: 2, next: null },
   ];
   assert.deepEqual([...shows].sort(scheduleOrder).map((x) => x.id),
-    ["one-pending-mon", "one-pending-sat", "one-pending-done", "two-pending", "sun-caught", "mon-caught", "wed-caught"]);
+    ["sun-1", "sun-caught", "mon-caught", "tue-1", "tue-3", "tue-caught", "done-2"]);
 });

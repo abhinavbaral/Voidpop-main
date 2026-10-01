@@ -744,16 +744,10 @@ function Help({ styles, navigation }) {
   );
 }
 
-// About: what the app is, which version and which update is running (so you
-// can tell at a glance whether the latest update reached this phone), who
-// made it, where the data comes from, and where your data lives.
+// About: what the app is, its version and a Check for updates button, who
+// made it (and Voidmon's YouTube channel), where the data comes from, and
+// where your data lives.
 function About({ styles, C }) {
-  const updateLine = () => {
-    if (!Updates || Platform.OS === "web") return "Website";
-    if (Updates.isEmbeddedLaunch || !Updates.updateId) return "Running the version built into this APK (no update downloaded yet)";
-    const when = Updates.createdAt ? new Date(Updates.createdAt) : null;
-    return `Update from ${when ? `${when.toLocaleDateString()} ${when.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "unknown date"} · ${String(Updates.updateId).slice(0, 8)}`;
-  };
   const [checking, setChecking] = useState(null);
   const check = async () => {
     if (!Updates || Platform.OS === "web") return;
@@ -782,25 +776,25 @@ function About({ styles, C }) {
         <Text style={[styles.cardTitle, { fontSize: 18, marginTop: 6 }]}>Voidation</Text>
         <Text style={styles.note}>Version {VERSION}</Text>
         <Text style={[styles.note, { textAlign: "center", marginTop: 8 }]}>
-          An anime and manga tracker with live countdowns to the next episode, Void Verdicts instead of scores, and a Rewind of your year.
+          An anime and manga tracker with live countdowns to the next episode and Void Verdicts instead of scores.
         </Text>
       </View>
       <View style={styles.card}>
         <Text style={styles.cardTitle}>This copy</Text>
         {line("Version", `${VERSION} (Android app)`)}
-        {line("Running", updateLine())}
         {Platform.OS !== "web" && line("Check for updates", checking || "Downloads the newest update if there is one", check)}
       </View>
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Credits</Text>
         {line("Made by Abhinav Baral", "www.abhinavbaral.com.np · Jhapa, Nepal", () => Linking.openURL("https://www.abhinavbaral.com.np/").catch(() => {}))}
-        {line("Voidmon", "Voidation's mascot, an original character by Abhinav Baral")}
+        {line("Voidmon", "Voidation's mascot, a character by Abhinav Baral")}
+        {line("Voidmon on YouTube", "youtube.com/@voidmonreal", () => Linking.openURL("https://www.youtube.com/@voidmonreal").catch(() => {}))}
         {line("Anime and manga data: AniList", "Voidation is not affiliated with AniList", () => Linking.openURL("https://anilist.co").catch(() => {}))}
       </View>
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Your data</Text>
         <Text style={[styles.note, { marginTop: 6 }]}>
-          Your library, verdicts, notes and Rewind are saved on this phone only. There's no Voidation account and no server. The app talks to AniList to look up shows, and to your AniList account only if you sign in there to sync. Back up or move your data in Data and storage.
+          Your library, verdicts and notes are saved on this phone only. There's no Voidation account and no server. The app talks to AniList to look up shows, and to your AniList account only if you sign in there to sync. Back up or move your data in Data and storage.
         </Text>
       </View>
     </>
