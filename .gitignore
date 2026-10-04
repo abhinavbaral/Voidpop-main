@@ -15,13 +15,8 @@ app/ios/
 **/.env
 **/.env.local
 
-# The website is kept on this computer only (app-first for now). Still listed
-# in package.json workspaces so it keeps working locally; to bring it back:
-# delete these lines and `git add web`.
 web/
-
-# Commit message that comes with each zip from Claude (use: git commit -F COMMIT.txt)
-COMMIT.txt
+app.txt
 
 # CI / local bundle check output
 .check-bundle/
