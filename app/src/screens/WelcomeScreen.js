@@ -1,6 +1,7 @@
 // First screen on a fresh install: a tilted wall of anime posters, the logo in
 // a white disc, a headline, and a "swipe for start" slider. Swiping all the way
-// opens the welcome steps (OnboardingScreen).
+// opens the welcome steps (OnboardingScreen) on a first run, or the app after that.
+// It shows on every launch (see App.js).
 //   - Posters come from AniList (popular anime). Offline, dark placeholder
 //     tiles fill the wall instead.
 //   - Always dark, whatever theme is chosen: it's a splash, like the artwork.
@@ -13,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Defs, LinearGradient, Stop, Rect, Path } from "react-native-svg";
 import { fetchAniList } from "@voidation/shared/api/anilist";
 import { useSettings } from "@voidation/shared/backend/SettingsContext";
+import { isOnboarded } from "@voidation/shared/backend/store";
 import { LOGOS } from "../components/Brand.js";
 
 // ---- the words (change them here) -------------------------------------------
@@ -169,7 +171,7 @@ function SwipeButton({ width, onComplete }) {
 }
 
 // ---- screen -------------------------------------------------------------------
-export default function WelcomeScreen({ navigation }) {
+export default function WelcomeScreen({ navigation, route }) {
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { settings } = useSettings();
@@ -186,6 +188,14 @@ export default function WelcomeScreen({ navigation }) {
       .catch(() => {});
     return () => { alive = false; };
   }, []);
+
+  // first run (or "Welcome tour" in More): on to the welcome steps.
+  // Every other launch: straight into the app.
+  const start = async () => {
+    const done = await isOnboarded().catch(() => false);
+    if (done && !route?.params?.tour) navigation.goBack();
+    else navigation.replace("Onboarding");
+  };
 
   const s = Math.min(1.15, width / 390); // text scales a little with the screen
   const sideMargin = Math.round(width * 0.125);
@@ -222,7 +232,7 @@ export default function WelcomeScreen({ navigation }) {
         <Text style={[styles.subtitle, { fontSize: 16 * s, lineHeight: 23 * s, maxWidth: width * 0.72 }]}>{SUBTITLE}</Text>
 
         <View style={{ marginTop: 30 * s }}>
-          <SwipeButton width={width - sideMargin * 2} onComplete={() => navigation.replace("Onboarding")} />
+          <SwipeButton width={width - sideMargin * 2} onComplete={start} />
         </View>
       </View>
     </View>

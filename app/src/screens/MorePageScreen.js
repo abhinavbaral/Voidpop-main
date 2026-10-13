@@ -272,7 +272,7 @@ function Settings({ styles, C, navigation }) {
       )}
     </View>
     {/* the first-run welcome screens, any time; nothing you've set up changes */}
-    <Pressable style={[styles.card, styles.toggleRow]} onPress={() => navigation.navigate("Onboarding")} accessibilityRole="button"
+    <Pressable style={[styles.card, styles.toggleRow]} onPress={() => navigation.navigate("Welcome", { tour: true })} accessibilityRole="button"
       accessibilityHint="Opens the welcome screens again">
       <View style={{ flex: 1 }}>
         <Text style={styles.cardTitle}>Welcome tour</Text>

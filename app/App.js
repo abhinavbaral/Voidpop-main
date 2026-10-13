@@ -10,9 +10,9 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
-import { AppState, Platform } from "react-native";
+import { AppState, Linking, Platform } from "react-native";
 import { createNavigationContainerRef } from "@react-navigation/native";
-import { onDataChange, getPending, isOnboarded } from "@voidation/shared/backend/store";
+import { onDataChange, getPending } from "@voidation/shared/backend/store";
 import { AuthProvider } from "@voidation/shared/backend/AuthContext";
 import { SettingsProvider } from "@voidation/shared/backend/SettingsContext";
 import { ThemeProvider, useTheme } from "./src/context/ThemeContext.js";
@@ -150,8 +150,9 @@ function ThemedApp() {
 
   return (
     <NavigationContainer ref={navRef} theme={navTheme} linking={linking}
-      // first run: the swipe-to-start welcome, then the welcome steps, once
-      onReady={() => { isOnboarded().then((done) => { if (!done) navRef.navigate("Welcome"); }).catch(() => {}); }}>
+      // the swipe-to-start welcome shows on every launch (not when the app was
+      // opened from a link, like a widget tap or an alert)
+      onReady={() => { Linking.getInitialURL().then((url) => { if (!url) navRef.navigate("Welcome"); }).catch(() => navRef.navigate("Welcome")); }}>
       <StatusBar style={dark ? "light" : "dark"} />
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Main" component={MainTabs} />
