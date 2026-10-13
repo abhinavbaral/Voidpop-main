@@ -20,6 +20,7 @@ import ExploreScreen from "./src/screens/ExploreScreen.js";
 import BrowseScreen from "./src/screens/BrowseScreen.js";
 import PersonScreen from "./src/screens/PersonScreen.js";
 import OnboardingScreen from "./src/screens/OnboardingScreen.js";
+import WelcomeScreen from "./src/screens/WelcomeScreen.js";
 import ScheduleScreen from "./src/screens/ScheduleScreen.js";
 import HistoryScreen from "./src/screens/HistoryScreen.js";
 import MoreScreen from "./src/screens/MoreScreen.js";
@@ -149,8 +150,8 @@ function ThemedApp() {
 
   return (
     <NavigationContainer ref={navRef} theme={navTheme} linking={linking}
-      // first run: the welcome screens, once
-      onReady={() => { isOnboarded().then((done) => { if (!done) navRef.navigate("Onboarding"); }).catch(() => {}); }}>
+      // first run: the swipe-to-start welcome, then the welcome steps, once
+      onReady={() => { isOnboarded().then((done) => { if (!done) navRef.navigate("Welcome"); }).catch(() => {}); }}>
       <StatusBar style={dark ? "light" : "dark"} />
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Main" component={MainTabs} />
@@ -165,6 +166,7 @@ function ThemedApp() {
         <Stack.Screen name="MorePage" component={MorePageScreen} />
         <Stack.Screen name="Season" component={SeasonScreen} />
         <Stack.Screen name="Browse" component={BrowseScreen} />
+        <Stack.Screen name="Welcome" component={WelcomeScreen} options={{ animation: "fade", gestureEnabled: false }} />
         <Stack.Screen name="Onboarding" component={OnboardingScreen} options={{ animation: "fade", gestureEnabled: false }} />
         <Stack.Screen name="Person" component={PersonScreen} getId={({ params }) => (params ? String(params.id) : undefined)} />
         <Stack.Screen name="Trends" component={TrendsScreen} />
