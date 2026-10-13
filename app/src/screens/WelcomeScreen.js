@@ -1,18 +1,20 @@
 // The first screen on every launch (see App.js): a tilted wall of anime posters,
 // the logo in a white disc, a headline, and a "swipe for start" slider.
-//   - While Explore's first data loads (Coming up, Coming soon, the posters),
-//     the slider is replaced by a "Loading" pill. Once it's ready the slider
-//     appears; swiping opens Explore (or the welcome steps on a first run).
-//   - Posters come from AniList. If it's slow or offline, dark placeholder
-//     tiles fill the wall, and the slider shows up after a few seconds anyway.
+//   - The slider is there from the first frame; nothing waits on the network.
+//   - The poster wall comes from the last launch (links saved on the phone, the
+//     images themselves sit in the image cache), so it appears instantly. Fresh
+//     posters are fetched quietly in the background for the NEXT launch.
+//   - Very first launch only: dark placeholder tiles, then the posters fade in.
+//   - In the background it also warms Explore's data, so Explore opens filled.
 //   - Always dark, whatever theme is chosen: it's a splash, like the artwork.
 //   - Built from what the app already has (Animated, PanResponder, SVG), so it
 //     ships as a normal `eas update`, no new native build.
 import { useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, Image, Animated, PanResponder, ActivityIndicator, StyleSheet, useWindowDimensions } from "react-native";
+import { View, Text, Image, Animated, PanResponder, StyleSheet, useWindowDimensions } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Svg, { Defs, LinearGradient, Stop, Rect, Path } from "react-native-svg";
+import Svg, { Defs, LinearGradient, Stop, Rect } from "react-native-svg";
 import { fetchNextEpisodes } from "@voidation/shared/api/anilist";
 import { loadExplorePools } from "@voidation/shared/explore";
 import { useSettings } from "@voidation/shared/backend/SettingsContext";
@@ -25,8 +27,8 @@ const SUBTITLE = "Discover thousands of series and movies tailored to your taste
 const SWIPE_LABEL = "SWIPE FOR START";
 
 // ---- colours ----------------------------------------------------------------
-const RED = "#e50914";
 const BG = "#05060a";
+const POSTER_KEY = "voidation_welcome_posters"; // poster links from the last launch
 
 // ---- poster wall ------------------------------------------------------------
 const COLS = 4;
@@ -112,20 +114,13 @@ function PlaceholderWall({ width, height }) {
 }
 
 // ---- swipe slider -------------------------------------------------------------
-const KNOB = 46;
+const KNOB_H = 46;
+const KNOB_W = 62; // Voidmon is wider than tall
 const PAD = 7;
-
-function DoubleChevron({ size = 20, color = "#fff" }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
-      <Path d="M5 6l6 6-6 6" />
-      <Path d="M12 6l6 6-6 6" />
-    </Svg>
-  );
-}
+const KNOB_PIC = require("../../assets/voidmon/voidmon-corrupted-knob.png");
 
 function SwipeButton({ width, onComplete }) {
-  const maxX = width - KNOB - PAD * 2;
+  const maxX = width - KNOB_W - PAD * 2;
   const maxRef = useRef(maxX);
   maxRef.current = maxX;
   const doneRef = useRef(false);
@@ -167,27 +162,10 @@ function SwipeButton({ width, onComplete }) {
     >
       <Animated.Text style={[styles.pillText, { opacity: labelOpacity }]}>{SWIPE_LABEL}</Animated.Text>
       <Animated.View style={[styles.knob, { transform: [{ translateX: x }] }]} {...pan.panHandlers}>
-        <DoubleChevron />
+        <Image source={KNOB_PIC} style={{ width: KNOB_W, height: KNOB_H }} resizeMode="contain" accessibilityElementsHidden importantForAccessibility="no" />
       </Animated.View>
     </View>
   );
-}
-
-// shown in place of the slider while things load
-function LoadingPill({ width }) {
-  return (
-    <View style={[styles.pill, { width, flexDirection: "row", gap: 10 }]} accessible accessibilityRole="progressbar" accessibilityLabel="Loading">
-      <ActivityIndicator size="small" color={RED} />
-      <Text style={styles.pillText}>LOADING…</Text>
-    </View>
-  );
-}
-
-// fades its children in when it first appears
-function Reveal({ children }) {
-  const o = useRef(new Animated.Value(0)).current;
-  useEffect(() => { Animated.timing(o, { toValue: 1, duration: 350, useNativeDriver: true }).start(); }, [o]);
-  return <Animated.View style={{ opacity: o }}>{children}</Animated.View>;
 }
 
 // ---- screen -------------------------------------------------------------------
@@ -197,21 +175,26 @@ export default function WelcomeScreen({ navigation, route }) {
   const { settings } = useSettings();
   const [posters, setPosters] = useState([]);
   const tour = !!route?.params?.tour;
-  const [ready, setReady] = useState(tour); // false = show "Loading", true = show the slider
 
   // the logo you picked in More › Appearance; the dark-on-light version, since
   // it sits on a white disc
   const logo = (LOGOS[settings?.logo] || LOGOS.classic).light;
 
-  // Load what Explore needs first (Coming soon + the posters, and Coming up:
-  // the countdowns for what you're watching), so Explore opens already filled.
-  // Answers are cached, so Explore's own requests are then instant.
   useEffect(() => {
     let alive = true;
+    let shown = false; // is a wall on screen already?
     const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     const within = (p, ms) => Promise.race([p, wait(ms)]);
-    const giveUp = setTimeout(() => alive && setReady(true), 15000); // never leave you stuck on Loading
+    const url = (i) => i.imageSmall || i.image;
 
+    // 1. last launch's posters: straight onto the screen
+    AsyncStorage.getItem(POSTER_KEY).then((raw) => {
+      const saved = raw ? JSON.parse(raw) : [];
+      if (alive && Array.isArray(saved) && saved.length >= 8) { shown = true; setPosters(saved); }
+    }).catch(() => {});
+
+    // 2. in the background: fresh posters for next time (and for this screen
+    //    if there was nothing saved yet), plus Explore's data so it opens filled
     const comingUp = (async () => {
       const [lib, ex] = await Promise.all([getLibrary(), getExcited()]);
       const picked = [
@@ -222,27 +205,28 @@ export default function WelcomeScreen({ navigation, route }) {
     })().catch(() => {});
 
     (async () => {
+      await wait(400); // let the first frame draw before any network work
       let pools = null;
-      // AniList can be slow or briefly busy: try a few times
-      for (let i = 0; i < 3 && alive; i++) {
+      for (let i = 0; i < 3 && alive; i++) { // AniList can be briefly slow or busy
         pools = await loadExplorePools().catch(() => null);
         if (pools && (pools.trA.length || pools.popA.length)) break;
         await wait(1500);
       }
-      if (!alive) return;
+      if (!alive || !pools) return;
       const seen = new Set();
-      const list = [...(pools?.trA || []), ...(pools?.popA || [])]
-        .filter((i) => (i.imageSmall || i.image) && !seen.has(i.id) && seen.add(i.id))
-        .slice(0, 30);
-      // download the first covers before showing the wall, so it doesn't pop in
-      await within(Promise.all(list.slice(0, 14).map((i) => Image.prefetch(i.imageSmall || i.image).catch(() => {}))), 5000);
-      if (!alive) return;
-      setPosters(list);
-      await within(comingUp, 8000);
-      if (alive) setReady(true);
+      const list = [...pools.trA, ...pools.popA]
+        .filter((i) => url(i) && !seen.has(i.id) && seen.add(i.id))
+        .slice(0, 30)
+        .map((i) => ({ id: i.id, imageSmall: url(i) }));
+      if (list.length < 8) return;
+      // download the covers now so next launch finds them in the image cache
+      await within(Promise.all(list.slice(0, 14).map((i) => Image.prefetch(i.imageSmall).catch(() => {}))), 6000);
+      AsyncStorage.setItem(POSTER_KEY, JSON.stringify(list)).catch(() => {});
+      if (alive && !shown) setPosters(list); // first launch ever: fade the wall in
+      await comingUp;
     })();
 
-    return () => { alive = false; clearTimeout(giveUp); };
+    return () => { alive = false; };
   }, []);
 
   // first run (or "Welcome tour" in More): on to the welcome steps.
@@ -287,10 +271,8 @@ export default function WelcomeScreen({ navigation, route }) {
         <Text style={[styles.title, { fontSize: 34 * s, lineHeight: 42 * s }]} accessibilityRole="header">{TITLE}</Text>
         <Text style={[styles.subtitle, { fontSize: 16 * s, lineHeight: 23 * s, maxWidth: width * 0.72 }]}>{SUBTITLE}</Text>
 
-        <View style={{ marginTop: 30 * s, height: KNOB + PAD * 2 }}>
-          {ready
-            ? <Reveal><SwipeButton width={width - sideMargin * 2} onComplete={start} /></Reveal>
-            : <LoadingPill width={width - sideMargin * 2} />}
+        <View style={{ marginTop: 30 * s }}>
+          <SwipeButton width={width - sideMargin * 2} onComplete={start} />
         </View>
       </View>
     </View>
@@ -304,7 +286,7 @@ const styles = StyleSheet.create({
   disc: { backgroundColor: "#fff", alignItems: "center", justifyContent: "center", elevation: 8 },
   title: { color: "#fff", fontWeight: "800", textAlign: "center", letterSpacing: 0.2 },
   subtitle: { color: "rgba(255,255,255,0.82)", textAlign: "center", marginTop: 14 },
-  pill: { height: KNOB + PAD * 2, borderRadius: (KNOB + PAD * 2) / 2, backgroundColor: "#fff", justifyContent: "center", alignItems: "center" },
+  pill: { height: KNOB_H + PAD * 2, borderRadius: (KNOB_H + PAD * 2) / 2, backgroundColor: "#fff", justifyContent: "center", alignItems: "center" },
   pillText: { color: "#111", fontWeight: "800", fontSize: 15, letterSpacing: 0.3 },
-  knob: { position: "absolute", left: PAD, top: PAD, width: KNOB, height: KNOB, borderRadius: KNOB / 2, backgroundColor: RED, alignItems: "center", justifyContent: "center" },
+  knob: { position: "absolute", left: PAD, top: PAD, width: KNOB_W, height: KNOB_H, alignItems: "center", justifyContent: "center" },
 });
