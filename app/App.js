@@ -10,7 +10,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
-import { AppState, Linking, Platform } from "react-native";
+import { AppState, Platform } from "react-native";
 import { createNavigationContainerRef } from "@react-navigation/native";
 import { onDataChange, getPending } from "@voidation/shared/backend/store";
 import { AuthProvider } from "@voidation/shared/backend/AuthContext";
@@ -149,12 +149,9 @@ function ThemedApp() {
   };
 
   return (
-    <NavigationContainer ref={navRef} theme={navTheme} linking={linking}
-      // the swipe-to-start welcome shows on every launch (not when the app was
-      // opened from a link, like a widget tap or an alert)
-      onReady={() => { Linking.getInitialURL().then((url) => { if (!url) navRef.navigate("Welcome"); }).catch(() => navRef.navigate("Welcome")); }}>
+    <NavigationContainer ref={navRef} theme={navTheme} linking={linking}>
       <StatusBar style={dark ? "light" : "dark"} />
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Navigator initialRouteName="Welcome" screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Main" component={MainTabs} />
         {/* getId: opening a different title pushes a new screen instead of
             reusing the existing Detail screen with stale state */}

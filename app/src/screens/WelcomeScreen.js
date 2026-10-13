@@ -1,20 +1,22 @@
-// First screen on a fresh install: a tilted wall of anime posters, the logo in
-// a white disc, a headline, and a "swipe for start" slider. Swiping all the way
-// opens the welcome steps (OnboardingScreen) on a first run, or the app after that.
-// It shows on every launch (see App.js).
-//   - Posters come from AniList (popular anime). Offline, dark placeholder
-//     tiles fill the wall instead.
+// The first screen on every launch (see App.js): a tilted wall of anime posters,
+// the logo in a white disc, a headline, and a "swipe for start" slider.
+//   - While Explore's first data loads (Coming up, Coming soon, the posters),
+//     the slider is replaced by a "Loading" pill. Once it's ready the slider
+//     appears; swiping opens Explore (or the welcome steps on a first run).
+//   - Posters come from AniList. If it's slow or offline, dark placeholder
+//     tiles fill the wall, and the slider shows up after a few seconds anyway.
 //   - Always dark, whatever theme is chosen: it's a splash, like the artwork.
 //   - Built from what the app already has (Animated, PanResponder, SVG), so it
 //     ships as a normal `eas update`, no new native build.
 import { useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, Image, Animated, PanResponder, StyleSheet, useWindowDimensions } from "react-native";
+import { View, Text, Image, Animated, PanResponder, ActivityIndicator, StyleSheet, useWindowDimensions } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Defs, LinearGradient, Stop, Rect, Path } from "react-native-svg";
-import { fetchAniList } from "@voidation/shared/api/anilist";
+import { fetchNextEpisodes } from "@voidation/shared/api/anilist";
+import { loadExplorePools } from "@voidation/shared/explore";
 import { useSettings } from "@voidation/shared/backend/SettingsContext";
-import { isOnboarded } from "@voidation/shared/backend/store";
+import { isOnboarded, getLibrary, getExcited } from "@voidation/shared/backend/store";
 import { LOGOS } from "../components/Brand.js";
 
 // ---- the words (change them here) -------------------------------------------
@@ -73,6 +75,7 @@ function PosterWall({ posters, width, height }) {
                 source={{ uri: p.imageSmall || p.image }}
                 style={{ width: pw, height: ph, borderRadius: 14, backgroundColor: "#12151f" }}
                 resizeMode="cover"
+                fadeDuration={0}
                 accessibilityElementsHidden
                 importantForAccessibility="no"
               />
@@ -170,30 +173,83 @@ function SwipeButton({ width, onComplete }) {
   );
 }
 
+// shown in place of the slider while things load
+function LoadingPill({ width }) {
+  return (
+    <View style={[styles.pill, { width, flexDirection: "row", gap: 10 }]} accessible accessibilityRole="progressbar" accessibilityLabel="Loading">
+      <ActivityIndicator size="small" color={RED} />
+      <Text style={styles.pillText}>LOADING…</Text>
+    </View>
+  );
+}
+
+// fades its children in when it first appears
+function Reveal({ children }) {
+  const o = useRef(new Animated.Value(0)).current;
+  useEffect(() => { Animated.timing(o, { toValue: 1, duration: 350, useNativeDriver: true }).start(); }, [o]);
+  return <Animated.View style={{ opacity: o }}>{children}</Animated.View>;
+}
+
 // ---- screen -------------------------------------------------------------------
 export default function WelcomeScreen({ navigation, route }) {
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { settings } = useSettings();
   const [posters, setPosters] = useState([]);
+  const tour = !!route?.params?.tour;
+  const [ready, setReady] = useState(tour); // false = show "Loading", true = show the slider
 
   // the logo you picked in More › Appearance; the dark-on-light version, since
   // it sits on a white disc
   const logo = (LOGOS[settings?.logo] || LOGOS.classic).light;
 
+  // Load what Explore needs first (Coming soon + the posters, and Coming up:
+  // the countdowns for what you're watching), so Explore opens already filled.
+  // Answers are cached, so Explore's own requests are then instant.
   useEffect(() => {
     let alive = true;
-    fetchAniList("anime", { sort: "popular", perPage: 30 })
-      .then((r) => { if (alive) setPosters(r.items.filter((i) => i.imageSmall || i.image)); })
-      .catch(() => {});
-    return () => { alive = false; };
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const within = (p, ms) => Promise.race([p, wait(ms)]);
+    const giveUp = setTimeout(() => alive && setReady(true), 15000); // never leave you stuck on Loading
+
+    const comingUp = (async () => {
+      const [lib, ex] = await Promise.all([getLibrary(), getExcited()]);
+      const picked = [
+        ...Object.values(lib).filter((e) => e.status === "watching"),
+        ...Object.values(ex),
+      ].map((e) => e.item).filter((i) => i.segment === "anime");
+      await fetchNextEpisodes([...new Set(picked.map((i) => i.id))]);
+    })().catch(() => {});
+
+    (async () => {
+      let pools = null;
+      // AniList can be slow or briefly busy: try a few times
+      for (let i = 0; i < 3 && alive; i++) {
+        pools = await loadExplorePools().catch(() => null);
+        if (pools && (pools.trA.length || pools.popA.length)) break;
+        await wait(1500);
+      }
+      if (!alive) return;
+      const seen = new Set();
+      const list = [...(pools?.trA || []), ...(pools?.popA || [])]
+        .filter((i) => (i.imageSmall || i.image) && !seen.has(i.id) && seen.add(i.id))
+        .slice(0, 30);
+      // download the first covers before showing the wall, so it doesn't pop in
+      await within(Promise.all(list.slice(0, 14).map((i) => Image.prefetch(i.imageSmall || i.image).catch(() => {}))), 5000);
+      if (!alive) return;
+      setPosters(list);
+      await within(comingUp, 8000);
+      if (alive) setReady(true);
+    })();
+
+    return () => { alive = false; clearTimeout(giveUp); };
   }, []);
 
   // first run (or "Welcome tour" in More): on to the welcome steps.
-  // Every other launch: straight into the app.
+  // Every other launch: straight into Explore.
   const start = async () => {
     const done = await isOnboarded().catch(() => false);
-    if (done && !route?.params?.tour) navigation.goBack();
+    if (done && !tour) navigation.replace("Main");
     else navigation.replace("Onboarding");
   };
 
@@ -231,8 +287,10 @@ export default function WelcomeScreen({ navigation, route }) {
         <Text style={[styles.title, { fontSize: 34 * s, lineHeight: 42 * s }]} accessibilityRole="header">{TITLE}</Text>
         <Text style={[styles.subtitle, { fontSize: 16 * s, lineHeight: 23 * s, maxWidth: width * 0.72 }]}>{SUBTITLE}</Text>
 
-        <View style={{ marginTop: 30 * s }}>
-          <SwipeButton width={width - sideMargin * 2} onComplete={start} />
+        <View style={{ marginTop: 30 * s, height: KNOB + PAD * 2 }}>
+          {ready
+            ? <Reveal><SwipeButton width={width - sideMargin * 2} onComplete={start} /></Reveal>
+            : <LoadingPill width={width - sideMargin * 2} />}
         </View>
       </View>
     </View>

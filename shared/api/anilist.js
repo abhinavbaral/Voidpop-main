@@ -252,7 +252,10 @@ export async function fetchAniList(segment, opts = {}) {
   if (origin) { varDefs.push("$country: CountryCode"); args.push("countryOfOrigin: $country"); variables.country = origin; }
   if (unreleasedOnly) { args.push("status: NOT_YET_RELEASED"); }
   if (genre) { varDefs.push("$genre: String"); args.push("genre: $genre"); variables.genre = genre; }
-  if (tag) { varDefs.push("$tag: String"); args.push("tag: $tag"); variables.tag = tag; }
+  // tagMinimumRank: without it AniList matches a tag at ANY strength, so a show
+// with one voter-added "Isekai" tag (like Fullmetal Alchemist: Brotherhood)
+// lands in Isekai Heaven. 60 keeps only shows the tag really describes.
+  if (tag) { varDefs.push("$tag: String"); args.push("tag: $tag", "tagMinimumRank: 60"); variables.tag = tag; }
   if (segment === "anime" && season) {
     varDefs.push("$season: MediaSeason", "$seasonYear: Int");
     args.push("season: $season", "seasonYear: $seasonYear");
