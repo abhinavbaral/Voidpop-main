@@ -44,11 +44,11 @@ Data comes from the public [AniList](https://anilist.co) GraphQL API, which need
 
 ```
 voidation/
-├── app/      Android + iOS app — Expo / React Native
-├── web/      Website — React + Vite
+├── app/      Android + iOS app: Expo / React Native
+├── web/      Website: React + Vite (frozen)
 └── shared/   Everything both products must agree on, written once:
-              the AniList client, the on-device data layer, tiers,
-              verdicts, countdown formatting, demo data
+              api/ (AniList), backend/ (your data), features/ (rules),
+              lib/ (helpers), demo/ (sample data), test/
 ```
 
 Only the UI is written twice. What a screen shows, how the library is stored and how a

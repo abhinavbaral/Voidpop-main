@@ -3,7 +3,7 @@
 // the app changes your library), so the list shows the air time ("Today
 // 8:30 PM") with a rough "in 3h" rather than a ticking countdown.
 import { FlexWidget, ListWidget, TextWidget, ImageWidget } from "react-native-android-widget";
-import { airTime, dayLabel } from "@voidation/shared/format";
+import { airTime, dayLabel } from "@voidation/shared/lib/format";
 
 const C = { bg: "#0b0f19", card: "#111827", text: "#f3f4f6", sub: "#9ca3af", purple: "#a855f7", orange: "#ee8f2e", rose: "#f43f5e", border: "#1f2937" };
 

@@ -15,7 +15,7 @@ memoryStorage({ "voidation:db:v1": JSON.stringify({
 }) });
 
 const { getLibrary, getLibraryDates, sortEntries } = await import("../backend/store.js");
-const { applyPalette, THEMES, PALETTES } = await import("../theme.js");
+const { applyPalette, THEMES, PALETTES } = await import("../lib/theme.js");
 
 test("library sorts: date added, last watched, longest", async () => {
   const list = Object.values(await getLibrary());
@@ -37,7 +37,7 @@ test("colour themes swap accents and keep pure black black", () => {
 });
 
 test("your people: counts titles, skips Plan to Watch, groups roles", async () => {
-  const { tallyPeople } = await import("../peopleStats.js");
+  const { tallyPeople } = await import("../features/peopleStats.js");
   const a = (id, status, genres) => ({ status, item: { id, segment: "anime", title: `A${id}`, genres } });
   const entries = [a(1, "completed", ["Action", "Drama"]), a(2, "watching", ["Action"]), a(3, "plan", ["Action"])];
   const credits = {

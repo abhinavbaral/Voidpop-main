@@ -1,0 +1,188 @@
+// OUT THIS WEEK (inside the Schedule tab) — a month calendar of premieres (tap
+// a day to see them), a release calendar for the next 7 days (tap a day in the
+// strip: every episode airing that day, by time, with a countdown), and the
+// latest premieres. Same as the website. Drawn inside Schedule's scroll view;
+// refreshKey changes when Schedule is pulled to refresh.
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { View, Text, Image, TouchableOpacity, StyleSheet, useWindowDimensions } from "react-native";
+import { loadMonthPremieres, monthGrid, dayKey, loadAiringWeek, loadLatestPremieres } from "@voidation/shared/features/upcoming";
+import { getExcited, toggleExcited } from "@voidation/shared/backend/store";
+import { useAuth } from "@voidation/shared/backend/AuthContext";
+import { useNow } from "@voidation/shared/lib/useNow";
+import { useSettings } from "@voidation/shared/backend/SettingsContext";
+import { formatCountdown, airTime, hypeLabel } from "@voidation/shared/lib/format";
+import PosterRow from "../ui/PosterRow.js";
+import { useTheme } from "../../context/ThemeContext.js";
+import { openDetail } from "../../utils/nav";
+import { SkeletonList } from "../ui/Skeleton.js";
+
+const WEEKDAYS = ["M", "T", "W", "T", "F", "S", "S"];
+
+export default function OutThisWeek({ navigation, refreshKey = 0 }) {
+  const { C } = useTheme();
+  const styles = makeStyles(C);
+  const { width } = useWindowDimensions();
+  const { user } = useAuth();
+  const now = useNow(1000);
+  const { clock24 } = useSettings().settings;
+  const today = new Date();
+  const [month, setMonth] = useState({ y: today.getFullYear(), m: today.getMonth() });
+  const [byDay, setByDay] = useState(null);
+  const [picked, setPicked] = useState(null);
+  const [week, setWeek] = useState(null); // { "2026-09-30": [episodes] }
+  const [weekDay, setWeekDay] = useState(dayKey(new Date()));
+  const [latest, setLatest] = useState([]);
+  const [excited, setExcited] = useState({});
+
+  const loadMonth = useCallback(async () => {
+    setByDay(null);
+    try {
+      const d = await loadMonthPremieres(month.y, month.m);
+      setByDay(d);
+      const t = dayKey(new Date());
+      const keys = Object.keys(d).sort();
+      setPicked(d[t] ? t : keys.find((k) => k >= t) || keys[0] || null);
+    } catch { setByDay({}); }
+  }, [month.y, month.m]);
+  const loadRest = useCallback(async () => {
+    loadAiringWeek(7).then(setWeek).catch(() => setWeek({}));
+    loadLatestPremieres(21).then(setLatest).catch(() => {});
+    getExcited(user).then(setExcited).catch(() => {});
+  }, [user]);
+  useEffect(() => { loadMonth(); }, [loadMonth]);
+  useEffect(() => { loadRest(); }, [loadRest, refreshKey]);
+  useEffect(() => { if (refreshKey) loadMonth(); }, [refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const weeks = useMemo(() => monthGrid(month.y, month.m), [month.y, month.m]);
+  const title = new Date(month.y, month.m, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  const shift = (d) => setMonth(({ y, m }) => { const x = new Date(y, m + d, 1); return { y: x.getFullYear(), m: x.getMonth() }; });
+  // most hyped premiere of the day first
+  const dayItems = [...(picked && byDay ? byDay[picked] || [] : [])].sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+  const cell = Math.floor((Math.min(width, 720) - 28 - 6 * 4) / 7);
+  const open = (it) => openDetail(navigation, it);
+  const excite = async (item) => { await toggleExcited(user, item); setExcited(await getExcited(user)); };
+
+  return (
+    <View>
+        <View style={styles.monthRow}>
+          <Text style={styles.section}>Premieres</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <TouchableOpacity style={styles.arrow} onPress={() => shift(-1)} accessibilityLabel="Previous month"><Text style={styles.arrowText}>‹</Text></TouchableOpacity>
+            <Text style={{ color: C.text, fontWeight: "800", minWidth: 110, textAlign: "center" }}>{title}</Text>
+            <TouchableOpacity style={styles.arrow} onPress={() => shift(1)} accessibilityLabel="Next month"><Text style={styles.arrowText}>›</Text></TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.grid}>
+          {WEEKDAYS.map((d, i) => <Text key={i} style={[styles.weekday, { width: cell }]}>{d}</Text>)}
+          {weeks.flat().map((d, i) => {
+            if (!d) return <View key={i} style={{ width: cell, height: cell }} />;
+            const k = dayKey(d);
+            const items = byDay?.[k] || [];
+            const on = picked === k;
+            const isToday = k === dayKey(today);
+            return (
+              <TouchableOpacity key={k} onPress={() => setPicked(k)}
+                style={[styles.cell, { width: cell, height: cell }, items.length > 0 && styles.cellHas, on && { borderColor: C.purple, borderWidth: 2 }]}
+                accessibilityLabel={`${d.toDateString()}: ${items.length} premieres`}>
+                <Text style={[styles.num, isToday && { color: C.orange }, items.length > 0 && { color: C.text }]}>{d.getDate()}</Text>
+                {items.length > 0 && (items[0].image
+                  ? <Image source={{ uri: items[0].image }} style={styles.cellImg} />
+                  : <View style={styles.dot} />)}
+                {items.length > 1 && <Text style={styles.more}>+{items.length - 1}</Text>}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {byDay === null ? <SkeletonList rows={2} /> : picked ? (
+          <>
+            <Text style={styles.dayTitle}>{new Date(`${picked}T00:00`).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}</Text>
+            {dayItems.length ? dayItems.map((item) => {
+              const on = !!excited[`anime:${item.id}`];
+              return (
+                <View key={item.id} style={styles.row}>
+                  <TouchableOpacity style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 10 }} onPress={() => open(item)}>
+                    {item.image ? <Image source={{ uri: item.image }} style={styles.thumb} /> : <View style={styles.thumb} />}
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.rowTitle} numberOfLines={2}>{item.title}</Text>
+                      <Text style={styles.rowSub} numberOfLines={1}>{[item.format?.replace("_", " "), item.creator, hypeLabel(item.popularity)].filter(Boolean).join(" · ")}</Text>
+                    </View>
+                  </TouchableOpacity>
+                  {item.unreleased && (
+                    <TouchableOpacity onPress={() => excite(item)} style={[styles.excite, on && { backgroundColor: C.orange }]}>
+                      <Text style={{ fontSize: 11, fontWeight: "800", color: on ? "#fff" : C.orange }}>{on ? "Excited ✓" : "Excited?"}</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              );
+            }) : <Text style={styles.empty}>No premieres that day.</Text>}
+          </>
+        ) : <Text style={styles.empty}>No premieres with a set date this month yet.</Text>}
+
+        <Text style={[styles.section, { paddingHorizontal: 14, marginTop: 22 }]}>Release calendar <Text style={{ color: C.faint, fontSize: 12, fontWeight: "600" }}>every episode, next 7 days</Text></Text>
+        <View style={styles.strip}>
+          {Array.from({ length: 7 }, (_, n) => {
+            const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + n);
+            const k = dayKey(d);
+            const on = weekDay === k;
+            const count = week?.[k]?.length || 0;
+            return (
+              <TouchableOpacity key={k} onPress={() => setWeekDay(k)} accessibilityRole="tab" accessibilityState={{ selected: on }}
+                accessibilityLabel={`${d.toDateString()}: ${count} episodes`}
+                style={[styles.dayChip, on && { backgroundColor: C.purple, borderColor: C.purple }]}>
+                <Text style={[styles.dayName, on && { color: "#fff" }]}>{n === 0 ? "Today" : d.toLocaleDateString(undefined, { weekday: "short" })}</Text>
+                <Text style={[styles.dayNum, on && { color: "#fff" }]}>{d.getDate()}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        {week === null ? <SkeletonList rows={3} /> : !(week[weekDay] || []).length ? (
+          <Text style={styles.empty}>No episodes left to air that day.</Text>
+        ) : week[weekDay].map((s) => (
+          <TouchableOpacity key={`${s.item.id}-${s.episode}`} style={styles.calRow} onPress={() => open(s.item)}>
+            <Text style={styles.calTime}>{airTime(s.airingAt, clock24)}</Text>
+            {s.item.image ? <Image source={{ uri: s.item.image }} style={styles.thumb} /> : <View style={styles.thumb} />}
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rowTitle} numberOfLines={2}>{s.item.title}</Text>
+              <Text style={styles.rowSub} numberOfLines={1}>{[`Episode ${s.episode}${s.item.episodes ? ` of ${s.item.episodes}` : ""}`, s.item.format?.replace("_", " ")].filter(Boolean).join(" · ")}</Text>
+              <Text style={styles.countdown}>{formatCountdown(s.airingAt, now)}</Text>
+            </View>
+          </TouchableOpacity>
+        ))}
+
+        {latest.length > 0 && <PosterRow title="Latest premieres · last 3 weeks" items={latest} onOpen={open} />}
+    </View>
+  );
+}
+
+const makeStyles = (C) => StyleSheet.create({
+  monthRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 14, marginTop: 4, marginBottom: 8 },
+  section: { color: C.text, fontWeight: "800", fontSize: 15 },
+  arrow: { width: 34, height: 34, borderRadius: 9, borderWidth: 1, borderColor: C.border, alignItems: "center", justifyContent: "center" },
+  arrowText: { color: C.text, fontSize: 20, marginTop: -2 },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 4, paddingHorizontal: 14 },
+  weekday: { textAlign: "center", color: C.faint, fontSize: 11, fontWeight: "800", marginBottom: 2 },
+  cell: { borderRadius: 9, borderWidth: 1, borderColor: C.border, padding: 3, overflow: "hidden" },
+  cellHas: { backgroundColor: C.card },
+  num: { color: C.faint, fontSize: 11, fontWeight: "800" },
+  cellImg: { position: "absolute", right: 3, bottom: 3, width: "46%", aspectRatio: 2 / 3, borderRadius: 3 },
+  dot: { position: "absolute", bottom: 5, alignSelf: "center", width: 6, height: 6, borderRadius: 3, backgroundColor: C.purple },
+  more: { position: "absolute", left: 4, bottom: 3, color: C.purple, fontSize: 10, fontWeight: "900" },
+  dayTitle: { color: C.text, fontWeight: "800", fontSize: 14, paddingHorizontal: 14, marginTop: 14, marginBottom: 4 },
+  empty: { color: C.faint, fontSize: 13, paddingHorizontal: 14, marginTop: 10 },
+  row: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 7 },
+  thumb: { width: 40, height: 56, borderRadius: 6, backgroundColor: C.border },
+  thumbSm: { width: 36, height: 50, borderRadius: 6, backgroundColor: C.border },
+  rowTitle: { color: C.text, fontSize: 13, fontWeight: "700" },
+  rowSub: { color: C.faint, fontSize: 11, marginTop: 2 },
+  time: { color: C.sub, fontSize: 11, fontWeight: "700", width: 58 },
+  countdown: { color: C.purple, fontWeight: "800", fontSize: 12, marginTop: 4 },
+  strip: { flexDirection: "row", gap: 6, paddingHorizontal: 14, marginTop: 10, marginBottom: 6 },
+  dayChip: { flex: 1, alignItems: "center", paddingVertical: 8, borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.card },
+  dayName: { color: C.faint, fontSize: 10, fontWeight: "800" },
+  dayNum: { color: C.text, fontSize: 16, fontWeight: "900", marginTop: 2 },
+  calRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: C.border },
+  calTime: { color: C.text, fontSize: 15, fontWeight: "900", width: 64 },
+  excite: { borderWidth: 1, borderColor: C.orange, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+});

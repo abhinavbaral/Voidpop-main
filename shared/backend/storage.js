@@ -2,7 +2,7 @@
 //
 // Each platform plugs in its own key-value store at startup:
 //   web/src/init.js          → localStorage
-//   app/src/backend/init.js  → AsyncStorage
+//   app/src/bootstrap/init.js → AsyncStorage
 // Demo mode swaps this whole file for shared/demo/storage.js (sample library).
 //
 // An adapter is { getItem(key), setItem(key, value), removeItem?(key) } returning values or promises.

@@ -2,9 +2,9 @@
 // Supports: countryOfOrigin toggles, seasons, trending, airing schedule,
 // upcoming (unreleased) titles, and per-title details (trailer + related seasons).
 
-import { CRUNCHYROLL_AOTY } from "../awards.js";
-import { readingLinks } from "../readLinks.js";
-import { formatDateParts } from "../format.js";
+import { CRUNCHYROLL_AOTY } from "../features/awards.js";
+import { readingLinks } from "../features/readLinks.js";
+import { formatDateParts } from "../lib/format.js";
 import { cacheKey, cacheGet, cachePut, isDeviceOnline, noteSavedShown } from "./cache.js";
 export { onNetState, cacheClear, cacheSize, setDeviceOnline, isDeviceOnline } from "./cache.js";
 
@@ -428,6 +428,21 @@ export async function fetchAnimeOfTheYear() {
   return out.filter(Boolean);
 }
 
+// Trending anime covers for the welcome screen's poster wall: [{ id, uri, color }].
+// Adult titles are left out (isAdult: false). Not cached here: the screen keeps
+// its own copy of the downloaded images.
+export async function fetchCoverPool(count = 15) {
+  const data = await gql(
+    `query { Page(perPage: 30) { media(type: ANIME, sort: TRENDING_DESC, isAdult: false) { id coverImage { extraLarge color } } } }`,
+    {},
+    { save: false },
+  );
+  return (data.Page.media || [])
+    .filter((m) => m.coverImage?.extraLarge)
+    .slice(0, count)
+    .map((m) => ({ id: m.id, uri: m.coverImage.extraLarge, color: m.coverImage.color || null }));
+}
+
 // Anime starting between two dates (YYYYMMDD numbers), for the Upcoming calendar
 // and "Latest premieres". sort: START_DATE or START_DATE_DESC.
 export async function fetchPremieres(from, to, { sort = "START_DATE", status = null, pages = 3 } = {}) {
@@ -557,7 +572,7 @@ export async function fetchAniListDetail(segment, id) {
     // anime: what it's adapted from, with a link when that's a manga/manhwa/novel on AniList
     source: segment === "anime" ? sourceInfo(m.source, m.relations?.edges || []) : null,
     whereToWatch: watchLinks(m.externalLinks),
-    // manga: official readers, stores, or search boxes (shared/readLinks.js)
+    // manga: official readers, stores, or search boxes (shared/features/readLinks.js)
     whereToRead: read,
     // official site, socials, and the title's AniList / MyAnimeList pages
     // (for manga, minus anything already under Where to read)

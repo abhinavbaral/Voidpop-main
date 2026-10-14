@@ -13,10 +13,10 @@ memoryStorage({ "voidation:db:v1": JSON.stringify({ library: {
   "manga:6": { status: "watching", progress: 40, item: it(6, "manga", { episodes: null, finished: false }), updatedAt: daysAgo(8, now) },
 } }) });
 
-const { parseMalXml, malFileToText } = await import("../malImport.js");
-const { loadJumpBackIn } = await import("../explore.js");
-const { hypeLabel, formatCountdown } = await import("../format.js");
-const { readableAccent, contrast, parseHex } = await import("../color.js");
+const { parseMalXml, malFileToText } = await import("../features/malImport.js");
+const { loadJumpBackIn } = await import("../features/explore.js");
+const { hypeLabel, formatCountdown } = await import("../lib/format.js");
+const { readableAccent, contrast, parseHex } = await import("../lib/color.js");
 
 test("Jump back in: started, left 3+ days, something left; most recent first", async () => {
   const r = await loadJumpBackIn(now);
@@ -75,7 +75,7 @@ test("ranks: 15 in order; old 'seen' ranks map by titles needed; Voidmon's verdi
   assert.equal(s.TIERS[s.seenTierIndex({ tierSeen: "elite", tierSeenV: 2 })].key, "elite");
   assert.equal(s.seenTierIndex({}), -1);
 
-  const { verdictPrompt } = await import("../voidmon.js");
+  const { verdictPrompt } = await import("../features/voidmon.js");
   assert.equal(verdictPrompt({}).pose, "asking");
   assert.match(verdictPrompt({}).text, /Void Verdict/);
   assert.match(verdictPrompt({ step: "feel" }).text, /feeling/);

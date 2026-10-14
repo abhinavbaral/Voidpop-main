@@ -20,7 +20,7 @@ memoryStorage({ "voidation:db:v1": JSON.stringify({
   categories: [], excited: {}, settings: {}, notes: {}, meta: {},
 }) });
 
-const { computeAchievements, longestStreak } = await import("../achievements.js");
+const { computeAchievements, longestStreak } = await import("../features/achievements.js");
 const { getLog } = await import("../backend/store.js");
 
 test("achievements: streaks, bingeing, night owl, firsts", async () => {

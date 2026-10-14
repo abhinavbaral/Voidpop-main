@@ -2,8 +2,8 @@
 // local catalog. Constants are re-exported from the real module so the
 // filters in the UI can never drift from production.
 import { CATALOG, findItem, toAppItem } from "./catalog.js";
-import { CRUNCHYROLL_AOTY } from "../awards.js";
-import { readingLinks } from "../readLinks.js";
+import { CRUNCHYROLL_AOTY } from "../features/awards.js";
+import { readingLinks } from "../features/readLinks.js";
 export { SORTS, SEASONS, GENRES, ANIME_ORIGINS, MANGA_ORIGINS, NOVEL_ORIGINS, labelOrder } from "../api/anilist.js";
 import { labelOrder } from "../api/anilist.js";
 // the demo is always "online"; these keep the same exports as the real module
@@ -242,6 +242,12 @@ export async function fetchAnimeOfTheYear() {
     if (hit) used.add(hit.id);
     return hit ? { ...toAppItem(hit), awardYear: w.year, award: "Crunchyroll Anime Awards" } : null;
   }).filter(Boolean);
+}
+
+// Welcome-screen cover wall (demo): covers of the sample catalog.
+export async function fetchCoverPool(count = 15) {
+  await wait(200);
+  return CATALOG.anime.map(toAppItem).filter((i) => i.image).slice(0, count).map((i) => ({ id: i.id, uri: i.image, color: i.color || null }));
 }
 
 // Premieres (demo): catalog anime starting in the range; the demo's upcoming

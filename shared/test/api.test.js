@@ -4,7 +4,7 @@ import { memoryStorage, fakeAniList, media } from "./helpers.js";
 
 memoryStorage();
 const a = await import("../api/anilist.js");
-const { readingLinks } = await import("../readLinks.js");
+const { readingLinks } = await import("../features/readLinks.js");
 
 test("normalize: title, colour, hype fields come through", async () => {
   fakeAniList(() => ({ Media: media(5, { popularity: 12400, trending: 30 }) }));
@@ -14,6 +14,17 @@ test("normalize: title, colour, hype fields come through", async () => {
   assert.equal(it.color, "#e4a15d");
   assert.equal(it.popularity, 12400);
   assert.equal(it.date, "2024-01-05");
+});
+
+test("cover pool: trending covers, entries without a cover skipped, trimmed to the count", async () => {
+  fakeAniList(() => ({ Page: { media: [
+    { id: 1, coverImage: { extraLarge: "u1", color: "#fff" } },
+    { id: 2, coverImage: { extraLarge: null } },
+    { id: 3, coverImage: { extraLarge: "u3", color: null } },
+    { id: 4, coverImage: { extraLarge: "u4", color: null } },
+  ] } }));
+  const pool = await a.fetchCoverPool(2);
+  assert.deepEqual(pool, [{ id: 1, uri: "u1", color: "#fff" }, { id: 3, uri: "u3", color: null }]);
 });
 
 test("source line: comics before novels, labels by country and format", () => {
