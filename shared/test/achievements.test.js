@@ -20,20 +20,41 @@ memoryStorage({ "voidation:db:v1": JSON.stringify({
   categories: [], excited: {}, settings: {}, notes: {}, meta: {},
 }) });
 
-const { computeAchievements, longestStreak } = await import("../features/achievements.js");
+const { computeAchievements, longestStreak, levelFor } = await import("../features/achievements.js");
 const { getLog } = await import("../backend/store.js");
 
-test("achievements: streaks, bingeing, night owl, firsts", async () => {
+test("levelFor: how many goals a count has reached", () => {
+  const days = [1, 7, 15, 30, 90];
+  assert.equal(levelFor(0, days), 0);
+  assert.equal(levelFor(1, days), 1);
+  assert.equal(levelFor(6, days), 1);
+  assert.equal(levelFor(7, days), 2);
+  assert.equal(levelFor(30, days), 4);
+  assert.equal(levelFor(500, days), 5);
+});
+
+test("achievements: leveled streak, bingeing, night owl, firsts", async () => {
   assert.equal(longestStreak(await getLog()), 8);
-  const a = Object.fromEntries((await computeAchievements()).map((x) => [x.key, x]));
-  assert.equal(a.week.done, true);
+  const list = await computeAchievements();
+  const a = Object.fromEntries(list.map((x) => [x.key, x]));
+  // 8 days in a row: past level 2 (7 days), working towards level 3 (15 days)
+  assert.equal(a.blaze.level, 2);
+  assert.equal(a.blaze.maxLevel, 5);
   assert.equal(a.blaze.have, 8);
+  assert.equal(a.blaze.need, 15);
   assert.equal(a.blaze.done, false);
+  assert.equal(a.blaze.earned, true);
   assert.equal(a.binger.have, 12); // 13 in a day, capped at the goal
   assert.equal(a.binger.done, true);
   assert.equal(a.owl.have, 3);
   assert.equal(a.junior.done, true);
+  assert.equal(a.junior.earned, true);
   assert.equal(a.peak.have, 1);
-  assert.equal(a.again.done, true);
   assert.equal(a.otaku.have, 12 + 14);
+  // retired: the three separate streak badges and Round Two
+  for (const gone of ["week", "wildfire", "again"]) assert.equal(a[gone], undefined);
+  // one completed title = still Newbie: rank 1 of 15, next goal is 5 ranks
+  assert.equal(a.rankCollector.have, 1);
+  assert.equal(a.rankCollector.level, 1);
+  assert.equal(a.rankCollector.need, 5);
 });

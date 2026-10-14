@@ -500,31 +500,45 @@ function Achievements({ styles, C }) {
   const [list, setList] = useState(null);
   useFocusEffect(useCallback(() => { computeAchievements().then(setList).catch(() => setList([])); }, []));
   if (!list) return <SkeletonList rows={4} thumb={false} style={{ paddingHorizontal: 0 }} />;
-  const earned = list.filter((a) => a.done).length;
+  const earned = list.filter((a) => a.earned).length;
   return (
     <>
       <Text style={[styles.note, { marginBottom: 10 }]}>{earned} of {list.length} earned. Ranks count what you finish; these are about how you watch.</Text>
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
-        {list.map((a) => (
-          <View key={a.key} accessible accessibilityLabel={`${a.name}: ${a.text}. ${a.done ? "Earned" : `${a.have} of ${a.need}`}`}
-            style={{ flexBasis: "47%", flexGrow: 1, borderRadius: 16, borderWidth: 1, borderColor: a.done ? a.color : C.border, backgroundColor: C.card, padding: 14, alignItems: "center", gap: 6 }}>
-            <View style={{ width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center", backgroundColor: a.done ? a.color : C.border }}>
-              <Icon name={a.icon} size={28} color={a.done ? "#fff" : C.faint} />
-            </View>
-            <Text style={{ color: a.done ? a.color : C.text, fontWeight: "900", fontSize: 15 }}>{a.name}</Text>
-            <Text style={[styles.note, { textAlign: "center", minHeight: 32 }]}>{a.text}</Text>
-            {a.done ? (
-              <Text style={{ color: a.color, fontWeight: "800", fontSize: 12 }}>Earned</Text>
-            ) : (
-              <View style={{ width: "100%", gap: 4 }}>
-                <View style={{ height: 6, borderRadius: 3, backgroundColor: C.border, overflow: "hidden" }}>
-                  <View style={{ width: `${Math.round((a.have / a.need) * 100)}%`, height: "100%", backgroundColor: a.color }} />
-                </View>
-                <Text style={[styles.note, { textAlign: "right", fontSize: 11 }]}>{a.have.toLocaleString()} / {a.need.toLocaleString()}</Text>
+        {list.map((a) => {
+          const isLevel = a.levels != null; // Blaze and Rank Collector grow through levels
+          const state = a.done ? (isLevel ? "Max level" : "Earned") : `${a.have.toLocaleString()} of ${a.need.toLocaleString()}`;
+          return (
+            <View key={a.key} accessible accessibilityLabel={`${a.name}${isLevel ? `, level ${a.level} of ${a.maxLevel}` : ""}: ${a.text}. ${state}`}
+              style={{ flexBasis: "47%", flexGrow: 1, borderRadius: 16, borderWidth: 1, borderColor: a.earned ? a.color : C.border, backgroundColor: C.card, padding: 14, alignItems: "center", gap: 6 }}>
+              <View style={{ width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center", backgroundColor: a.earned ? a.color : C.border }}>
+                <Icon name={a.icon} size={28} color={a.earned ? "#fff" : C.faint} />
               </View>
-            )}
-          </View>
-        ))}
+              <Text style={{ color: a.earned ? a.color : C.text, fontWeight: "900", fontSize: 15 }}>{a.name}</Text>
+              {isLevel && (
+                <>
+                  <View style={{ flexDirection: "row", gap: 4 }}>
+                    {Array.from({ length: a.maxLevel }, (_, i) => (
+                      <View key={i} style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: i < a.level ? a.color : C.border }} />
+                    ))}
+                  </View>
+                  <Text style={{ color: a.earned ? a.color : C.faint, fontWeight: "800", fontSize: 12 }}>Level {a.level} of {a.maxLevel}</Text>
+                </>
+              )}
+              <Text style={[styles.note, { textAlign: "center", minHeight: 32 }]}>{a.text}</Text>
+              {a.done ? (
+                <Text style={{ color: a.color, fontWeight: "800", fontSize: 12 }}>{isLevel ? "Max level" : "Earned"}</Text>
+              ) : (
+                <View style={{ width: "100%", gap: 4 }}>
+                  <View style={{ height: 6, borderRadius: 3, backgroundColor: C.border, overflow: "hidden" }}>
+                    <View style={{ width: `${Math.round((a.have / a.need) * 100)}%`, height: "100%", backgroundColor: a.color }} />
+                  </View>
+                  <Text style={[styles.note, { textAlign: "right", fontSize: 11 }]}>{a.have.toLocaleString()} / {a.need.toLocaleString()}</Text>
+                </View>
+              )}
+            </View>
+          );
+        })}
       </View>
     </>
   );

@@ -760,6 +760,16 @@ export async function getUserTier() {
   return { tier: tierFor(stats.totalCompleted), stats };
 }
 
+// Ranks collected, for the Rank Collector achievement: 1 = Newbie … 15 = Addicted.
+// It counts the highest rank you have reached, including one you were shown and
+// then dropped below by removing titles, so a collected rank is never lost.
+export async function getRanksCollected() {
+  const db = await load();
+  const { tier } = await getUserTier();
+  const now = TIERS.findIndex((t) => t.key === tier.key);
+  return Math.max(now, seenTierIndex(db.meta)) + 1;
+}
+
 // Rank-up celebrations: the highest rank you've already been shown. A new,
 // higher rank → celebrate once. Dropping a rank (removing titles) never
 // celebrates again when you climb back.

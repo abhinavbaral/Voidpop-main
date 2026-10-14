@@ -22,7 +22,7 @@ function sortItems(items, sort) {
   const s = [...items];
   if (sort === "newest") s.sort((a, b) => byDate(b) - byDate(a));
   else if (sort === "oldest") s.sort((a, b) => byDate(a) - byDate(b));
-  else if (sort === "score") s.sort((a, b) => (b.score || 0) - (a.score || 0) || b.popularity - a.popularity);
+  else if (sort === "loved") s.sort((a, b) => (b.favourites ?? b.popularity ?? 0) - (a.favourites ?? a.popularity ?? 0));
   else if (sort === "trending") s.sort((a, b) => byDate(b) - byDate(a) || b.popularity - a.popularity);
   else s.sort((a, b) => b.popularity - a.popularity);
   return s;

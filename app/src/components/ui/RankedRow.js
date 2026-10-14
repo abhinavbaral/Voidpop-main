@@ -1,4 +1,4 @@
-// "Top rated" (idea from Zenshu): a sideways row with a big 01, 02… above
+// "Most loved" (idea from Zenshu): a sideways row with a big 01, 02… above
 // each poster, a status badge (Finished / Airing / Upcoming) on the poster
 // (no scores: Voidation only shows your own verdict), and "Ep 28 · Adventure" under the title.
 import { View, Text, Image, FlatList, Pressable, StyleSheet } from "react-native";

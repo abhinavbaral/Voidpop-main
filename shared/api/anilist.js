@@ -13,7 +13,7 @@ const URL = "https://graphql.anilist.co";
 export const SORTS = [
   { key: "popular", label: "Popular" },
   { key: "trending", label: "Trending" },
-  { key: "score", label: "Top rated" },
+  { key: "loved", label: "Most loved" }, // AniList favourites: how many people favourited it, not a score
   { key: "newest", label: "Newest" },
   { key: "oldest", label: "Oldest" },
 ];
@@ -21,7 +21,7 @@ export const SORTS = [
 const sortMap = {
   popular: "POPULARITY_DESC",
   trending: "TRENDING_DESC",
-  score: "SCORE_DESC",
+  loved: "FAVOURITES_DESC",
   newest: "START_DATE_DESC",
   oldest: "START_DATE",
 };

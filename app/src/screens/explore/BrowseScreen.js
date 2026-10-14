@@ -53,7 +53,7 @@ export default function BrowseScreen({ navigation, route }) {
   const [origin, setOrigin] = useState("");
   const [season, setSeason] = useState("");
   const [year, setYear] = useState(String(THIS_YEAR));
-  const [sort, setSort] = useState(route?.params?.sort || "popular"); // "See all" from Top rated opens it sorted by score
+  const [sort, setSort] = useState(route?.params?.sort || "popular"); // "See all" from Most loved opens it sorted by favourites
   const [genre, setGenre] = useState("");
 
   const [items, setItems] = useState([]);

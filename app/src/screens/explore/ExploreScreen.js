@@ -84,10 +84,10 @@ export default function ExploreScreen({ navigation }) {
     const list = COUNTRIES.filter((c) => c.key);
     setCountry(list[(list.findIndex((c) => c.key === country) + 1) % list.length].key);
   };
-  // "Top rated": the highest-scored anime on AniList
-  const [topRated, setTopRated] = useState(null);
+  // "Most loved": the anime most AniList users have favourited (a count of fans, not a score)
+  const [mostLoved, setMostLoved] = useState(null);
   useEffect(() => {
-    fetchAniList("anime", { sort: "score", perPage: 30 }).then((r) => setTopRated(r.items)).catch(() => setTopRated([]));
+    fetchAniList("anime", { sort: "loved", perPage: 30 }).then((r) => setMostLoved(r.items)).catch(() => setMostLoved([]));
   }, []);
   useEffect(() => {
     let alive = true;
@@ -123,8 +123,8 @@ export default function ExploreScreen({ navigation }) {
     newSeasons.length > 0 && row("new-seasons", () => <PosterRow title="New seasons of shows you watched" items={newSeasons} onOpen={open} />),
     ...verdictRows.map((r) => row(`verdict-${r.verdict}`, () => <PosterRow title={r.title} dot={r.color} items={r.items} onOpen={open} />)),
     row("talk", () => <PosterRow title="Talk of the Week" items={data.talk} loading={loading} onOpen={open} onMore={() => navigation.navigate("Trends")} />),
-    row("top-rated", () => <RankedRow title="Top rated" subtitle="The highest-scored anime on AniList" items={unmarked(topRated)?.slice(0, 10)} loading={topRated === null} onOpen={open}
-      onMore={() => navigation.navigate("Browse", { sort: "score" })} />),
+    row("most-loved", () => <RankedRow title="Most loved" subtitle="Favourited by the most AniList users" items={unmarked(mostLoved)?.slice(0, 10)} loading={mostLoved === null} onOpen={open}
+      onMore={() => navigation.navigate("Browse", { sort: "loved" })} />),
     row("trending-in", () => <PosterRow title="Trending in" items={unmarked(trend)?.slice(0, 15)} loading={trend === null} onOpen={open}
       chip={{ label: COUNTRIES.find((c) => c.key === country)?.label, onPress: nextCountry, a11y: "Change country" }}
       onMore={() => navigation.navigate("Trends", { country })} />),
