@@ -5,8 +5,13 @@
         "projectId": "60c0d3f0-5f80-4f55-b21e-9d32892e270f"
       }
     },
-    "android": {
-      "package": "com.abhinavbaral.voidation"
-    }
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/60c0d3f0-5f80-4f55-b21e-9d32892e270f"
+    },
+    "android": {},
+    "ios": {}
   }
 }
