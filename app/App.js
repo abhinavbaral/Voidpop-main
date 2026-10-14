@@ -20,7 +20,7 @@ import ExploreScreen from "./src/screens/ExploreScreen.js";
 import BrowseScreen from "./src/screens/BrowseScreen.js";
 import PersonScreen from "./src/screens/PersonScreen.js";
 import OnboardingScreen from "./src/screens/OnboardingScreen.js";
-import WelcomeScreen from "./src/screens/WelcomeScreen.js";
+import WelcomeScreen from "./src/screens/WelcomeScreen.jsx";
 import ScheduleScreen from "./src/screens/ScheduleScreen.js";
 import HistoryScreen from "./src/screens/HistoryScreen.js";
 import MoreScreen from "./src/screens/MoreScreen.js";
