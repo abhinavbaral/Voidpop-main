@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AccessibilityInfo, Animated, Easing, StyleSheet, View, useWindowDimensions } from "react-native";
-import { Image } from "expo-image";
-import { LinearGradient } from "expo-linear-gradient";
+// Only React Native + react-native-svg here (both already inside the installed
+// app), so this ships as a normal `eas update`. expo-image and
+// expo-linear-gradient are native modules: an update that imports them crashes
+// on a phone whose app was built without them.
+import { AccessibilityInfo, Animated, Easing, Image, StyleSheet, View, useWindowDimensions } from "react-native";
+import Svg, { Defs, LinearGradient, Stop, Rect } from "react-native-svg";
 
 const TILE_W = 132;
 const TILE_H = 196;
@@ -17,7 +20,7 @@ function Tile({ cover }) {
     backgroundColor: cover.color ?? "#161b22",
   };
   if (!cover.uri) return <View style={style} />;
-  return <Image source={{ uri: cover.uri }} cachePolicy="disk" contentFit="cover" style={style} />;
+  return <Image source={{ uri: cover.uri }} resizeMode="cover" fadeDuration={0} style={style} />;
 }
 
 function Column({ items, dir, seconds, phase, still }) {
@@ -86,7 +89,16 @@ export default function CoverWall({ covers }) {
         ))}
       </View>
       <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.45)" }]} />
-      <LinearGradient colors={["transparent", "#000"]} locations={[0.45, 0.8]} style={StyleSheet.absoluteFill} />
+      {/* fades the wall to black toward the bottom, where the text sits */}
+      <Svg style={StyleSheet.absoluteFill} width="100%" height="100%">
+        <Defs>
+          <LinearGradient id="wallFade" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0.45" stopColor="#000" stopOpacity="0" />
+            <Stop offset="0.8" stopColor="#000" stopOpacity="1" />
+          </LinearGradient>
+        </Defs>
+        <Rect x="0" y="0" width="100%" height="100%" fill="url(#wallFade)" />
+      </Svg>
     </View>
   );
 }

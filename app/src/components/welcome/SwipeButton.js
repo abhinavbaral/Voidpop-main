@@ -1,6 +1,5 @@
 import { useRef, useState } from "react";
-import { Animated, PanResponder, StyleSheet, View } from "react-native";
-import { Image } from "expo-image";
+import { Animated, Image, PanResponder, StyleSheet, View } from "react-native";
 
 const H = 76;
 const PAD = 6;
@@ -51,7 +50,7 @@ export default function SwipeButton({ label, knobSource, onComplete }) {
     >
       <Animated.Text style={[s.label, { opacity: labelOpacity }]}>{label}</Animated.Text>
       <Animated.View style={[s.knob, { transform: [{ translateX: x }] }]} {...pan.panHandlers}>
-        <Image source={knobSource} contentFit="contain" style={{ width: KNOB_W, height: KNOB_H }} />
+        <Image source={knobSource} resizeMode="contain" style={{ width: KNOB_W, height: KNOB_H }} />
       </Animated.View>
     </View>
   );

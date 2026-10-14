@@ -1,16 +1,7 @@
-// Which screen the app opens on: "Welcome" the first time, "Main" after that.
-// Null for a moment while the saved flag is read (App shows a blank screen).
-import { useEffect, useState } from "react";
-import { isOnboarded } from "@voidation/shared/backend/store";
-
+// Which screen the app opens on: always "Welcome" (the swipe-to-start screen).
+// Swiping goes on to Main, or to Onboarding on a first run (see WelcomeScreen).
+// If the app is opened from a link (widget tap, notification), React Navigation
+// uses that link's screen instead, so Welcome never covers what was tapped.
 export default function useInitialRoute() {
-  const [route, setRoute] = useState(null);
-  useEffect(() => {
-    let live = true;
-    isOnboarded()
-      .then((done) => live && setRoute(done ? "Main" : "Welcome"))
-      .catch(() => live && setRoute("Main")); // can't read it: don't trap the user on Welcome
-    return () => { live = false; };
-  }, []);
-  return route;
+  return "Welcome";
 }

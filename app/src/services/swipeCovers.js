@@ -3,7 +3,7 @@
 // once a day so it keeps changing. The network part lives in
 // @voidation/shared/api/anilist (fetchCoverPool), like every other AniList call.
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Image } from "expo-image";
+import { Image } from "react-native";
 import { fetchCoverPool } from "@voidation/shared/api/anilist";
 
 const SET_KEY = "swipe-set";
@@ -24,7 +24,7 @@ async function refresh() {
   try {
     const items = await fetchCoverPool(POOL);
     if (items.length < POOL) return null;
-    const ok = await Promise.all(items.map((i) => Image.prefetch(i.uri)));
+    const ok = await Promise.all(items.map((i) => Image.prefetch(i.uri).catch(() => false)));
     if (!ok.every(Boolean)) return null; // keep the old set if any image failed
     await AsyncStorage.setItem(SET_KEY, JSON.stringify({ at: Date.now(), items }));
     return items;
