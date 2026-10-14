@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1024 1024" role="img" aria-labelledby="t">
+  <title id="t">Corrupted Voidmon</title>
+  <defs>
+    <radialGradient id="body" cx="38%" cy="30%" r="80%"><stop offset="0" stop-color="#3a1d57"/><stop offset=".55" stop-color="#170a22"/><stop offset="1" stop-color="#0a050f"/></radialGradient>
+    <linearGradient id="wing" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a1d57"/><stop offset="1" stop-color="#0d0712"/></linearGradient>
+    <radialGradient id="ball" cx="50%" cy="38%" r="65%"><stop offset="0" stop-color="#ffffff"/><stop offset=".6" stop-color="#ede4ff"/><stop offset="1" stop-color="#b9a4ee"/></radialGradient>
+    <radialGradient id="iris" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#d8b4fe"/><stop offset=".55" stop-color="#9333ea"/><stop offset="1" stop-color="#581c87"/></radialGradient>
+  </defs>
+
+  <!-- tail (behind body) -->
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M392 668 C350 760 262 800 212 748" stroke="#a855f7" stroke-width="30"/>
+    <path d="M392 668 C350 760 262 800 212 748" stroke="#120819" stroke-width="16"/>
+  </g>
+  <g transform="translate(212 748) rotate(-48)" stroke-linejoin="round">
+    <path d="M0 -52 L36 10 L0 -6 L-36 10 Z" fill="#120819" stroke="#a855f7" stroke-width="9"/>
+    <path d="M0 -30 L14 0 L0 -8 L-14 0 Z" fill="#c084fc" opacity=".55"/>
+  </g>
+
+  <!-- wings -->
+  <g id="wingL" stroke-linejoin="round">
+    <path d="M338 522 C300 470 240 425 150 398 L226 462 L170 524 L246 544 L208 608 L298 588 L340 596 Z" fill="url(#wing)" stroke="#a855f7" stroke-width="8"/>
+    <g fill="none" stroke="#c084fc" stroke-width="4" stroke-linecap="round" opacity=".75">
+      <path d="M340 540 C290 500 220 440 160 404"/><path d="M340 556 C290 540 220 530 176 520"/><path d="M340 574 C300 586 250 598 214 604"/>
+    </g>
+  </g>
+  <use xlink:href="#wingL" transform="translate(1024 0) scale(-1 1)"/>
+
+  <!-- feet -->
+  <g id="foot" fill="#120819" stroke="#a855f7" stroke-width="6" stroke-linejoin="round">
+    <path d="M410 716 C400 744 404 772 396 790 L420 770 L428 796 L442 766 L462 780 L458 726 Z"/>
+  </g>
+  <use xlink:href="#foot" transform="translate(1024 0) scale(-1 1)"/>
+
+  <!-- ears -->
+  <g id="earL" stroke-linejoin="round">
+    <path d="M394 440 L352 290 L486 396 Z" fill="url(#wing)" stroke="#a855f7" stroke-width="8"/>
+    <path d="M392 392 L364 308 L440 368 Z" fill="#1e3a8a" opacity=".9"/>
+    <path d="M388 372 L370 322 L418 360 Z" fill="#7dd3fc"/>
+  </g>
+  <use xlink:href="#earL" transform="translate(1024 0) scale(-1 1)"/>
+
+  <!-- body -->
+  <circle cx="512" cy="562" r="188" fill="url(#body)" stroke="#a855f7" stroke-width="9"/>
+
+  <!-- cracks (glow = wide faint underlay + bright core) -->
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <g stroke="#a855f7" stroke-width="14" opacity=".28">
+      <path id="cr1" d="M432 600 L392 590 L372 636 L352 640"/>
+      <path d="M594 598 L634 580 L656 524 L674 522"/>
+      <path d="M520 654 L534 704 L500 734"/>
+      <path d="M424 480 L396 462 L406 428"/>
+      <path d="M610 470 L640 452 L634 420"/>
+    </g>
+    <g stroke="#d8b4fe" stroke-width="5">
+      <path d="M432 600 L392 590 L372 636 L352 640"/>
+      <path d="M594 598 L634 580 L656 524 L674 522"/>
+      <path d="M520 654 L534 704 L500 734"/>
+      <path d="M424 480 L396 462 L406 428"/>
+      <path d="M610 470 L640 452 L634 420"/>
+    </g>
+  </g>
+
+  <!-- face -->
+  <circle cx="512" cy="540" r="92" fill="url(#ball)" stroke="#a855f7" stroke-width="7"/>
+  <circle cx="512" cy="540" r="62" fill="url(#iris)"/>
+  <circle cx="512" cy="540" r="62" fill="none" stroke="#4c1d95" stroke-width="7" stroke-dasharray="5 6"/>
+  <circle cx="512" cy="540" r="40" fill="#7e22ce" opacity=".8"/>
+  <polygon points="512,494 538,540 512,586 486,540" fill="#10061a"/>
+  <polygon points="512,508 524,540 512,572 500,540" fill="#2e1065" opacity=".7"/>
+  <circle cx="527" cy="523" r="7" fill="#ffffff"/>
+  <path d="M472 640 H552 L544 672 L530 654 L512 676 L494 654 L480 672 Z" fill="#f3e8ff" stroke="#a855f7" stroke-width="5" stroke-linejoin="round"/>
+
+  <!-- particles -->
+  <g fill="#c4b5fd">
+    <circle cx="226" cy="352" r="5"/><circle cx="262" cy="322" r="3"/><circle cx="806" cy="338" r="5"/><circle cx="772" cy="300" r="3"/>
+    <circle cx="858" cy="590" r="4"/><circle cx="168" cy="650" r="4"/><circle cx="780" cy="760" r="4"/>
+  </g>
+</svg>
