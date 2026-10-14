@@ -3,13 +3,13 @@ import { StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import CoverWall from '../components/CoverWall'
 import SwipeButton from '../components/SwipeButton'
-import Logo from '../components/Logo' // your existing countdown-ring V logo; adjust the path or name
+import Logo from '../../assets/logo.png';
 import { getCoversForWelcome } from '../lib/swipeCovers'
 
 const COPY = {
-  title: 'Track every anime, manga and novel',
-  sub: 'Keep your lists, get airing alerts and find what to watch or read next.',
-  button: 'Swipe to start',
+  title: 'Track every anime, manga and novel,
+  sub: 'Discover new stories, keep up with your favorites, and never miss a release.  ',
+  button: 'Let’s go',
 }
 
 export default function WelcomeScreen({ onStart }) {
