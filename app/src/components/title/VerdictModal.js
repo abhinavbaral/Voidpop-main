@@ -1,32 +1,36 @@
 // Popup when marking Completed/Finished, in two steps with Voidmon asking:
 //   1. your Void Verdict (Peak / Dive In / One Time / Void It)
-//   2. moods (up to 3) and an optional note, in one speech bubble, then Save
+//   2. moods (up to 3, five to pick from for each verdict) and an optional note,
+//      in one speech bubble, then Save
 // Vibes aren't asked any more; any already on this verdict are kept as they are.
 
 import { useEffect, useState } from "react";
 import {
   Modal, View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet,
 } from "react-native";
-import { VERDICTS, MOODS } from "@voidation/shared/backend/store";
+import { VERDICTS, moodsFor } from "@voidation/shared/backend/store";
 import { verdictPrompt } from "@voidation/shared/features/voidmon";
 import { useTheme } from "../../context/ThemeContext.js";
 import Voidmon from "../brand/Voidmon.js";
+
+// moods from an older review (or another verdict) that this verdict doesn't offer are dropped
+const keepMoods = (verdict, moods) => (moods || []).filter((m) => moodsFor(verdict).includes(m));
 
 export default function VerdictModal({ visible, initial, onSave, onClose }) {
   const { C } = useTheme();
   const styles = makeStyles(C);
   const [step, setStep] = useState("verdict");
   const [verdict, setVerdict] = useState(initial?.verdict || null);
-  const [moods, setMoods] = useState(initial?.moods || []);
+  const [moods, setMoods] = useState(keepMoods(initial?.verdict, initial?.moods));
   const [comment, setComment] = useState(initial?.comment || "");
   // opening again starts at step 1 with what's saved (the window can stay mounted)
   useEffect(() => {
     if (!visible) return;
-    setStep("verdict"); setVerdict(initial?.verdict || null); setMoods(initial?.moods || []); setComment(initial?.comment || "");
+    setStep("verdict"); setVerdict(initial?.verdict || null); setMoods(keepMoods(initial?.verdict, initial?.moods)); setComment(initial?.comment || "");
   }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps -- reset only when it opens
   const toggleMood = (m) => setMoods((prev) => (prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m].slice(-3)));
   const prompt = verdictPrompt({ step, verdict, moods });
-  const pick = (key) => { setVerdict(key); setStep("feel"); };
+  const pick = (key) => { setVerdict(key); setMoods((prev) => keepMoods(key, prev)); setStep("feel"); };
   const save = () => onSave({ verdict, vibes: initial?.vibes || [], moods, comment: comment.trim() });
 
   return (
@@ -69,7 +73,7 @@ export default function VerdictModal({ visible, initial, onSave, onClose }) {
                 <View style={[styles.bubble, styles.bigBubble]}>
                   <Text style={styles.bubbleText}>{prompt.text}</Text>
                   <View style={[styles.moodWrap, { marginTop: 10 }]}>
-                    {MOODS.map((m) => {
+                    {moodsFor(verdict).map((m) => {
                       const active = moods.includes(m);
                       return (
                         <TouchableOpacity key={m} onPress={() => toggleMood(m)} accessibilityRole="button" accessibilityState={{ selected: active }}
@@ -119,7 +123,7 @@ const makeStyles = (C) => StyleSheet.create({
   },
   optionText: { color: C.sub, fontWeight: "800", fontSize: 14 },
   moodWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  mood: { paddingHorizontal: 12, height: 32, borderRadius: 16, borderWidth: 1, borderColor: C.border, justifyContent: "center", backgroundColor: C.card },
+  mood: { paddingHorizontal: 12, paddingVertical: 6, minHeight: 32, maxWidth: "100%", borderRadius: 16, borderWidth: 1, borderColor: C.border, justifyContent: "center", backgroundColor: C.card },
   moodActive: { backgroundColor: C.orange, borderColor: C.orange },
   moodText: { color: C.sub, fontSize: 12, fontWeight: "600" },
   input: {

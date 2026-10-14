@@ -15,7 +15,7 @@ import Icon from "../../components/ui/Icon.js";
 
 const GROUPS = [
   [["statistics", "stats", "Statistics"], ["data", "storage", "Data and storage"]],
-  [["announced", "bell", "New announcements"]],
+  [["youwatching", "play", "You're watching"], ["announced", "bell", "New announcements"]],
   [["categories", "browse", "Categories"], ["anilist", "sync", "AniList"]],
   [["settings", "palette", "Appearance and Settings"], ["help", "help", "Help"], ["about", "info", "About"]],
 ];

@@ -65,6 +65,7 @@ const MEDIA_FIELDS = `
   coverImage { large extraLarge color }
   bannerImage
   startDate { year month day }
+  endDate { year month day }
   genres
   description(asHtml: false)
   siteUrl
@@ -115,6 +116,9 @@ function normalize(m, segment) {
     // (shows up as "NaN" years) — "2013-04-07" parses everywhere.
     date: d && d.year ? `${d.year}-${pad(d.month || 1)}-${pad(d.day || 1)}` : null,
     dateLabel: formatDateParts(d?.year, d?.month, d?.day),
+    // when it finished airing (the last episode's day); null while airing / unknown.
+    // "You're watching" and the Schedule use it (see store.js, pastWrapUp)
+    endDate: m.endDate?.year ? `${m.endDate.year}-${pad(m.endDate.month || 12)}-${pad(m.endDate.day || 28)}` : null,
     creator: segment === "manga" ? mangakaOf(m) : m.studios?.nodes?.[0]?.name || null,
     genres: m.genres || [],
     genre: m.genres?.[0] || (segment === "anime" ? "Anime" : "Manga"),
@@ -283,7 +287,7 @@ export async function fetchAniList(segment, opts = {}) {
 // creator load the first time its page is opened (item.partial).
 const LIST_FIELDS = `
   id title { english romaji } coverImage { large extraLarge color } bannerImage
-  startDate { year month day } genres siteUrl status format countryOfOrigin duration
+  startDate { year month day } endDate { year month day } genres siteUrl status format countryOfOrigin duration
   episodes chapters nextAiringEpisode { episode airingAt }
 `;
 // Pass a username (public lists), or { userId, token } when signed in (then

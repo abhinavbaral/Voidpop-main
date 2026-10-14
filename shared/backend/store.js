@@ -148,7 +148,7 @@ export async function setStatus(_user, segment, item, status) {
 // creator until its page is opened once.
 function freshest(prev, next) {
   if (!prev) return next;
-  return next.partial && !prev.partial ? { ...prev, ...pick(next, ["nextEpisode", "finished", "episodes", "chapters"]) } : next;
+  return next.partial && !prev.partial ? { ...prev, ...pick(next, ["nextEpisode", "finished", "episodes", "chapters", "endDate"]) } : next;
 }
 const pick = (o, keys) => Object.fromEntries(keys.filter((k) => o[k] !== undefined).map((k) => [k, o[k]]));
 
@@ -172,6 +172,20 @@ export function airedFor(item) {
   }
   return item.finished ? item.episodes ?? null : null;
 }
+// A show that finished airing stays on Schedule for this many days (so you can
+// catch up on what you missed), then moves to More > You're watching.
+export const WRAP_UP_DAYS = 14;
+
+// True once a show has been finished airing for more than WRAP_UP_DAYS.
+// Finished but no end date saved yet (an old saved copy): counts as long ago,
+// and the date arrives with the next AniList refresh.
+export function pastWrapUp(item, now = Date.now()) {
+  if (item.segment !== "anime" || !item.finished) return false;
+  if (!item.endDate) return true;
+  const end = Date.parse(`${item.endDate}T23:59:59Z`); // the last episode aired on this day
+  return Number.isNaN(end) ? true : now - end > WRAP_UP_DAYS * 86400000;
+}
+
 // Library badge: episodes (or chapters) that are out and you haven't watched.
 // 24-episode show, 23 out, watched 3 → 20. Watched all 23 → 0 (no badge).
 // Completed → 0. Ongoing manga (no known chapter count) → null (no badge).
@@ -410,7 +424,8 @@ const FOLLOWING = new Set(["watching", "plan", "onhold"]);
 
 // Every anime you follow (Watching, Plan to Watch, On Hold) that has an episode
 // coming, or aired episodes you haven't watched (Watching only). Soonest first;
-// shows with nothing scheduled but episodes to catch up on go last.
+// shows with nothing scheduled but episodes to catch up on go last (only for
+// two weeks after the final episode, then they move to youreWatching).
 //   fresh: { id -> item } from fetchNextEpisodes (newer air times than the saved copy)
 export function yourShows(lib, fresh = {}, now = Date.now()) {
   const nowS = now / 1000;
@@ -426,8 +441,20 @@ export function yourShows(lib, fresh = {}, now = Date.now()) {
         delay: e.delay && e.delay.episode === item.nextEpisode?.episode ? e.delay : null,
       };
     })
-    .filter((x) => x.next || x.pending > 0)
+    // finished airing more than 2 weeks ago: not a Schedule show any more, it
+    // lives in More > You're watching (see youreWatching)
+    .filter((x) => x.next || (x.pending > 0 && !pastWrapUp(x.item, now)))
     .sort(scheduleOrder);
+}
+
+// More > You're watching: finished shows you are watching again, or catching up
+// on after the two weeks on Schedule are over. Rewatching always lands here.
+// Most recently touched first. Finishing one moves it to Completed as usual.
+export function youreWatching(lib, now = Date.now()) {
+  return Object.values(lib)
+    .filter((e) => e.item.segment === "anime"
+      && (e.status === "rewatching" || (e.status === "watching" && pastWrapUp(e.item, now))))
+    .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
 }
 
 // Schedule's order: by the weekday the next episode airs, Sunday → Saturday.
@@ -492,7 +519,7 @@ export async function getPending() {
     .filter((e) => e.item.segment === "anime" && e.status === "watching");
   const items = entries
     .map((e) => ({ entry: e, pending: behindBy(e) }))
-    .filter(({ entry, pending }) => pending > 0 || (entry.item.nextEpisode && !entry.item.finished))
+    .filter(({ entry, pending }) => (pending > 0 && !pastWrapUp(entry.item)) || (entry.item.nextEpisode && !entry.item.finished))
     .sort((a, b) => b.pending - a.pending
       || (a.entry.item.nextEpisode?.airingAt ?? Infinity) - (b.entry.item.nextEpisode?.airingAt ?? Infinity));
   return { total: items.reduce((n, x) => n + x.pending, 0), items };
@@ -521,8 +548,8 @@ export async function noteAiring(fresh) {
       delete e.delay; // that episode aired; the next one is on its own schedule
       changed = true;
     }
-    if (JSON.stringify(before) !== JSON.stringify(now) || e.item.finished !== f.finished || !!e.item.unreleased !== !!f.unreleased) {
-      e.item = { ...e.item, nextEpisode: now, finished: f.finished, unreleased: f.unreleased, episodes: f.episodes ?? e.item.episodes };
+    if (JSON.stringify(before) !== JSON.stringify(now) || e.item.finished !== f.finished || !!e.item.unreleased !== !!f.unreleased || (f.endDate ?? null) !== (e.item.endDate ?? null)) {
+      e.item = { ...e.item, nextEpisode: now, finished: f.finished, unreleased: f.unreleased, episodes: f.episodes ?? e.item.episodes, endDate: f.endDate ?? null };
       changed = true;
     }
   });
@@ -783,10 +810,41 @@ export const VIBES = [
 ];
 
 // Moods: how it made you FEEL (vibes are what KIND of show it was). Up to 3.
-export const MOODS = [
-  "Made me laugh", "Made me cry", "Hyped me up", "Made me think", "Scared me",
-  "Surprised me", "Relaxed me", "Motivated me", "Broke my heart", "Bored me",
-];
+// Each Void Verdict asks for its own five, so the choices match the verdict.
+export const MOODS_BY_VERDICT = {
+  peak: [
+    "Made me forget the world.",
+    "Made me feel alive.",
+    "Made me question reality.",
+    "Made me believe in stories.",
+    "Made me feel something indescribable.",
+  ],
+  divein: [
+    "Made me crave more.",
+    "Made me lose track of time.",
+    "Made me obsessed.",
+    "Made me forget to sleep.",
+    "Made me fall into its world.",
+  ],
+  onetime: [
+    "Made me pass the time.",
+    "Made me mildly entertained.",
+    "Made me kill some time.",
+    "Made me watch without thinking.",
+    `Made me say, "That was okay."`,
+  ],
+  voidit: [
+    "Wasted my time.",
+    "Made me lose interest.",
+    "Made me wish I'd watched something else.",
+    "Made me check how many episodes were left.",
+    "Made me wonder how it got made.",
+  ],
+};
+// the five moods for one verdict key ("peak", "divein", "onetime", "voidit")
+export const moodsFor = (verdict) => MOODS_BY_VERDICT[verdict] || [];
+// every mood there is (reviews saved with older moods, like "Made me laugh", still show as they are)
+export const MOODS = Object.values(MOODS_BY_VERDICT).flat();
 
 export async function addReview(_user, segment, id, { verdict, vibes, moods, comment }) {
   const db = await load();
