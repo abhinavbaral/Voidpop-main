@@ -7,8 +7,8 @@ import Logo from '../../assets/logo.png';
 import { getCoversForWelcome } from '../lib/swipeCovers'
 
 const COPY = {
-  title: 'Track every anime, manga and novel,
-  sub: 'Discover new stories, keep up with your favorites, and never miss a release.  ',
+  title: 'Track every anime, manga and novel',
+  sub: 'Discover new stories, keep up with your favorites, and never miss a release. All in one place.',
   button: 'Let’s go',
 }
 
