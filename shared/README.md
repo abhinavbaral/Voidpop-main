@@ -1,4 +1,4 @@
-# `@voidation/shared`
+# `@voidpop/shared`
 
 Plain JavaScript used by both the app and the website: no React Native, no DOM.
 

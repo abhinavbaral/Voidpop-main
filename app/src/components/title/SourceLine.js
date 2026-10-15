@@ -6,8 +6,8 @@ import { useCallback, useState } from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 import { openDetail } from "../../utils/nav";
 import { useFocusEffect } from "@react-navigation/native";
-import { getStatus, statusesFor } from "@voidation/shared/backend/store";
-import { useAuth } from "@voidation/shared/backend/AuthContext";
+import { getStatus, statusesFor } from "@voidpop/shared/backend/store";
+import { useAuth } from "@voidpop/shared/backend/AuthContext";
 import { useTheme } from "../../context/ThemeContext.js";
 
 export default function SourceLine({ source, navigation }) {

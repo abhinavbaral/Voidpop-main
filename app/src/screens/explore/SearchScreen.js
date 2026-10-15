@@ -6,11 +6,11 @@ import {
   View, Text, TextInput, SectionList, TouchableOpacity, Image, StyleSheet,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { fetchAniList, fetchPeople } from "@voidation/shared/api/anilist";
+import { fetchAniList, fetchPeople } from "@voidpop/shared/api/anilist";
 import Chips from "../../components/ui/Chips.js";
 import { useTheme } from "../../context/ThemeContext.js";
 import { openDetail, goBackOrHome } from "../../utils/nav";
-import { releaseLabel } from "@voidation/shared/lib/format";
+import { releaseLabel } from "@voidpop/shared/lib/format";
 import { VoidmonEmpty, VoidmonLoading, VoidmonTrouble } from "../../components/brand/Voidmon.js";
 
 function CreatorText({ item, style }) {
@@ -134,7 +134,7 @@ export default function SearchScreen({ navigation, route }) {
           </TouchableOpacity>
         )}
         ListEmptyComponent={
-          status === "loading" ? <VoidmonLoading text="Searching AniList…" style={{ marginTop: 28 }} />
+          status === "loading" ? <VoidmonLoading text="Searching…" style={{ marginTop: 28 }} />
           : status === "failed" ? <VoidmonTrouble what="Search" onRetry={retry} navigation={navigation} />
           : status === "done" ? <VoidmonEmpty pose="peeking" text="No matches found. Try the English or Japanese title." />
           : <Text style={styles.hint}>Type at least 2 characters to search anime, manga and people (voice actors, directors, mangaka).</Text>

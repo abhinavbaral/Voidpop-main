@@ -1,11 +1,11 @@
 // More → AniList: sign in for two-way sync, see its state, sync now, sign out.
 // Sign-in opens AniList in a secure browser tab; AniList sends you back to
-// voidation://auth with a token (your password never touches Voidation).
+// voidation://auth with a token (your password never touches VoidPop).
 import { useEffect, useState } from "react";
 import { View, Text, Image, TouchableOpacity, Alert } from "react-native";
 import * as WebBrowser from "expo-web-browser";
-import { onSyncState, authUrl, finishSignIn, syncNow, signOut, redirectUri } from "@voidation/shared/sync/anilist";
-import { timeAgo } from "@voidation/shared/backend/store";
+import { onSyncState, authUrl, finishSignIn, syncNow, signOut, redirectUri } from "@voidpop/shared/sync/anilist";
+import { timeAgo } from "@voidpop/shared/backend/store";
 import { VoidmonLoading } from "../brand/Voidmon.js";
 
 export default function AniListSync({ styles, C, onChange }) {
@@ -50,7 +50,7 @@ export default function AniListSync({ styles, C, onChange }) {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Sync with AniList</Text>
         <Text style={[styles.note, { marginTop: 6 }]}>
-          Sign in once and your anime and manga lists stay the same everywhere: this app, the Voidation website, and
+          Sign in once and your anime and manga lists stay the same everywhere: this app, the VoidPop website, and
           AniList itself. Status and progress sync both ways. Verdicts, categories, Excited and your watch log stay on
           this phone. The first sync merges both sides; nothing is deleted.
         </Text>

@@ -1,4 +1,4 @@
-// Where Voidation keeps your data: on this device, nowhere else.
+// Where VoidPop keeps your data: on this device, nowhere else.
 //
 // Each platform plugs in its own key-value store at startup:
 //   web/src/init.js          → localStorage

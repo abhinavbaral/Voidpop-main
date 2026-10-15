@@ -1,10 +1,10 @@
 // The anime covers behind the welcome screen. They are downloaded to the phone,
 // so the screen opens instantly and works offline, and the set is replaced about
 // once a day so it keeps changing. The network part lives in
-// @voidation/shared/api/anilist (fetchCoverPool), like every other AniList call.
+// @voidpop/shared/api/anilist (fetchCoverPool), like every other AniList call.
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "react-native";
-import { fetchCoverPool } from "@voidation/shared/api/anilist";
+import { fetchCoverPool } from "@voidpop/shared/api/anilist";
 
 const SET_KEY = "swipe-set";
 const LAST_KEY = "swipe-last-first";

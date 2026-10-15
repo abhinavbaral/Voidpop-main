@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { View, Animated, Easing, AccessibilityInfo, StyleSheet } from "react-native";
 import Svg, { Defs, LinearGradient, Stop, Rect, Path } from "react-native-svg";
-import { parseHex, toHex } from "@voidation/shared/lib/color";
+import { parseHex, toHex } from "@voidpop/shared/lib/color";
 
 const mixHex = (a, b, t) => {
   const x = parseHex(a) || [168, 85, 247];

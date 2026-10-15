@@ -1,7 +1,7 @@
 // One followed show: poster, title (+ Japanese title), next episode with a big
 // DAY / HOURS / MINS / SECS countdown, and your pending episodes with +1.
 import { View, Text, Image, TouchableOpacity, StyleSheet } from "react-native";
-import { countdownParts, dayLabel, airTime } from "@voidation/shared/lib/format";
+import { countdownParts, dayLabel, airTime } from "@voidpop/shared/lib/format";
 import { useTheme } from "../../context/ThemeContext.js";
 
 const STATUS = { plan: "Plan to Watch", onhold: "On Hold" };

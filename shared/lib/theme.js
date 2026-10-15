@@ -59,4 +59,4 @@ export function applyPalette(theme, mode, key) {
 export const C = THEMES.void;
 
 // Brand constants used by both clients
-export const BRAND = { name: "Voidation", orange: "#ee8f2e", purple: "#a855f7", ink: "#0b0f19" };
+export const BRAND = { name: "VoidPop", orange: "#ee8f2e", purple: "#a855f7", ink: "#0b0f19" };

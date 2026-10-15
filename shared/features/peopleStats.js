@@ -63,6 +63,27 @@ export function tallyPeople(entries, credits, limit = 10) {
   return out;
 }
 
+// "Familiar faces" on a title page: for each person (voice actor or staff), how
+// many OTHER titles in your library they are credited on. Pure; exported for tests.
+export function familiarFaces(entries, credits, exceptKey) {
+  const counts = {};
+  for (const e of entries) {
+    if (e.status === "plan") continue;
+    const key = `${e.item.segment}:${e.item.id}`;
+    const c = credits[key];
+    if (key === exceptKey || !c) continue;
+    const ids = new Set([...(c.voices || []).map((v) => v.id), ...(c.staff || []).map((p) => p.id)]);
+    ids.forEach((id) => { counts[id] = (counts[id] || 0) + 1; });
+  }
+  return counts;
+}
+
+// Works offline from the credits already saved on this device; never asks AniList.
+export async function loadFamiliarFaces(item) {
+  const [lib, credits] = await Promise.all([getLibrary(), loadCredits()]);
+  return familiarFaces(Object.values(lib), credits, `${item.segment}:${item.id}`);
+}
+
 // onProgress(done, total) while fetching; works offline with what's saved.
 export async function loadPeopleStats({ onProgress } = {}) {
   const entries = Object.values(await getLibrary());

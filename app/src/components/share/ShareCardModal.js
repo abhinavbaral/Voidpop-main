@@ -1,9 +1,9 @@
 // "Share Review" — renders a branded card (poster, your verdict, review,
-// Voidation branding), captures it as an image, and opens the share sheet.
+// VoidPop branding), captures it as an image, and opens the share sheet.
 
 import { useRef, useState } from "react";
 import { Modal, View, Text, Image, TouchableOpacity, StyleSheet } from "react-native";
-import { VERDICTS } from "@voidation/shared/backend/store";
+import { VERDICTS } from "@voidpop/shared/backend/store";
 import { shareCardImage } from "../../services/shareCard";
 import { notify } from "../../services/notify";
 import { useTheme } from "../../context/ThemeContext.js";

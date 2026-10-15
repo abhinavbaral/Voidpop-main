@@ -5,12 +5,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { View, Text, ScrollView, StyleSheet, useWindowDimensions } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
-import { useAuth } from "@voidation/shared/backend/AuthContext";
+import { useAuth } from "@voidpop/shared/backend/AuthContext";
 import {
   getLibrary, yourShows, setProgress, setStatus, addReview, onDataChange, noteAiring,
-} from "@voidation/shared/backend/store";
-import { fetchNextEpisodes } from "@voidation/shared/api/anilist";
-import { useSettings } from "@voidation/shared/backend/SettingsContext";
+} from "@voidpop/shared/backend/store";
+import { fetchNextEpisodes } from "@voidpop/shared/api/anilist";
+import { useSettings } from "@voidpop/shared/backend/SettingsContext";
 import CountdownCard from "../share/CountdownCard.js";
 import VerdictModal from "../title/VerdictModal.js";
 import { useTheme } from "../../context/ThemeContext.js";

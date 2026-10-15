@@ -7,16 +7,16 @@ import { ScrollView, View, Text, Pressable, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useCallback, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
-import { getUserTier, TIERS, categoriesUnlocked } from "@voidation/shared/backend/store";
+import { getUserTier, TIERS, categoriesUnlocked } from "@voidpop/shared/backend/store";
 import { useTheme } from "../../context/ThemeContext.js";
 import Voidmon from "../../components/brand/Voidmon.js";
 import AnimatedBanner from "../../components/brand/AnimatedBanner.js";
 import Icon from "../../components/ui/Icon.js";
 
 const GROUPS = [
-  [["statistics", "stats", "Statistics"], ["data", "storage", "Data and storage"]],
+  [["statistics", "stats", "Statistics"], ["compare", "list", "Compare"], ["data", "storage", "Data and storage"]],
   [["youwatching", "play", "You're watching"], ["announced", "bell", "New announcements"]],
-  [["categories", "browse", "Categories"], ["anilist", "sync", "AniList"]],
+  [["categories", "browse", "Categories"], ["anilist", "sync", "Sync"]],
   [["settings", "palette", "Appearance and Settings"], ["help", "help", "Help"], ["about", "info", "About"]],
 ];
 

@@ -1,5 +1,5 @@
 // NEW ANNOUNCEMENTS — anime newly announced on AniList. Each one stays in the
-// list for 7 days from when Voidation first saw it, then drops off.
+// list for 7 days from when VoidPop first saw it, then drops off.
 //
 // AniList doesn't publish an "announced on" date, so the date is when this
 // device first saw the title among AniList's newest not-yet-released entries.

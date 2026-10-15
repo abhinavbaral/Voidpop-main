@@ -1,36 +1,37 @@
 // The pages behind the More menu: Statistics, Appearance, Settings,
 // Data and storage, Help, About. Same content as the website's /more/* pages.
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ScrollView, View, Text, TextInput, TouchableOpacity, Pressable, Switch, StyleSheet, Share, Alert, Linking, Platform, Image,
 } from "react-native";
-import { fetchAniListUserList, cacheSize, cacheClear } from "@voidation/shared/api/anilist";
+import { fetchAniListUserList, cacheSize, cacheClear } from "@voidpop/shared/api/anilist";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import {
   getUserTier, TIERS, statusesFor, exportData, clearData, storageSize, importAniListEntries,
   getCategories, addCategory, renameCategory, moveCategory, deleteCategory,
-  getExcited, toggleExcited, celebrate, getCategoryAccess, CATEGORY_MIN, exportLibraryCsv,
-} from "@voidation/shared/backend/store";
-import { useSettings } from "@voidation/shared/backend/SettingsContext";
-import { THEMES, PALETTES, applyPalette } from "@voidation/shared/lib/theme";
+  getExcited, toggleExcited, celebrate, getCategoryAccess, CATEGORY_MIN, exportLibraryCsv, exportLibraryMarkdown,
+} from "@voidpop/shared/backend/store";
+import { useSettings } from "@voidpop/shared/backend/SettingsContext";
+import { THEMES, PALETTES, applyPalette } from "@voidpop/shared/lib/theme";
 import { useTheme } from "../../context/ThemeContext.js";
 import { goBackOrHome, openDetail } from "../../utils/nav";
-import { loadAnnounced, daysLeft, ANNOUNCED_DAYS } from "@voidation/shared/features/announced";
-import { useAuth } from "@voidation/shared/backend/AuthContext";
-import { releaseLabel, durationLabel } from "@voidation/shared/lib/format";
+import { loadAnnounced, daysLeft, ANNOUNCED_DAYS } from "@voidpop/shared/features/announced";
+import { useAuth } from "@voidpop/shared/backend/AuthContext";
+import { releaseLabel, durationLabel } from "@voidpop/shared/lib/format";
 import {
   FREQUENCIES, getBackupConfig, setFrequency, chooseFolder, backupNow, restoreFromFile,
 } from "../../services/backup";
 import { ensurePermission, rescheduleEpisodeAlerts } from "../../services/episodeAlerts";
 import AniListSync from "../../components/library/AniListSync.js";
+import CompareTitles from "../../components/library/CompareTitles.js";
 import OptionsSheet from "../../components/ui/OptionsSheet.js";
 import * as Sharing from "expo-sharing";
 import { cacheDirectory, writeAsStringAsync, readAsStringAsync } from "expo-file-system/legacy";
 import * as DocumentPicker from "expo-document-picker";
-import { importMalFile, base64ToBytes } from "@voidation/shared/features/malImport";
-import { timeAgo, getLibrary, youreWatching, setProgress, setStatus, addReview, totalFor } from "@voidation/shared/backend/store";
+import { importMalFile, base64ToBytes } from "@voidpop/shared/features/malImport";
+import { timeAgo, getLibrary, youreWatching, setProgress, setStatus, addReview, totalFor } from "@voidpop/shared/backend/store";
 import VerdictModal from "../../components/title/VerdictModal.js";
 import Icon from "../../components/ui/Icon.js";
 import { SkeletonList } from "../../components/ui/Skeleton.js";
@@ -43,13 +44,13 @@ const AUTO_BACKUP = Platform.OS === "android"; // Android's folder picker (SAF)
 import appConfig from "../../../app.json";
 import * as Updates from "expo-updates";
 import Chips from "../../components/ui/Chips.js";
-import { computeAchievements } from "@voidation/shared/features/achievements";
-import { loadPeopleStats, PEOPLE_KINDS } from "@voidation/shared/features/peopleStats";
+import { computeAchievements } from "@voidpop/shared/features/achievements";
+import { loadPeopleStats, PEOPLE_KINDS } from "@voidpop/shared/features/peopleStats";
 
 const VERSION = appConfig.expo.version;
 const TITLES = {
   statistics: "Statistics", appearance: "Appearance and Settings", settings: "Appearance and Settings",
-  data: "Data and storage", youwatching: "You're watching", announced: "New announcements", badge: "Ranks and achievements", categories: "Categories", anilist: "AniList", help: "Help", about: "About",
+  data: "Data and storage", youwatching: "You're watching", announced: "New announcements", badge: "Ranks and achievements", categories: "Categories", compare: "Compare", anilist: "Sync", help: "Help", about: "About",
 };
 
 export default function MorePageScreen({ route, navigation }) {
@@ -57,7 +58,7 @@ export default function MorePageScreen({ route, navigation }) {
   const { C } = useTheme();
   const styles = makeStyles(C);
   const page = route.params?.page;
-  const Body = { statistics: Statistics, settings: Settings, appearance: Settings, data: DataStorage, categories: Categories, anilist: AniListPage, announced: Announced, youwatching: YoureWatching, badge: BadgePage, help: Help, about: About }[page];
+  const Body = { statistics: Statistics, settings: Settings, appearance: Settings, data: DataStorage, categories: Categories, compare: CompareTitles, anilist: AniListPage, announced: Announced, youwatching: YoureWatching, badge: BadgePage, help: Help, about: About }[page];
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -172,7 +173,7 @@ function YourPeople({ styles, C, navigation }) {
         )}
         {!!data?.missing && (
           <Text style={[styles.note, { marginTop: 8 }]}>
-            {data.missing} {data.missing === 1 ? "title" : "titles"} still to look up (offline or AniList was busy). Open this page again later.
+            {data.missing} {data.missing === 1 ? "title" : "titles"} still to look up (offline or the server was busy). Open this page again later.
           </Text>
         )}
       </View>
@@ -244,6 +245,8 @@ function ThemeSettings({ styles, C }) {
 
 function Settings({ styles, C, navigation }) {
   const { settings, update } = useSettings();
+  const [nameDraft, setNameDraft] = useState(settings.name || "");
+  useEffect(() => { setNameDraft(settings.name || ""); }, [settings.name]);
   const row = (key, label, hint) => (
     <Pressable key={key} style={styles.toggleRow} onPress={() => update(key, !settings[key])}>
       <View style={{ flex: 1 }}>
@@ -255,6 +258,13 @@ function Settings({ styles, C, navigation }) {
   );
   return (
     <>
+    <View style={styles.card}>
+      <Text style={styles.cardTitle}>Your name</Text>
+      <Text style={styles.note}>Used in the greeting on your home page. Stays on this phone.</Text>
+      <TextInput value={nameDraft} onChangeText={setNameDraft} placeholder="Your name" placeholderTextColor={C.faint} maxLength={24}
+        autoCapitalize="words" accessibilityLabel="Your name" onEndEditing={() => update("name", nameDraft.trim())}
+        style={{ marginTop: 10, color: C.text, borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15 }} />
+    </View>
     <ThemeSettings styles={styles} C={C} />
     <LogoSettings styles={styles} C={C} />
     <View style={styles.card}>
@@ -286,7 +296,7 @@ function Settings({ styles, C, navigation }) {
 
   async function toggleAlerts(on) {
     if (on && !(await ensurePermission())) {
-      Alert.alert("Notifications are off", "Allow notifications for Voidation in your phone's settings, then turn this on again.", [
+      Alert.alert("Notifications are off", "Allow notifications for VoidPop in your phone's settings, then turn this on again.", [
         { text: "Not now", style: "cancel" },
         { text: "Open settings", onPress: () => Linking.openSettings() },
       ]);
@@ -339,7 +349,7 @@ function DataStorage({ styles, C }) {
   const create = () => run(async () => {
     try {
       if (cfg?.dirUri) { await backupNow(); setMessage("Backup saved to your backup folder."); }
-      else await shareFile(`voidation-backup-${new Date().toISOString().slice(0, 10)}.json`, await exportData(), "application/json");
+      else await shareFile(`voidpop-backup-${new Date().toISOString().slice(0, 10)}.json`, await exportData(), "application/json");
     } catch { setMessage("Couldn't create the backup. Choose the backup folder again."); }
   });
   const restore = () => Alert.alert("Replace your library?", "Everything on this phone will be replaced by the backup you pick.", [
@@ -352,8 +362,12 @@ function DataStorage({ styles, C }) {
     }) },
   ]);
   const exportList = () => run(async () => {
-    try { await shareFile(`voidation-library-${new Date().toISOString().slice(0, 10)}.csv`, await exportLibraryCsv(), "text/csv"); }
+    try { await shareFile(`voidpop-library-${new Date().toISOString().slice(0, 10)}.csv`, await exportLibraryCsv(), "text/csv"); }
     catch { setMessage("Couldn't export the list."); }
+  });
+  const exportNotes = () => run(async () => {
+    try { await shareFile(`voidpop-library-${new Date().toISOString().slice(0, 10)}.md`, await exportLibraryMarkdown(), "text/markdown"); }
+    catch { setMessage("Couldn't export the notes."); }
   });
   // MyAnimeList: the .xml.gz from MAL's Export page (no MAL account link needed)
   const importMal = () => run(async () => {
@@ -364,7 +378,7 @@ function DataStorage({ styles, C }) {
       const b64 = await readAsStringAsync(res.assets[0].uri, { encoding: "base64" });
       const r = await importMalFile(base64ToBytes(b64));
       setMessage(`MyAnimeList: ${r.added} added, ${r.kept} already in your library` +
-        (r.notFound.length ? `, ${r.notFound.length} not found on AniList (${r.notFound.slice(0, 3).join(", ")}${r.notFound.length > 3 ? "…" : ""})` : "") + ".");
+        (r.notFound.length ? `, ${r.notFound.length} not found (${r.notFound.slice(0, 3).join(", ")}${r.notFound.length > 3 ? "…" : ""})` : "") + ".");
       reload(); rescheduleEpisodeAlerts();
     } catch (e) {
       setMessage(e?.message?.includes("MyAnimeList") ? e.message : "Couldn't read that file. Pick the .xml or .xml.gz from MAL's Export page.");
@@ -394,7 +408,7 @@ function DataStorage({ styles, C }) {
     <>
       {AUTO_BACKUP && cfg && (
         <>
-          <Row title="Storage location" sub={cfg.dirUri ? cfg.dirName : "Tap to choose a folder, e.g. Download/Voidation"} onPress={pickFolder} />
+          <Row title="Storage location" sub={cfg.dirUri ? cfg.dirName : "Tap to choose a folder, e.g. Download/VoidPop"} onPress={pickFolder} />
           <Icon name="info" size={18} color={C.faint} />
           <Text style={[styles.note, { fontSize: 13, marginTop: 4 }]}>Used for automatic backups. A folder you choose survives uninstalling the app.</Text>
         </>
@@ -432,10 +446,11 @@ function DataStorage({ styles, C }) {
         onPress={async () => { await cacheClear(); setMessage("Offline copy cleared."); measure(); }} />
 
       <Section>Import</Section>
-      <Row title="Import from MyAnimeList" sub="On myanimelist.net: Profile → Export Lists, download the anime (and manga) file, then pick it here. Titles already in Voidation are kept as they are." onPress={importMal} />
+      <Row title="Import from MyAnimeList" sub="On myanimelist.net: Profile → Export Lists, download the anime (and manga) file, then pick it here. Titles already in VoidPop are kept as they are." onPress={importMal} />
 
       <Section>Export</Section>
       <Row title="Library list" sub="Every title as a spreadsheet (CSV): status, progress, verdict, categories" onPress={exportList} />
+      <Row title="Notes (Markdown)" sub="Every title with its verdict and your note, as plain text for Obsidian or any notes app" onPress={exportNotes} />
 
       <Section>Danger zone</Section>
       <Row title="Clear library" sub="Removes every tracked title, verdict and Excited mark from this phone" onPress={clear} danger />
@@ -674,7 +689,7 @@ function Announced({ styles, C, navigation }) {
   if (!list.length) return <Text style={styles.note}>No new announcements in the last {ANNOUNCED_DAYS} days.</Text>;
   return (
     <>
-      <Text style={styles.note}>Anime newly announced on AniList. Each one stays here for {ANNOUNCED_DAYS} days. Tap Excited to get it on your Schedule.</Text>
+      <Text style={styles.note}>Newly announced anime. Each one stays here for {ANNOUNCED_DAYS} days. Tap Excited to get it on your Schedule.</Text>
       <View style={[styles.card, { paddingVertical: 6 }]}>
         {list.map(({ item, seenAt }, i) => {
           const on = !!excited[`anime:${item.id}`];
@@ -796,13 +811,13 @@ const FAQ = [
   ["Where is my library saved?", "On this phone. There is no account and nothing is uploaded. Use Data and storage to back it up."],
   ["How do I move to a new phone?", "Copy a backup file from your backup folder (or Share backup), then use Restore from file on the new phone."],
   ["Can I bring my AniList lists?", "Yes, two ways under More → AniList: sign in to keep them in sync both ways, or import once by username (public lists; nothing is changed on AniList)."],
-  ["What does Delayed mean?", "The next episode was going to air earlier, and its date has since moved later. Voidation shows the original date next to the new one."],
+  ["What does Delayed mean?", "The next episode was going to air earlier, and its date has since moved later. VoidPop shows the original date next to the new one."],
   ["Does uninstalling delete my library?", "The library inside the app, yes. Backups in the folder you chose under Data and storage stay, so you can restore them after reinstalling."],
-  ["Why didn't I get an episode alert?", "Alerts are set up when you open Voidation and about hourly in the background, for the next episode of everything you follow. Check that notifications are allowed and New episode alerts is on in Settings. Some phones (Xiaomi, Oppo, Vivo…) stop background work to save battery; allow Voidation to run in the background in your phone's battery settings."],
-  ["Why doesn't a show have a countdown?", "It has finished airing, or AniList doesn't know the next episode's date yet. Countdowns appear as soon as a date is announced."],
-  ["What time zone are the airing times in?", "Yours. Voidation converts every broadcast time to your phone's time zone."],
+  ["Why didn't I get an episode alert?", "Alerts are set up when you open VoidPop and about hourly in the background, for the next episode of everything you follow. Check that notifications are allowed and New episode alerts is on in Settings. Some phones (Xiaomi, Oppo, Vivo…) stop background work to save battery; allow VoidPop to run in the background in your phone's battery settings."],
+  ["Why doesn't a show have a countdown?", "It has finished airing, or the next episode's date hasn't been announced yet. Countdowns appear as soon as a date is announced."],
+  ["What time zone are the airing times in?", "Yours. VoidPop converts every broadcast time to your phone's time zone."],
   ["What shows up in History?", "Episodes from the last 14 days for anime you mark Watching, Plan to Watch, On Hold, or Excited."],
-  ["Why no movies or web series?", "Voidation focuses on anime and manga, which AniList provides for free."],
+  ["Why no movies or web series?", "VoidPop focuses on anime, manga and novels."],
 ];
 
 function Help({ styles, navigation }) {
@@ -848,7 +863,7 @@ function About({ styles, C }) {
     <>
       <View style={[styles.card, { alignItems: "center" }]}>
         <Voidmon pose="welcome" size={96} />
-        <Text style={[styles.cardTitle, { fontSize: 18, marginTop: 6 }]}>Voidation</Text>
+        <Text style={[styles.cardTitle, { fontSize: 18, marginTop: 6 }]}>VoidPop</Text>
         <Text style={styles.note}>Version {VERSION}</Text>
         <Text style={[styles.note, { textAlign: "center", marginTop: 8 }]}>
           An anime and manga tracker with live countdowns to the next episode and Void Verdicts instead of scores.
@@ -862,14 +877,13 @@ function About({ styles, C }) {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Credits</Text>
         {line("Made by Abhinav Baral", "www.abhinavbaral.com.np · Jhapa, Nepal", () => Linking.openURL("https://www.abhinavbaral.com.np/").catch(() => {}))}
-        {line("Voidmon", "Voidation's mascot, a character by Abhinav Baral")}
+        {line("Voidmon", "VoidPop's mascot, a character by Abhinav Baral")}
         {line("Voidmon on YouTube", "youtube.com/@voidmonreal", () => Linking.openURL("https://www.youtube.com/@voidmonreal").catch(() => {}))}
-        {line("Anime and manga data: AniList", "Voidation is not affiliated with AniList")}
       </View>
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Your data</Text>
         <Text style={[styles.note, { marginTop: 6 }]}>
-          Your library, verdicts and notes are saved on this phone only. There's no Voidation account and no server. The app talks to AniList to look up shows, and to your AniList account only if you sign in there to sync. Back up or move your data in Data and storage.
+          Your library, verdicts and notes are saved on this phone only. There's no VoidPop account and no server. The app looks up shows online, and talks to your synced account only if you sign in to sync. Back up or move your data in Data and storage.
         </Text>
       </View>
     </>

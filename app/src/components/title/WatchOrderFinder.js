@@ -4,7 +4,7 @@
 // the movies). Uses the same watch order as every anime's page.
 import { useEffect, useState } from "react";
 import { View, Text, TextInput, Image, TouchableOpacity, ScrollView, StyleSheet } from "react-native";
-import { fetchAniList } from "@voidation/shared/api/anilist";
+import { fetchAniList } from "@voidpop/shared/api/anilist";
 import { useTheme } from "../../context/ThemeContext.js";
 import { WatchOrder } from "./TitleExtras.js";
 import { VoidmonEmpty, VoidmonLoading } from "../brand/Voidmon.js";

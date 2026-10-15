@@ -6,28 +6,28 @@ import { useFocusEffect } from "@react-navigation/native";
 import { FlatList, View, Text, TouchableOpacity, StyleSheet, RefreshControl, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import PosterRow from "../../components/ui/PosterRow.js";
-import { loadCategoryRows } from "@voidation/shared/backend/store";
+import { loadCategoryRows } from "@voidpop/shared/backend/store";
 import Brand from "../../components/brand/Brand.js";
-import { loadExplorePools, buildExplore, knownKeys, loadVerdictRows, loadNewSeasons, loadAnimeOfTheYear, loadJumpBackIn } from "@voidation/shared/features/explore";
+import { loadExplorePools, buildExplore, knownKeys, loadVerdictRows, loadNewSeasons, loadAnimeOfTheYear, loadJumpBackIn } from "@voidpop/shared/features/explore";
+import { greetingFor } from "@voidpop/shared/lib/greeting";
+import { useSettings } from "@voidpop/shared/backend/SettingsContext";
+import NamePrompt from "../../components/welcome/NamePrompt.js";
 import { useTheme } from "../../context/ThemeContext.js";
 import { openDetail } from "../../utils/nav";
 import { useIsWide } from "../../utils/layout";
 import Icon from "../../components/ui/Icon.js";
 import AnimatedBanner from "../../components/brand/AnimatedBanner.js";
 import { NewEpisodeCards, Countdowns } from "../../components/explore/ExploreCards.js";
-import RankedRow from "../../components/ui/RankedRow.js";
 import Billboard from "../../components/explore/Billboard.js";
 import { COUNTRIES } from "./TrendsScreen.js";
-import { fetchAniList } from "@voidation/shared/api/anilist";
+import { fetchAniList } from "@voidpop/shared/api/anilist";
 
-// the greeting on the banner, by the time of day
-const greeting = (h = new Date().getHours()) =>
-  h < 5 ? "Still up?" : h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : h < 22 ? "Good evening" : "Still up?";
 
 export default function ExploreScreen({ navigation }) {
   const { C, dark } = useTheme();
   const styles = makeStyles(C);
   const wide = useIsWide();
+  const { settings } = useSettings();
   const [data, setData] = useState({});
   const [loading, setLoading] = useState(true);
   const [verdictRows, setVerdictRows] = useState([]);
@@ -123,7 +123,7 @@ export default function ExploreScreen({ navigation }) {
     newSeasons.length > 0 && row("new-seasons", () => <PosterRow title="New seasons of shows you watched" items={newSeasons} onOpen={open} />),
     ...verdictRows.map((r) => row(`verdict-${r.verdict}`, () => <PosterRow title={r.title} dot={r.color} items={r.items} onOpen={open} />)),
     row("talk", () => <PosterRow title="Talk of the Week" items={data.talk} loading={loading} onOpen={open} onMore={() => navigation.navigate("Trends")} />),
-    row("most-loved", () => <RankedRow title="Most loved" subtitle="Favourited by the most AniList users" items={unmarked(mostLoved)?.slice(0, 10)} loading={mostLoved === null} onOpen={open}
+    row("most-loved", () => <PosterRow title="Most loved" items={unmarked(mostLoved)?.slice(0, 15)} loading={mostLoved === null} onOpen={open}
       onMore={() => navigation.navigate("Browse", { sort: "loved" })} />),
     row("trending-in", () => <PosterRow title="Trending in" items={unmarked(trend)?.slice(0, 15)} loading={trend === null} onOpen={open}
       chip={{ label: COUNTRIES.find((c) => c.key === country)?.label, onPress: nextCountry, a11y: "Change country" }}
@@ -133,7 +133,7 @@ export default function ExploreScreen({ navigation }) {
     row("dont-miss-novels", () => <PosterRow title="Don't Miss This — Novels" items={data.dontMissNovels} loading={loading} onOpen={open} />),
     row("isekai", () => <PosterRow title="Isekai Heaven" items={data.isekai} loading={loading} onOpen={open} />),
     row("shonen", () => <PosterRow title="Shonen Feast" items={data.shonen} loading={loading} onOpen={open} />),
-    row("angles", () => <PosterRow title="Voidation Angles" items={data.voidpicks} loading={loading} onOpen={open} />),
+    row("angles", () => <PosterRow title="VoidPop Angles" items={data.voidpicks} loading={loading} onOpen={open} />),
   ].filter(Boolean);
 
   const header = !wide && (
@@ -142,7 +142,7 @@ export default function ExploreScreen({ navigation }) {
       {/* the same animated sky as More (sun by day, moon and stars by night) */}
       <View style={StyleSheet.absoluteFill}><AnimatedBanner accent={C.purple} dark={dark} height={170} /></View>
       <View style={styles.heroTop}><Brand size={20} /></View>
-      <Text style={styles.hello} accessibilityRole="header">{greeting()}</Text>
+      <Text style={styles.hello} accessibilityRole="header">{greetingFor(new Date().getHours(), settings.name)}</Text>
     </View>
     <View style={styles.header}>
       {/* search and Browse in one row */}
@@ -160,6 +160,7 @@ export default function ExploreScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
+      <NamePrompt />
       {/* One vertical list of rows, drawn only near the screen: rows (and their
           posters) appear as you scroll to them and are dropped once they're
           well above or below, so Explore never holds every poster at once. */}

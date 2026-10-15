@@ -2,8 +2,8 @@
 // follow (Watching, Plan to Watch, On Hold, Excited), soonest first.
 // Fresh times from AniList when online; the offline copy / saved library
 // snapshots otherwise, so the widget still works without internet.
-import { fetchNextEpisodes } from "@voidation/shared/api/anilist";
-import { getLibrary, getExcited } from "@voidation/shared/backend/store";
+import { fetchNextEpisodes } from "@voidpop/shared/api/anilist";
+import { getLibrary, getExcited } from "@voidpop/shared/backend/store";
 
 export const WIDGET_LIMIT = 30;
 const FOLLOWING = new Set(["watching", "plan", "onhold"]);

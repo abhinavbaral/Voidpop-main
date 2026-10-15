@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import { View, Text, Image, FlatList, Pressable, TouchableOpacity, StyleSheet, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { fetchAniList } from "@voidation/shared/api/anilist";
+import { fetchAniList } from "@voidpop/shared/api/anilist";
 import { useTheme } from "../../context/ThemeContext.js";
 import { openDetail, goBackOrHome } from "../../utils/nav";
 import Icon from "../../components/ui/Icon.js";

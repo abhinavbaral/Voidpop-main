@@ -1,4 +1,4 @@
-// Voidation has no accounts: whoever holds the device is "you".
+// VoidPop has no accounts: whoever holds the device is "you".
 // This keeps the same useAuth() shape the screens were written against, so a
 // real sign-in can be added later without touching every screen.
 import { createContext, createElement, useContext } from "react";

@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Voidation",
+    "name": "VoidPop",
     "slug": "voidation",
     "version": "1.0.2",
     "orientation": "portrait",
@@ -26,6 +26,9 @@
         {
           "action": "VIEW",
           "data": [
+            {
+              "scheme": "voidpop"
+            },
             {
               "scheme": "voidation"
             }
@@ -54,7 +57,7 @@
           "widgets": [
             {
               "name": "NextEpisodes",
-              "label": "Voidation · Next episodes",
+              "label": "VoidPop · Next episodes",
               "description": "Countdowns for up to 30 anime you follow",
               "minWidth": "250dp",
               "minHeight": "180dp",
@@ -90,7 +93,7 @@
         ]
       ]
     ],
-    "scheme": "voidation",
+    "scheme": ["voidpop", "voidation"],
     "runtimeVersion": {
       "policy": "appVersion"
     },

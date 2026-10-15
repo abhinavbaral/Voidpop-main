@@ -2,7 +2,7 @@
 // full-screen medal pops in, glows and shines, with confetti. Shown once per rank.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Modal, View, Text, TouchableOpacity, Animated, Easing, StyleSheet, useWindowDimensions, AccessibilityInfo } from "react-native";
-import { checkRankUp, markRankSeen, onDataChange, onCelebrate, TIERS } from "@voidation/shared/backend/store";
+import { checkRankUp, markRankSeen, onDataChange, onCelebrate, TIERS } from "@voidpop/shared/backend/store";
 import Icon from "../ui/Icon.js";
 
 const COLORS = ["#a855f7", "#ee8f2e", "#22d3ee", "#10b981", "#f43f5e", "#f59e0b"];

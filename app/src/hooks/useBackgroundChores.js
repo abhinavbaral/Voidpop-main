@@ -3,7 +3,7 @@
 // Loaded lazily so the website build never touches the native-only modules.
 import { useEffect } from "react";
 import { AppState, Platform } from "react-native";
-import { onDataChange } from "@voidation/shared/backend/store";
+import { onDataChange } from "@voidpop/shared/backend/store";
 import { navRef } from "../navigation/navRef";
 
 export default function useBackgroundChores() {
@@ -13,8 +13,8 @@ export default function useBackgroundChores() {
     const alerts = require("../services/episodeAlerts");
     const widget = require("../widget");
     require("../services/backgroundWork").registerBackgroundWork();
-    const sync = require("@voidation/shared/sync/anilist");
-    const { promoteExcitedNow } = require("@voidation/shared/features/excited");
+    const sync = require("@voidpop/shared/sync/anilist");
+    const { promoteExcitedNow } = require("@voidpop/shared/features/excited");
     const chores = () => {
       promoteExcitedNow(); // Excited anime that came out → Watching
       sync.syncNow({ reason: "open" });

@@ -13,23 +13,24 @@ import WhereToWatch from "../../components/title/WhereToWatch";
 import WhereToRead from "../../components/title/WhereToRead";
 import SourceLine from "../../components/title/SourceLine.js";
 import CastCrew from "../../components/title/CastCrew.js";
+import { loadFamiliarFaces } from "@voidpop/shared/features/peopleStats";
 import EpisodeList from "../../components/title/EpisodeList.js";
 import { NoteBox, WatchOrder } from "../../components/title/TitleExtras.js";
 import { addToCalendar } from "../../services/calendar";
-import { completeEarlierSeasons, undoEarlierSeasons } from "@voidation/shared/features/earlierSeasons";
+import { completeEarlierSeasons, undoEarlierSeasons } from "@voidpop/shared/features/earlierSeasons";
 import { getCachedItem, cacheItem, openDetail, goBackOrHome } from "../../utils/nav";
-import { releaseLabel, formatCountdown, dayLabel, airTime } from "@voidation/shared/lib/format";
-import { useNow } from "@voidation/shared/lib/useNow";
-import { useSettings } from "@voidation/shared/backend/SettingsContext";
+import { releaseLabel, formatCountdown, dayLabel, airTime } from "@voidpop/shared/lib/format";
+import { useNow } from "@voidpop/shared/lib/useNow";
+import { useSettings } from "@voidpop/shared/backend/SettingsContext";
 import { useIsWide } from "../../utils/layout";
-import { useAuth } from "@voidation/shared/backend/AuthContext";
+import { useAuth } from "@voidpop/shared/backend/AuthContext";
 import {
   statusesAllowed, getStatus, setStatus, addReview, getMyReview,
   getExcited, toggleExcited, getEntry, setProgress, noteAiring, totalFor, unitFor, airedFor, maxProgress, checkProgress,
   getCategories, categoriesUnlocked, setEntryCategories, doneLabel, fillCompleted,
-} from "@voidation/shared/backend/store";
-import { fetchAniListDetail, fetchAniListItem, fetchNextEpisodes } from "@voidation/shared/api/anilist";
-import { readableAccent, withAlpha } from "@voidation/shared/lib/color";
+} from "@voidpop/shared/backend/store";
+import { fetchAniListDetail, fetchAniListItem, fetchNextEpisodes } from "@voidpop/shared/api/anilist";
+import { readableAccent, withAlpha } from "@voidpop/shared/lib/color";
 import ReviewCard from "../../components/title/ReviewCard.js";
 import VerdictModal from "../../components/title/VerdictModal.js";
 import ShareCardModal from "../../components/share/ShareCardModal.js";
@@ -72,7 +73,7 @@ export default function DetailScreen({ route, navigation }) {
 
   // browser tab title on web; harmless on native (header is hidden)
   useEffect(() => {
-    if (item) navigation.setOptions({ title: `${item.title} · Voidation` });
+    if (item) navigation.setOptions({ title: `${item.title} · VoidPop` });
   }, [item, navigation]);
 
   if (!item) {
@@ -82,7 +83,7 @@ export default function DetailScreen({ route, navigation }) {
           <>
             <Text style={{ color: C.text, fontWeight: "800", fontSize: 16 }}>Title not found</Text>
             <TouchableOpacity onPress={() => goBackOrHome(navigation)} style={{ marginTop: 14 }}>
-              <Text style={{ color: C.purple }}>← Back to Voidation</Text>
+              <Text style={{ color: C.purple }}>← Back to VoidPop</Text>
             </TouchableOpacity>
           </>
         ) : (
@@ -109,6 +110,7 @@ function DetailBody({ item, navigation }) {
   const [status, setStatusState] = useState(null);
   const [nextEpisode, setNextEpisode] = useState(item.nextEpisode || null);
   const [myReview, setMyReview] = useState(null);
+  useEffect(() => { let alive = true; loadFamiliarFaces({ segment: item.segment, id: item.id }).then((f) => alive && setFamiliar(f)).catch(() => {}); return () => { alive = false; }; }, [item.segment, item.id]);
   const [modalOpen, setModalOpen] = useState(false);
   const [isExcited, setIsExcited] = useState(false);
   const [progress, setProgressState] = useState(0);
@@ -126,6 +128,8 @@ function DetailBody({ item, navigation }) {
   const [trailer, setTrailer] = useState(null);
   const [related, setRelated] = useState([]);
   const [watch, setWatch] = useState([]);
+  const [youtube, setYoutube] = useState([]); // licensed YouTube channels
+  const [familiar, setFamiliar] = useState({}); // people you have met in your other titles
   const [read, setRead] = useState(null); // manga: { read, buy, search }
   const [moreText, setMoreText] = useState(false); // synopsis: + More
   const [source, setSource] = useState(null); // anime: { label, items }
@@ -154,7 +158,7 @@ function DetailBody({ item, navigation }) {
   useEffect(() => {
     let alive = true;
     fetchAniListDetail(item.segment, item.id)
-      .then((d) => { if (alive) { setTrailer(d.trailer); setRelated(d.related); setWatch(d.whereToWatch || []); setRead(d.whereToRead || null); setSource(d.source || null); setCast({ characters: d.characters || [], staff: d.staff || [], themes: d.themes || [] }); setEpisodes(d.episodes || []); } })
+      .then((d) => { if (alive) { setTrailer(d.trailer); setRelated(d.related); setWatch(d.whereToWatch || []); setYoutube(d.whereToYouTube || []); setRead(d.whereToRead || null); setSource(d.source || null); setCast({ characters: d.characters || [], staff: d.staff || [], themes: d.themes || [] }); setEpisodes(d.episodes || []); } })
       .catch(() => {});
     if (item.segment === "anime" && !item.finished) {
       fetchNextEpisodes([item.id])
@@ -375,11 +379,11 @@ function DetailBody({ item, navigation }) {
             <ProgressBox item={{ ...item, nextEpisode }} progress={progress} onChange={changeProgress} styles={styles} C={C} />
           )}
 
-          {item.segment === "manga" ? <WhereToRead links={read} /> : <WhereToWatch links={watch} segment={item.segment} />}
+          {item.segment === "manga" ? <WhereToRead links={read} /> : <WhereToWatch links={watch} youtube={youtube} segment={item.segment} />}
           <NoteBox item={item} />
           {item.segment === "anime" && <EpisodeList episodes={episodes} progress={progress} />}
           {item.segment === "anime" && <WatchOrder item={item} navigation={navigation} />}
-          <CastCrew {...cast} segment={item.segment} navigation={navigation} />
+          <CastCrew {...cast} segment={item.segment} navigation={navigation} familiar={familiar} />
 
           {/* your verdict */}
           {myReview && (

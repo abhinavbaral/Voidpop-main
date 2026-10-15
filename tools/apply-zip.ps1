@@ -1,4 +1,4 @@
-# Applies the newest Voidation zip from Downloads to your code folder, then
+# Applies the newest VoidPop zip from Downloads to your code folder, then
 # commits it (with the title line of the zip's COMMIT.txt) and pushes.
 #
 # One-time setup: copy this file to D:\voidation\apply-zip.ps1
@@ -12,11 +12,11 @@ param(
 )
 $ErrorActionPreference = "Stop"
 
-# 1. find the zip: the newest voidation*.zip in Downloads (not voidation-app)
+# 1. find the zip: the newest voidpop*.zip (or older voidation*.zip) in Downloads, not the -app ones
 if (-not $Zip) {
-  $latest = Get-ChildItem "$HOME\Downloads\voidation*.zip" -ErrorAction SilentlyContinue |
-    Where-Object { $_.Name -notlike "voidation-app*" } | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-  if (-not $latest) { throw "No voidation*.zip found in $HOME\Downloads" }
+  $latest = Get-ChildItem "$HOME\Downloads\voidpop*.zip", "$HOME\Downloads\voidation*.zip" -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -notlike "voidation-app*" -and $_.Name -notlike "voidpop-app*" } | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+  if (-not $latest) { throw "No voidpop*.zip (or voidation*.zip) found in $HOME\Downloads" }
   $Zip = $latest.FullName
 }
 Write-Host "Zip:  $Zip"
@@ -25,8 +25,9 @@ if (-not (Test-Path "$Repo\.git")) { throw "$Repo isn't linked to GitHub (no .gi
 # 2. unzip to a temporary folder and read the commit title
 $tmp = Join-Path $env:TEMP ("voidation-" + [guid]::NewGuid())
 Expand-Archive -Path $Zip -DestinationPath $tmp
-$src = Join-Path $tmp "voidation"
-if (-not (Test-Path "$src\package.json")) { Remove-Item -Recurse -Force $tmp; throw "The zip has no voidation folder inside." }
+$src = Join-Path $tmp "voidpop"
+if (-not (Test-Path "$src\package.json")) { $src = Join-Path $tmp "voidation" } # zips made before the rename
+if (-not (Test-Path "$src\package.json")) { Remove-Item -Recurse -Force $tmp; throw "The zip has no voidpop (or voidation) folder inside." }
 $title = if (Test-Path "$src\COMMIT.txt") { (Get-Content "$src\COMMIT.txt" -TotalCount 1).Trim() } else { "" }
 if (-not $title) { $title = "Update from zip " + (Get-Date -Format "yyyy-MM-dd HH:mm") }
 Write-Host "Commit: $title"

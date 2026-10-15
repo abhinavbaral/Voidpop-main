@@ -1,4 +1,4 @@
-// Voidmon, Voidation's mascot (an original character by Abhinav Baral).
+// Voidmon, VoidPop's mascot (an original character by Abhinav Baral).
 // The pictures are the PNGs in assets/voidmon/ (see shared/features/voidmon.js).
 //
 //   <Voidmon pose="welcome" size={110} />
@@ -22,8 +22,8 @@
 //     is back online. Online: AniList is slow or busy, with Try again.
 import { useEffect, useRef, useState } from "react";
 import { View, Text, Image, Animated, Easing, TouchableOpacity } from "react-native";
-import { onNetState } from "@voidation/shared/api/anilist";
-import { VOIDMON_POSES } from "@voidation/shared/features/voidmon";
+import { onNetState } from "@voidpop/shared/api/anilist";
+import { VOIDMON_POSES } from "@voidpop/shared/features/voidmon";
 import { useReduceMotion } from "./AnimatedBanner.js";
 import { useTheme } from "../../context/ThemeContext.js";
 
@@ -120,7 +120,7 @@ export function VoidmonTrouble({ what = "This page", onRetry, navigation, style 
     <VoidmonEmpty pose="sleeping" style={style}
       text={offline
         ? `You're offline. ${what} needs the internet, but your library and everything you've opened before still work.`
-        : "AniList is slow or busy right now. It usually wakes up in a moment."}>
+        : "The server is slow or busy right now. It usually wakes up in a moment."}>
       <View style={{ flexDirection: "row", gap: 10, marginTop: 14, flexWrap: "wrap", justifyContent: "center" }}>
         {offline && navigation && (
           <TouchableOpacity onPress={() => navigation.navigate("Main", { screen: "Library" })}

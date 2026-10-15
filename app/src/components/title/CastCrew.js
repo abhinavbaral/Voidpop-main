@@ -3,7 +3,7 @@
 import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet } from "react-native";
 import { useTheme } from "../../context/ThemeContext.js";
 
-export default function CastCrew({ characters = [], staff = [], themes = [], segment, navigation }) {
+export default function CastCrew({ characters = [], staff = [], themes = [], segment, navigation, familiar = {} }) {
   const openPerson = (p) => p?.id && navigation?.navigate("Person", { id: p.id, name: p.name });
   const { C } = useTheme();
   const styles = makeStyles(C);
@@ -36,7 +36,10 @@ export default function CastCrew({ characters = [], staff = [], themes = [], seg
                   <TouchableOpacity style={styles.voice} onPress={() => openPerson(c.voice)} accessibilityRole="link"
                     accessibilityLabel={`${c.voice.name}, voice of ${c.name}. See their other roles`}>
                     {face(c.voice, true)}
-                    <Text style={styles.voiceName} numberOfLines={2}>{c.voice.name}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.voiceName} numberOfLines={2}>{c.voice.name}</Text>
+                      {familiar[c.voice.id] > 0 && <Text style={styles.familiar}>In {familiar[c.voice.id]} of your shows</Text>}
+                    </View>
                   </TouchableOpacity>
                 )}
               </View>
@@ -53,6 +56,7 @@ export default function CastCrew({ characters = [], staff = [], themes = [], seg
               {face(s, true)}
               <Text style={styles.staffName} numberOfLines={1}>{s.name}</Text>
               <Text style={styles.staffRole} numberOfLines={1}>{s.role}</Text>
+              {familiar[s.id] > 0 && <Text style={styles.familiar}>{familiar[s.id]} of yours</Text>}
             </TouchableOpacity>
           ))}
         </View>
@@ -62,6 +66,7 @@ export default function CastCrew({ characters = [], staff = [], themes = [], seg
 }
 
 const makeStyles = (C) => StyleSheet.create({
+  familiar: { color: C.purple, fontSize: 10, fontWeight: "700", marginTop: 2 },
   title: { color: C.text, fontWeight: "800", fontSize: 15, marginBottom: 8 },
   wrap: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   chip: { borderWidth: 1, borderColor: C.border, backgroundColor: C.card, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },

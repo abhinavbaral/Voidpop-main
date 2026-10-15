@@ -1,4 +1,4 @@
-// One poster card — NO numerical ratings anywhere (Voidation rule).
+// One poster card — NO numerical ratings anywhere (VoidPop rule).
 // Under the poster:  Title
 //                    Creator (mangaka / studio)
 //                    Genre · release date
@@ -7,9 +7,9 @@
 import { useState } from "react";
 import { Pressable, Image, Text, View, StyleSheet, Platform } from "react-native";
 import { useTheme } from "../../context/ThemeContext.js";
-import { releaseLabel, formatCountdown } from "@voidation/shared/lib/format";
-import { useSettings } from "@voidation/shared/backend/SettingsContext";
-import { totalFor, unitFor, behindBy, maxProgress, doneLabel } from "@voidation/shared/backend/store";
+import { releaseLabel, formatCountdown } from "@voidpop/shared/lib/format";
+import { useSettings } from "@voidpop/shared/backend/SettingsContext";
+import { totalFor, unitFor, behindBy, maxProgress, doneLabel } from "@voidpop/shared/backend/store";
 import Icon from "./Icon.js";
 
 // `columns`: when used in a grid, each cell gets an exact 1/columns width so an

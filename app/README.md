@@ -1,4 +1,4 @@
-# Voidation — mobile app (`app/`)
+# VoidPop — mobile app (`app/`)
 
 Expo React Native app for Android and iOS. Uses the shared logic in `../shared`.
 
@@ -17,4 +17,4 @@ eas build -p android --profile preview   # installable .apk (see eas.json)
 The full map is in [../ARCHITECTURE.md](../ARCHITECTURE.md).
 
 Everything else (the library, tiers, the AniList client, countdown formatting) is
-imported from `@voidation/shared`.
+imported from `@voidpop/shared`.

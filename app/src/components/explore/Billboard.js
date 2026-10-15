@@ -1,13 +1,13 @@
 // Billboard: the big featured title at the top of Explore (the layout idea is
-// Netflix's; the look is Voidation's). Wide banner picture fading into the
+// Netflix's; the look is VoidPop's). Wide banner picture fading into the
 // page, the title, genres, two lines of story, and two buttons:
 // "My list" (adds it to Plan to Watch, or says where it already is) and Info.
 import { useCallback, useState } from "react";
 import { View, Text, Image, Pressable, StyleSheet, useWindowDimensions } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import Svg, { Defs, LinearGradient, Stop, Rect } from "react-native-svg";
-import { useAuth } from "@voidation/shared/backend/AuthContext";
-import { getStatus, setStatus, statusesFor } from "@voidation/shared/backend/store";
+import { useAuth } from "@voidpop/shared/backend/AuthContext";
+import { getStatus, setStatus, statusesFor } from "@voidpop/shared/backend/store";
 import { useTheme } from "../../context/ThemeContext.js";
 import Icon from "../ui/Icon.js";
 

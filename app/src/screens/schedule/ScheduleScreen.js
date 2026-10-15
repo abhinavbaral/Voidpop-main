@@ -6,10 +6,10 @@ import { useCallback, useState } from "react";
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
-import { fetchNextEpisodes } from "@voidation/shared/api/anilist";
-import { useAuth } from "@voidation/shared/backend/AuthContext";
-import { getLibrary, noteAiring } from "@voidation/shared/backend/store";
-import { useNow } from "@voidation/shared/lib/useNow";
+import { fetchNextEpisodes } from "@voidpop/shared/api/anilist";
+import { useAuth } from "@voidpop/shared/backend/AuthContext";
+import { getLibrary, noteAiring } from "@voidpop/shared/backend/store";
+import { useNow } from "@voidpop/shared/lib/useNow";
 import { useTheme } from "../../context/ThemeContext.js";
 import { openDetail } from "../../utils/nav";
 import YourShows from "../../components/library/YourShows.js";
@@ -60,7 +60,7 @@ export default function ScheduleScreen({ navigation }) {
           </TouchableOpacity>
         </View>
         {error && (
-          <Text style={styles.error}>Couldn't reach AniList for the latest airing times. Pull down to retry.</Text>
+          <Text style={styles.error}>Couldn't load the latest airing times. Pull down to retry.</Text>
         )}
 
         <View style={styles.viewTabs}>

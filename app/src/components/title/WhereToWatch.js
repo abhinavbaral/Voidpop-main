@@ -1,17 +1,27 @@
 // "Available on": the official services AniList lists for this anime.
 // Information only: the chips name the services, they don't open them.
+// YouTube appears only for a licensed channel ("On YouTube · Muse Asia").
 import { View, Text, StyleSheet } from "react-native";
 import { useTheme } from "../../context/ThemeContext.js";
 
-export default function WhereToWatch({ links, segment }) {
+export default function WhereToWatch({ links = [], youtube = [], segment }) {
   const { C } = useTheme();
-  if (!links?.length) return null;
+  if (!links.length && !youtube.length) return null;
   return (
     <View style={{ marginTop: 20 }}>
       <Text style={{ color: C.text, fontWeight: "800", fontSize: 15, marginBottom: 8 }}>
         Available on
       </Text>
       <View style={styles.wrap}>
+        {youtube.map((channel) => (
+          <View key={`yt-${channel}`} style={[styles.chip, { borderColor: C.border, backgroundColor: C.card }]}>
+            <View style={[styles.dot, { backgroundColor: "#ff0000" }]} />
+            <View>
+              <Text style={{ color: C.text, fontWeight: "700", fontSize: 13 }}>YouTube</Text>
+              <Text style={{ color: C.faint, fontSize: 10, marginTop: 1 }} numberOfLines={1}>{channel}</Text>
+            </View>
+          </View>
+        ))}
         {links.map((l) => (
           <View key={l.site} style={[styles.chip, { borderColor: C.border, backgroundColor: C.card }]}>
             <View style={[styles.dot, { backgroundColor: l.color || C.purple }]} />
@@ -25,7 +35,7 @@ export default function WhereToWatch({ links, segment }) {
         ))}
       </View>
       <Text style={{ color: C.faint, fontSize: 10, marginTop: 6 }}>
-        Availability depends on your country. From AniList.
+        {youtube.length > 0 ? "Availability depends on your country. Dubs are not included." : "Availability depends on your country."}
       </Text>
     </View>
   );

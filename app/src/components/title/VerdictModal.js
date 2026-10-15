@@ -8,8 +8,8 @@ import { useEffect, useState } from "react";
 import {
   Modal, View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet,
 } from "react-native";
-import { VERDICTS, moodsFor } from "@voidation/shared/backend/store";
-import { verdictPrompt } from "@voidation/shared/features/voidmon";
+import { VERDICTS, moodsFor } from "@voidpop/shared/backend/store";
+import { verdictPrompt } from "@voidpop/shared/features/voidmon";
 import { useTheme } from "../../context/ThemeContext.js";
 import Voidmon from "../brand/Voidmon.js";
 

@@ -4,7 +4,7 @@
 // in a row.
 import { useEffect, useState } from "react";
 import { Modal, View, Text, Image, Pressable, TouchableOpacity, StyleSheet } from "react-native";
-import { totalFor } from "@voidation/shared/backend/store";
+import { totalFor } from "@voidpop/shared/backend/store";
 import { useTheme } from "../../context/ThemeContext.js";
 import Voidmon from "../brand/Voidmon.js";
 

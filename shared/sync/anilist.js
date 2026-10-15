@@ -1,4 +1,4 @@
-// Two-way sync with your AniList account. No Voidation server: AniList itself
+// Two-way sync with your AniList account. No VoidPop server: AniList itself
 // holds the list, so the app and the website (and AniList's own site) all agree.
 //
 //   Synced:        status and progress of every anime and manga in your library
@@ -11,10 +11,10 @@
 //   - AniList's list is pulled on open, when the app comes back to the front,
 //     in the background job, and on "Sync now". The newer change wins; your
 //     unsent changes always win.
-//   - The first sync merges both ways: titles only in Voidation are added to
-//     AniList, titles only on AniList are added to Voidation.
+//   - The first sync merges both ways: titles only in VoidPop are added to
+//     AniList, titles only on AniList are added to VoidPop.
 //
-// Sign-in uses AniList's "implicit grant": no password ever touches Voidation;
+// Sign-in uses AniList's "implicit grant": no password ever touches VoidPop;
 // AniList hands back a token that lasts a year. Each platform plugs in its own
 // way of opening AniList's sign-in page (configureAniListSync).
 
@@ -146,7 +146,7 @@ async function push() {
   }
 }
 
-/* ---------- AniList → Voidation ---------- */
+/* ---------- AniList → VoidPop ---------- */
 
 async function pull(first) {
   const s = await loadState();
@@ -166,7 +166,7 @@ async function pull(first) {
     });
   }
   if (first) {
-    // titles only in Voidation go up to AniList
+    // titles only in VoidPop go up to AniList
     const lib = await getLibrary();
     Object.entries(lib).forEach(([key, e]) => {
       if (!remoteKeys.has(key) && !s.queue[key]) {
@@ -197,7 +197,7 @@ export function syncNow({ reason = "manual", force = false } = {}) {
       const due = force || reason === "manual" || !s.lastSync || Date.now() - new Date(s.lastSync).getTime() > PULL_EVERY_MS;
       await push();
       const result = due ? await pull(!!s.first) : null;
-      if (due && Object.keys(s.queue || {}).length) await push(); // send what the pull found newer here (and, first time, Voidation-only titles)
+      if (due && Object.keys(s.queue || {}).length) await push(); // send what the pull found newer here (and, first time, VoidPop-only titles)
       if (due) s.lastSync = new Date().toISOString();
       await saveState();
       return result;

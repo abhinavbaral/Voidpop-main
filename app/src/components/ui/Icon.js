@@ -1,6 +1,6 @@
-// Stroke icons from @voidation/shared/lib/iconPaths, drawn with react-native-svg.
+// Stroke icons from @voidpop/shared/lib/iconPaths, drawn with react-native-svg.
 import Svg, { Path } from "react-native-svg";
-import { ICON_PATHS } from "@voidation/shared/lib/iconPaths";
+import { ICON_PATHS } from "@voidpop/shared/lib/iconPaths";
 
 export default function Icon({ name, size = 18, color = "#888", fill = false, strokeWidth = 1.8, style }) {
   return (

@@ -8,9 +8,9 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, Image, StyleSheet 
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as DocumentPicker from "expo-document-picker";
 import { readAsStringAsync } from "expo-file-system/legacy";
-import { setOnboarded, importAniListEntries } from "@voidation/shared/backend/store";
-import { fetchAniListUserList } from "@voidation/shared/api/anilist";
-import { importMalFile, base64ToBytes } from "@voidation/shared/features/malImport";
+import { setOnboarded, importAniListEntries } from "@voidpop/shared/backend/store";
+import { fetchAniListUserList } from "@voidpop/shared/api/anilist";
+import { importMalFile, base64ToBytes } from "@voidpop/shared/features/malImport";
 import { useTheme } from "../../context/ThemeContext.js";
 import { ensurePermission, rescheduleEpisodeAlerts } from "../../services/episodeAlerts";
 import AnimatedBanner from "../../components/brand/AnimatedBanner.js";
@@ -51,9 +51,9 @@ export default function OnboardingScreen({ navigation }) {
     if (!user.trim()) return;
     try {
       const r = await importAniListEntries(await fetchAniListUserList(user.trim()));
-      setMessage(`Added ${r.added} from AniList.`);
+      setMessage(`Added ${r.added} from your list.`);
       rescheduleEpisodeAlerts();
-    } catch { setMessage("Couldn't find that AniList user, or their list is private."); }
+    } catch { setMessage("Couldn't find that username, or the list is private."); }
   });
   const allowAlerts = () => run(async () => { const ok = await ensurePermission(); setAlerts(ok); if (ok) rescheduleEpisodeAlerts(); });
 
@@ -77,7 +77,7 @@ export default function OnboardingScreen({ navigation }) {
       <View style={styles.hero}>
         <AnimatedBanner accent={C.purple} dark={dark} height={220} />
         <View style={[styles.logoDisc, { backgroundColor: C.bg }]}>
-          <Image source={logo} style={{ width: 76, height: 76 }} accessibilityLabel="Voidation" />
+          <Image source={logo} style={{ width: 76, height: 76 }} accessibilityLabel="VoidPop" />
         </View>
       </View>
       <Guide pose="welcome" says="Hi, I'm Voidmon. I'll show you around." />
@@ -111,15 +111,15 @@ export default function OnboardingScreen({ navigation }) {
       <View style={styles.bigBtn}>
         <Icon name="sync" size={20} color={C.purple} />
         <View style={{ flex: 1 }}>
-          <Text style={styles.bigTitle}>From AniList</Text>
+          <Text style={styles.bigTitle}>From a username</Text>
           <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
-            <TextInput value={user} onChangeText={setUser} placeholder="AniList username" placeholderTextColor={C.faint} autoCapitalize="none"
+            <TextInput value={user} onChangeText={setUser} placeholder="Username" placeholderTextColor={C.faint} autoCapitalize="none"
               style={styles.input} onSubmitEditing={importAniList} returnKeyType="go" />
             <TouchableOpacity style={[styles.smallBtn, !user.trim() && { opacity: 0.5 }]} onPress={importAniList} disabled={busy || !user.trim()}>
               <Text style={{ color: "#fff", fontWeight: "800" }}>Import</Text>
             </TouchableOpacity>
           </View>
-          <Text style={styles.small}>For two-way sync, sign in later in More › AniList.</Text>
+          <Text style={styles.small}>For two-way sync, sign in later in More › Sync.</Text>
         </View>
       </View>
       {!!message && <Text style={[styles.p, { color: C.text, marginTop: 10 }]}>{message}</Text>}
@@ -128,12 +128,12 @@ export default function OnboardingScreen({ navigation }) {
     <View key="a">
       <Guide pose="alerts" says="I'll ring when a new episode is out." />
       <Text style={styles.h1}>Never miss an episode</Text>
-      <Text style={styles.p}>Voidation can alert you when an episode of a show you follow comes out. You can turn this off in settings.</Text>
+      <Text style={styles.p}>VoidPop can alert you when an episode of a show you follow comes out. You can turn this off in settings.</Text>
       <TouchableOpacity style={[styles.bigBtn, alerts && styles.choiceOn]} onPress={allowAlerts} disabled={busy || alerts}>
         <Icon name="bell" size={20} color={alerts ? "#fff" : C.purple} />
         <Text style={[styles.bigTitle, alerts && { color: "#fff" }]}>{alerts ? "Episode alerts are on" : alerts === false ? "Not allowed. You can enable it in phone settings." : "Turn on episode alerts"}</Text>
       </TouchableOpacity>
-      <Text style={[styles.p, { marginTop: 18 }]}>Tip: add the Voidation widget to your home screen for countdowns at a glance (long-press your home screen › Widgets).</Text>
+      <Text style={[styles.p, { marginTop: 18 }]}>Tip: add the VoidPop widget to your home screen for countdowns at a glance (long-press your home screen › Widgets).</Text>
     </View>,
   ];
 

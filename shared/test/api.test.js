@@ -49,6 +49,7 @@ test("where to watch merges languages per service", () => {
     { site: "Crunchyroll", url: "c", type: "STREAMING", language: "English" },
     { site: "Crunchyroll", url: "c", type: "STREAMING", language: "Hindi" },
     { site: "Twitter", url: "t", type: "SOCIAL" },
+    { site: "YouTube", url: "y", type: "STREAMING", notes: "Muse Asia" }, // shown by officialYouTube instead
   ]);
   assert.deepEqual(w.map((x) => [x.site, x.languages]), [["Crunchyroll", ["English", "Hindi"]]]);
 });

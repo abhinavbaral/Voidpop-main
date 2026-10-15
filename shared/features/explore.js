@@ -83,7 +83,7 @@ export function buildExplore(pools, known = new Set(), seed = daySeed()) {
   const dontMissAnime = rotate(popA, seed).slice(0, 10);
   const dontMissManga = rotate(popM, seed).slice(0, 10);
   const dontMissNovels = rotate(fresh(pools.popN || []), seed).slice(0, 10);
-  // Voidation picks never repeat what "Don't miss this" already shows
+  // VoidPop picks never repeat what "Don't miss this" already shows
   const shown = new Set(dontMissAnime.map((it) => `${it.segment}:${it.id}`));
   // prefer titles no other row shows; if that leaves nothing, allow repeats
   const notShown = (items) => { const left = items.filter((it) => !shown.has(`${it.segment}:${it.id}`)); return left.length ? left : items; };

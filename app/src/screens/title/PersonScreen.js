@@ -4,8 +4,8 @@
 import { useEffect, useState } from "react";
 import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { fetchPerson } from "@voidation/shared/api/anilist";
-import { yearOf } from "@voidation/shared/lib/format";
+import { fetchPerson } from "@voidpop/shared/api/anilist";
+import { yearOf } from "@voidpop/shared/lib/format";
 import { useTheme } from "../../context/ThemeContext.js";
 import { openDetail, goBackOrHome } from "../../utils/nav";
 import { SkeletonHeader, SkeletonList } from "../../components/ui/Skeleton.js";
@@ -67,7 +67,6 @@ export default function PersonScreen({ route, navigation }) {
                 </View>
               </TouchableOpacity>
             ))}
-            <Text style={[styles.note, { marginTop: 16 }]}>From AniList.</Text>
           </>
         )}
       </ScrollView>

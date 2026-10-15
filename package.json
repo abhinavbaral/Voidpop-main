@@ -1,7 +1,7 @@
 {
-  "name": "voidation",
+  "name": "voidpop",
   "private": true,
-  "description": "Voidation — anime & manga tracker with airing countdowns. Website (web/), mobile app (app/), shared logic (shared/). No accounts, no keys.",
+  "description": "VoidPop — anime & manga tracker with airing countdowns. Website (web/), mobile app (app/), shared logic (shared/). No accounts, no keys.",
   "workspaces": [
     "app",
     "web",

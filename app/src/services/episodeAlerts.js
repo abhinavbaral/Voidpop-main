@@ -3,14 +3,14 @@
 // Scheduled on the phone itself, so there is no server and no push service.
 // AniList only knows each show's NEXT episode, so the alerts are rebuilt every
 // time the app opens, comes back to the foreground, or your library changes;
-// opening Voidation at least once a week keeps every alert in place.
+// opening VoidPop at least once a week keeps every alert in place.
 //
 // Followed = Watching, Plan to Watch, On Hold, or Excited (same as History).
 
 import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
-import { fetchNextEpisodes } from "@voidation/shared/api/anilist";
-import { getLibrary, getExcited, getSettings } from "@voidation/shared/backend/store";
+import { fetchNextEpisodes } from "@voidpop/shared/api/anilist";
+import { getLibrary, getExcited, getSettings } from "@voidpop/shared/backend/store";
 
 const FOLLOWING = new Set(["watching", "plan", "onhold"]);
 const CHANNEL = "episodes";

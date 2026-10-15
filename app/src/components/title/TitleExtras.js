@@ -5,14 +5,17 @@
 import { useCallback, useEffect, useState } from "react";
 import { View, Text, TextInput, Image, TouchableOpacity, StyleSheet } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
-import { fetchWatchOrder } from "@voidation/shared/api/anilist";
-import { getNote, setNote, getLibrary, statusesFor } from "@voidation/shared/backend/store";
-import { yearOf } from "@voidation/shared/lib/format";
+import { fetchWatchOrder } from "@voidpop/shared/api/anilist";
+import { getNote, setNote, getLibrary, statusesFor } from "@voidpop/shared/backend/store";
+import { yearOf } from "@voidpop/shared/lib/format";
 import { useTheme } from "../../context/ThemeContext.js";
 import { openDetail } from "../../utils/nav";
 import Icon from "../ui/Icon.js";
 
 const FORMAT = { TV: "TV", TV_SHORT: "TV short", MOVIE: "Movie", OVA: "OVA", ONA: "ONA", SPECIAL: "Special" };
+
+// headings you can drop into a note
+const NOTE_TEMPLATES = ["What worked", "What didn't", "Who it's for", "Stopped at"];
 
 export function NoteBox({ item }) {
   const { C } = useTheme();
@@ -27,6 +30,15 @@ export function NoteBox({ item }) {
     return (
       <View style={styles.box}>
         <Text style={styles.label}>Your note</Text>
+        {/* optional starting points: each adds a heading line to the note */}
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+          {NOTE_TEMPLATES.map((t) => (
+            <TouchableOpacity key={t} onPress={() => setDraft((d) => `${d.trim() ? `${d.trim()}\n\n` : ""}${t}: `)} accessibilityRole="button"
+              accessibilityLabel={`Add ${t} to your note`} style={{ borderWidth: 1, borderColor: C.border, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 5 }}>
+              <Text style={{ color: C.sub, fontSize: 12, fontWeight: "700" }}>{t}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
         <TextInput value={draft} onChangeText={setDraft} multiline autoFocus maxLength={2000}
           placeholder="Only you see this, e.g. stopped at the tournament arc" placeholderTextColor={C.faint} style={styles.input} />
         <View style={{ flexDirection: "row", gap: 16, justifyContent: "flex-end", marginTop: 8 }}>
@@ -61,7 +73,7 @@ export function WatchOrder({ item, navigation, finder = false }) {
   return (
     <View style={{ marginTop: 20 }}>
       <Text style={styles.title}>Watch order</Text>
-      {list.length < 2 && <Text style={styles.faint}>Just this one so far: no other seasons, movies or specials on AniList.</Text>}
+      {list.length < 2 && <Text style={styles.faint}>Just this one so far: no other seasons, movies or specials.</Text>}
       {list.map((it, i) => {
         const here = !finder && it.id === item.id;
         const status = lib[`anime:${it.id}`]?.status;
@@ -77,7 +89,7 @@ export function WatchOrder({ item, navigation, finder = false }) {
           </TouchableOpacity>
         );
       })}
-      <Text style={[styles.faint, { marginTop: 6 }]}>In release order, from AniList. Recaps and remakes are left out.</Text>
+      <Text style={[styles.faint, { marginTop: 6 }]}>In release order. Recaps and remakes are left out.</Text>
     </View>
   );
 }

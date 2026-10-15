@@ -1,4 +1,4 @@
-// Voidmon, Voidation's mascot (an original character by Abhinav Baral).
+// Voidmon, VoidPop's mascot (an original character by Abhinav Baral).
 // The pictures are app/assets/voidmon/voidmon-<pose>.png (made from the .svg
 // drawings next to them by app/scripts/voidmon-art.mjs). This file holds what
 // the app and website both need to know about each pose.

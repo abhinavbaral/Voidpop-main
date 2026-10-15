@@ -1,9 +1,9 @@
-# Voidation — how the code is organised
+# VoidPop — how the code is organised
 
 One rule holds everything together: **logic lives in `shared/`, screens live
 in `app/` (and `web/`)**. A screen asks `shared/` for data and draws it; it
 never talks to AniList or storage directly. That keeps the logic testable
-without a phone, and lets VoidPop reuse it later.
+without a phone, and lets the website reuse it.
 
 ```
 app/                         Android + iOS app (Expo / React Native)
@@ -69,6 +69,12 @@ web/                         website (React + Vite), kept locally, frozen
 - **A new AniList query:** `shared/api/anilist.js`, plus the same export in `shared/demo/api-anilist.js`.
 
 ## Conventions
+
+- **Some names still say "voidation" on purpose.** Saved-data keys (`voidation:*`,
+  `voidation_theme`…), the Android package `com.voidation.app`, the Expo slug and the
+  `voidation://auth` sign-in redirect keep the old name. Renaming them would wipe the
+  data on people's phones, make Android treat the app as a new one, or break sync
+  sign-in. The `voidpop://` link scheme works alongside `voidation://`.
 
 - **Every AniList field goes through `normalize()`** in `api/anilist.js`, so
   screens always get the same item shape.

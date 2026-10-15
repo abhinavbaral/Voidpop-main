@@ -1,10 +1,10 @@
-// The Voidation logo, icon only (no wordmark). You pick one in More ›
+// The VoidPop logo, icon only (no wordmark). You pick one in More ›
 // Appearance: the classic countdown ring around a V, the ring with Voidmon in
 // place of the orange dot, or Voidmon peeking. The V is light on dark themes
 // and dark on the light theme, so it never vanishes.
 // On the phone the home-screen icon changes to match (app version 1.0.1+).
 import { Image, Platform } from "react-native";
-import { useSettings } from "@voidation/shared/backend/SettingsContext";
+import { useSettings } from "@voidpop/shared/backend/SettingsContext";
 import { useTheme } from "../../context/ThemeContext.js";
 
 export const LOGOS = {
@@ -48,7 +48,7 @@ export default function Brand({ size = 20 }) {
       style={{ width: size * 1.6, height: size * 1.6 }}
       resizeMode="contain"
       accessibilityRole="image"
-      accessibilityLabel="Voidation"
+      accessibilityLabel="VoidPop"
     />
   );
 }

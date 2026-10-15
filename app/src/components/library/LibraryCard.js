@@ -7,9 +7,9 @@
 // you haven't watched, the Delayed tag, and when the next episode airs
 // ("Ep 6 · Sat 4 Oct, 9:30 PM"; on covers the short "Ep 6 · 2d 4h").
 import { Pressable, Image, Text, View, StyleSheet } from "react-native";
-import { leftToWatch, totalFor } from "@voidation/shared/backend/store";
-import { dayLabel, airTime, formatCountdown } from "@voidation/shared/lib/format";
-import { useSettings } from "@voidation/shared/backend/SettingsContext";
+import { leftToWatch, totalFor } from "@voidpop/shared/backend/store";
+import { dayLabel, airTime, formatCountdown } from "@voidpop/shared/lib/format";
+import { useSettings } from "@voidpop/shared/backend/SettingsContext";
 import { useTheme } from "../../context/ThemeContext.js";
 
 const progressLine = (entry) => {

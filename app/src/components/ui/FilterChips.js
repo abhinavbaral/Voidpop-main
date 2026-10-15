@@ -2,7 +2,7 @@
 // two scrolling rows of chips, most common first, with counts.
 import { useMemo } from "react";
 import { View } from "react-native";
-import { filterOptions } from "@voidation/shared/lib/filters";
+import { filterOptions } from "@voidpop/shared/lib/filters";
 import Chips from "./Chips.js";
 
 export default function FilterChips({ items, value, onChange, style }) {

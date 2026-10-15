@@ -1,13 +1,13 @@
-// Voidation mobile app (Android + iOS). No accounts: your library lives on the phone.
+// VoidPop mobile app (Android + iOS). No accounts: your library lives on the phone.
 // This file only wires things together; the screens are in src/screens, the
-// navigation in src/navigation, and the logic in @voidation/shared.
+// navigation in src/navigation, and the logic in @voidpop/shared.
 import "./src/bootstrap/init.js"; // must run first: plugs in AsyncStorage
 
 import { NavigationContainer, DarkTheme, DefaultTheme } from "@react-navigation/native";
 import { StatusBar } from "expo-status-bar";
 import { View } from "react-native";
-import { AuthProvider } from "@voidation/shared/backend/AuthContext";
-import { SettingsProvider } from "@voidation/shared/backend/SettingsContext";
+import { AuthProvider } from "@voidpop/shared/backend/AuthContext";
+import { SettingsProvider } from "@voidpop/shared/backend/SettingsContext";
 import { ThemeProvider, useTheme } from "./src/context/ThemeContext";
 import RootNavigator from "./src/navigation/RootNavigator";
 import { navRef } from "./src/navigation/navRef";

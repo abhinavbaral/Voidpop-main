@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CoverWall from "../../components/welcome/CoverWall";
 import SwipeButton from "../../components/welcome/SwipeButton";
 import { useLogo } from "../../components/brand/Brand";
-import { isOnboarded } from "@voidation/shared/backend/store";
+import { isOnboarded } from "@voidpop/shared/backend/store";
 import { getCoversForWelcome } from "../../services/swipeCovers";
 
 const COPY = {
@@ -41,7 +41,7 @@ export default function WelcomeScreen({ navigation, route }) {
     <View style={s.root}>
       {covers && <CoverWall covers={covers} />}
       <View style={[s.content, { paddingBottom: insets.bottom + 28 }]}>
-        <Image source={logo} style={s.logo} resizeMode="contain" accessibilityLabel="Voidation" />
+        <Image source={logo} style={s.logo} resizeMode="contain" accessibilityLabel="VoidPop" />
         <Text style={s.title} accessibilityRole="header">{COPY.title}</Text>
         <Text style={s.sub}>{COPY.sub}</Text>
         <SwipeButton

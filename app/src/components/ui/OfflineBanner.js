@@ -2,8 +2,8 @@
 // AniList can't be reached and saved answers are shown (shared/api/cache.js).
 import { useEffect, useState } from "react";
 import { View, Text, StyleSheet } from "react-native";
-import { onNetState } from "@voidation/shared/api/anilist";
-import { timeAgo } from "@voidation/shared/backend/store";
+import { onNetState } from "@voidpop/shared/api/anilist";
+import { timeAgo } from "@voidpop/shared/backend/store";
 import { useTheme } from "../../context/ThemeContext.js";
 
 export default function OfflineBanner() {

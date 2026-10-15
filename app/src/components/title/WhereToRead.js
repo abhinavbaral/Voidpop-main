@@ -33,7 +33,7 @@ export default function WhereToRead({ links }) {
       {read.length > 0 && <>{head("Read officially")}{chips(read)}</>}
       {buy.length > 0 && <>{head("Buy the volumes")}{chips(buy)}</>}
       <Text style={{ color: C.faint, fontSize: 10, marginTop: 8 }}>
-        Official services only. Availability depends on your country. From AniList.
+        Official services only. Availability depends on your country.
       </Text>
     </View>
   );

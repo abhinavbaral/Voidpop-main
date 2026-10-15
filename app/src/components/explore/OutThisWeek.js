@@ -5,12 +5,12 @@
 // refreshKey changes when Schedule is pulled to refresh.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { View, Text, Image, TouchableOpacity, StyleSheet, useWindowDimensions } from "react-native";
-import { loadMonthPremieres, monthGrid, dayKey, loadAiringWeek, loadLatestPremieres } from "@voidation/shared/features/upcoming";
-import { getExcited, toggleExcited } from "@voidation/shared/backend/store";
-import { useAuth } from "@voidation/shared/backend/AuthContext";
-import { useNow } from "@voidation/shared/lib/useNow";
-import { useSettings } from "@voidation/shared/backend/SettingsContext";
-import { formatCountdown, airTime, hypeLabel } from "@voidation/shared/lib/format";
+import { loadMonthPremieres, monthGrid, dayKey, loadAiringWeek, loadLatestPremieres } from "@voidpop/shared/features/upcoming";
+import { getExcited, toggleExcited } from "@voidpop/shared/backend/store";
+import { useAuth } from "@voidpop/shared/backend/AuthContext";
+import { useNow } from "@voidpop/shared/lib/useNow";
+import { useSettings } from "@voidpop/shared/backend/SettingsContext";
+import { formatCountdown, airTime, hypeLabel } from "@voidpop/shared/lib/format";
 import PosterRow from "../ui/PosterRow.js";
 import { useTheme } from "../../context/ThemeContext.js";
 import { openDetail } from "../../utils/nav";

@@ -4,7 +4,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useColorScheme } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { THEMES, resolveTheme, applyPalette, PALETTES } from "@voidation/shared/lib/theme";
+import { THEMES, resolveTheme, applyPalette, PALETTES } from "@voidpop/shared/lib/theme";
 
 const KEY = "voidation_theme"; // "system" | "light" | "dark" (older saves: "void" / "pop")
 const BLACK_KEY = "voidation_black";

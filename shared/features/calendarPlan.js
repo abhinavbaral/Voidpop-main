@@ -3,7 +3,7 @@
 //   - Google Calendar link (works anywhere)
 //   - .ics file (Apple Calendar, Outlook, and Google too)
 //   - the app uses the phone's own "new event" screen (see app/src/services/calendar.js)
-// If a show takes a break, the calendar won't know; Voidation's countdown will.
+// If a show takes a break, the calendar won't know; VoidPop's countdown will.
 
 const LENGTH_MIN = 24; // a TV episode
 const UNKNOWN_RUN = 12; // weeks to add when the episode count isn't announced
@@ -19,7 +19,7 @@ export function calendarPlan(item) {
   return {
     title: `${item.title} — new episode`,
     notes: `Episodes ${next.episode}${count > 1 ? `–${last}` : ""}${item.episodes ? ` of ${item.episodes}` : ""}, weekly. ` +
-      `Times are from AniList; if the show takes a break, check Voidation for the new date.${item.url ? `\n${item.url}` : ""}`,
+      `Air times can change; if the show takes a break, check VoidPop for the new date.${item.url ? `\n${item.url}` : ""}`,
     start, end, count,
     known: !!item.episodes,
   };
@@ -49,7 +49,7 @@ export function icsFor(item) {
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//Voidation//Anime countdown//EN",
+    "PRODID:-//VoidPop//Anime countdown//EN",
     "CALSCALE:GREGORIAN",
     "BEGIN:VEVENT",
     `UID:voidation-${item.segment}-${item.id}-${item.nextEpisode.episode}@voidation`,

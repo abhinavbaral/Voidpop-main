@@ -3,6 +3,7 @@
 // upcoming (unreleased) titles, and per-title details (trailer + related seasons).
 
 import { CRUNCHYROLL_AOTY } from "../features/awards.js";
+import { officialYouTube } from "../features/officialYouTube.js";
 import { readingLinks } from "../features/readLinks.js";
 import { formatDateParts } from "../lib/format.js";
 import { cacheKey, cacheGet, cachePut, isDeviceOnline, noteSavedShown } from "./cache.js";
@@ -210,7 +211,7 @@ async function request(body, k, save, token = null) {
       res = await post(body, token);
     }
     if (res.status === 401) throw new AniListAuthError("Your AniList sign-in has expired. Sign in again.");
-    if (res.status >= 500 || res.status === 429) throw new Error(`AniList is busy (${res.status}). Try again in a minute.`);
+    if (res.status >= 500 || res.status === 429) throw new Error(`The server is busy (${res.status}). Try again in a minute.`);
     json = await res.json();
   } catch (err) {
     if (err instanceof AniListAuthError) throw err;
@@ -222,7 +223,7 @@ async function request(body, k, save, token = null) {
     throw err;
   }
   if (json.errors) {
-    const msg = json.errors[0].message || "AniList error";
+    const msg = json.errors[0].message || "Server error";
     if (token && /invalid token|unauthori[sz]ed|expired/i.test(msg)) throw new AniListAuthError("Your AniList sign-in has expired. Sign in again.");
     throw new Error(msg);
   }
@@ -538,7 +539,7 @@ export async function fetchAniListDetail(segment, id) {
       staff(sort: [RELEVANCE, ID], perPage: 12) {
         edges { role node { id name { full native } image { medium } } }
       }
-      externalLinks { site url type language color isDisabled }
+      externalLinks { site url type language color notes isDisabled }
       relations {
         edges {
           relationType
@@ -576,6 +577,7 @@ export async function fetchAniListDetail(segment, id) {
     // anime: what it's adapted from, with a link when that's a manga/manhwa/novel on AniList
     source: segment === "anime" ? sourceInfo(m.source, m.relations?.edges || []) : null,
     whereToWatch: watchLinks(m.externalLinks),
+    whereToYouTube: officialYouTube(m.externalLinks),
     // manga: official readers, stores, or search boxes (shared/features/readLinks.js)
     whereToRead: read,
     // official site, socials, and the title's AniList / MyAnimeList pages
@@ -766,7 +768,8 @@ export async function fetchByMalIds(segment, malIds) {
 export function watchLinks(links) {
   const bySite = new Map();
   (links || [])
-    .filter((l) => l.type === "STREAMING" && !l.isDisabled && l.url)
+    // YouTube is handled by officialYouTube (licensed channels only), never as a plain chip
+    .filter((l) => l.type === "STREAMING" && !l.isDisabled && l.url && String(l.site).toLowerCase() !== "youtube")
     .forEach((l) => {
       const cur = bySite.get(l.site);
       if (cur) {

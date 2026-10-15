@@ -123,7 +123,8 @@ export async function fetchAniListDetail(segment, id) {
       { site: "MyAnimeList", url: `https://myanimelist.net/${segment}`, color: "#2e51a2", language: null },
     ],
   };
-  return { trailer: null, related, whereToWatch, whereToRead, source, characters, staff, themes, episodes, links }; // trailers can't be embedded in the demo
+  const whereToYouTube = segment === "anime" && it.id % 2 === 0 ? ["Muse Asia"] : [];
+  return { trailer: null, related, whereToWatch, whereToYouTube, whereToRead, source, characters, staff, themes, episodes, links }; // trailers can't be embedded in the demo
 }
 
 // Every episode airing in the next `days` days: each airing demo title gets its

@@ -12,7 +12,7 @@ import Sidebar from "../../components/ui/Sidebar.js";
 import Card from "../../components/ui/Card.js";
 import {
   fetchAniList, SORTS, SEASONS, GENRES, ANIME_ORIGINS, MANGA_ORIGINS, NOVEL_ORIGINS,
-} from "@voidation/shared/api/anilist";
+} from "@voidpop/shared/api/anilist";
 import { useTheme } from "../../context/ThemeContext.js";
 import { useGridColumns } from "../../utils/layout";
 import { openDetail } from "../../utils/nav";

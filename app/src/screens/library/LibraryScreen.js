@@ -10,15 +10,15 @@ import { useCallback, useMemo, useState } from "react";
 import { View, Text, TextInput, FlatList, StyleSheet, TouchableOpacity, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
-import { useAuth } from "@voidation/shared/backend/AuthContext";
+import { useAuth } from "@voidpop/shared/backend/AuthContext";
 import {
   getLibrary, statusesFor, LIBRARY_KINDS as KINDS, kindOf, kindsMissing, fillKinds,
   setStatus, addReview, noteAiring, LIBRARY_SORTS, LIBRARY_LAYOUTS, sortEntries, getLibraryDates,
   getCategories, categoriesUnlocked, bulkSetStatus, bulkCategory, bulkRemove,
-} from "@voidation/shared/backend/store";
+} from "@voidpop/shared/backend/store";
 import OptionsSheet from "../../components/ui/OptionsSheet.js";
 import VerdictModal from "../../components/title/VerdictModal.js";
-import { fetchNextEpisodes, fetchKinds } from "@voidation/shared/api/anilist";
+import { fetchNextEpisodes, fetchKinds } from "@voidpop/shared/api/anilist";
 import Chips from "../../components/ui/Chips.js";
 import LibraryCard from "../../components/library/LibraryCard.js";
 import { useTheme } from "../../context/ThemeContext.js";
@@ -27,7 +27,7 @@ import { openDetail } from "../../utils/nav";
 import { VoidmonEmpty } from "../../components/brand/Voidmon.js";
 import PickForMe from "../../components/explore/PickForMe.js";
 import Icon from "../../components/ui/Icon.js";
-import { useSettings } from "@voidation/shared/backend/SettingsContext";
+import { useSettings } from "@voidpop/shared/backend/SettingsContext";
 
 
 export default function LibraryScreen({ navigation }) {

@@ -2,7 +2,7 @@
 // doesn't have, so everything here is loaded only if that native part exists:
 // in Expo Go these calls quietly do nothing; in the real APK they work.
 import { Platform, TurboModuleRegistry } from "react-native";
-import { getSettings } from "@voidation/shared/backend/store";
+import { getSettings } from "@voidpop/shared/backend/store";
 
 export const WIDGET_NAME = "NextEpisodes";
 
@@ -23,7 +23,7 @@ async function render(quick = false) {
     const [rows, settings] = await Promise.all([loadWidgetRows({ quick }), getSettings().catch(() => ({}))]);
     return <NextEpisodesWidget rows={rows} clock24={!!settings.clock24} />;
   } catch {
-    return <WidgetMessage text="Couldn't load your shows. Tap to open Voidation." />;
+    return <WidgetMessage text="Couldn't load your shows. Tap to open VoidPop." />;
   }
 }
 

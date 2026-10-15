@@ -1,4 +1,4 @@
-# Voidation
+# VoidPop
 
 **Anime and manga tracker with live countdowns to the next episode.** A website and an
 Android app, built from one codebase. No sign-up and no API keys: open it and use it.
@@ -43,7 +43,7 @@ Android app, built from one codebase. No sign-up and no API keys: open it and us
 Data comes from the public [AniList](https://anilist.co) GraphQL API, which needs no key.
 
 ```
-voidation/
+voidpop/
 ├── app/      Android + iOS app: Expo / React Native
 ├── web/      Website: React + Vite (frozen)
 └── shared/   Everything both products must agree on, written once:
@@ -98,17 +98,18 @@ eas build -p android --profile preview   # gives you a download link to an .apk
 
 ## History
 
-Voidation started as a fork of VoidPop, my larger pop-culture tracker. It keeps only the
-anime and manga side, with the social feed, accounts and the movie and web-series
-sections taken out, and adds the airing countdowns.
+VoidPop began as a larger pop-culture tracker: anime, manga, movies, web series, a social
+feed and accounts. This codebase is the main VoidPop app now. It currently covers anime,
+manga and novels with the airing countdowns; the rest of the original is being brought back
+in stages, and the social feed (Mesh) is not coming back.
 
 ## Set up AniList sync (free, once)
 
 AniList lets any app sign users in for free; it just needs to know where to send
-them back. Each place Voidation runs needs its own AniList app (one redirect URL each).
+them back. Each place VoidPop runs needs its own AniList app (one redirect URL each).
 
 1. Sign in at anilist.co, open **Settings → Developer → Create new client**.
-2. **App (APK):** name `Voidation`, redirect URL `voidation://auth`. Copy the client id into
+2. **App (APK):** name `VoidPop`, redirect URL `voidation://auth`. Copy the client id into
    `app/.env` as `EXPO_PUBLIC_ANILIST_CLIENT_ID=…`, then build the APK.
    (For EAS, also add it under the build profile's `env`, or as an EAS environment variable.)
 3. **Website:** create a second client with redirect URL `https://<your site>/auth/anilist`
@@ -134,7 +135,7 @@ Install that APK. From then on, after changing code (from `app/`):
 
     npx eas-cli update --channel preview --message "what changed"
 
-Open Voidation, close it completely, open it again: the update is in.
+Open VoidPop, close it completely, open it again: the update is in.
 
 A new APK is only needed when a native library is added or changed (a new
 `expo-*` or `react-native-*` package, or app.json plugins/permissions).

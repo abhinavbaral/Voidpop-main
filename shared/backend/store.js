@@ -1,4 +1,4 @@
-// Voidation data layer. Shared by the app AND the website: every screen talks
+// VoidPop data layer. Shared by the app AND the website: every screen talks
 // ONLY to these functions, so both clients keep the same data in the same shape.
 //
 // There are no accounts. Everything lives in one JSON document on this device
@@ -21,7 +21,7 @@ import { readKey, writeKey } from "./storage.js";
 const DB_KEY = "voidation:db:v1";
 // notifyEpisodes only matters in the app (the website can't schedule alerts)
 // logo: which logo the app shows (see Brand.js): "classic", "voidmon" or "peeking"
-export const DEFAULT_SETTINGS = { clock24: false, posterBadges: true, notifyEpisodes: true, seasonLayout: "grid", logo: "classic", libraryLayout: "compact" };
+export const DEFAULT_SETTINGS = { clock24: false, posterBadges: true, notifyEpisodes: true, seasonLayout: "grid", logo: "classic", libraryLayout: "compact", name: "", nameAsked: false };
 const EMPTY = () => ({ library: {}, reviews: {}, excited: {}, notes: {}, log: [], categories: [], meta: {}, settings: { ...DEFAULT_SETTINGS } });
 
 let cache = null;
@@ -594,8 +594,8 @@ const ANILIST_STATUS = {
 };
 
 // entries: [{ status, progress, updatedAt (unix s), item }] from fetchAniListUserList.
-// A title already in Voidation keeps whichever copy was changed more recently.
-// Verdicts are never touched (AniList scores are numbers; Voidation has none).
+// A title already in VoidPop keeps whichever copy was changed more recently.
+// Verdicts are never touched (AniList scores are numbers; VoidPop has none).
 export async function importAniListEntries(entries) {
   const db = await load();
   const result = { added: 0, updated: 0, kept: 0 };
@@ -620,7 +620,7 @@ export async function importAniListEntries(entries) {
 }
 
 // entries: [{ item, status, progress, times }] from a MyAnimeList export.
-// Titles already in Voidation are left as they are (your copy wins); new ones
+// Titles already in VoidPop are left as they are (your copy wins); new ones
 // are added. times = how many times you finished it on MAL (rewatches).
 export async function importMalEntries(entries) {
   const db = await load();
@@ -722,7 +722,7 @@ export async function fillKinds(found) {
 // at 60 and grow, so each rank takes longer than the last.
 export const TIERS = [
   { key: "newbie", label: "Newbie", min: 0, color: "#9ca3af",
-    title: "You are a Newbie", message: "Welcome to Voidation. Complete anime and finish manga to climb the ranks." },
+    title: "You are a Newbie", message: "Welcome to VoidPop. Complete anime and finish manga to climb the ranks." },
   { key: "rookie", label: "Rookie", min: 5, color: "#60a5fa",
     title: "You are a Rookie", message: "5 anime completed and manga finished. You've started something." },
   { key: "amateur", label: "Amateur", min: 10, color: "#38bdf8",
@@ -856,11 +856,18 @@ export const moodsFor = (verdict) => MOODS_BY_VERDICT[verdict] || [];
 // every mood there is (reviews saved with older moods, like "Made me laugh", still show as they are)
 export const MOODS = Object.values(MOODS_BY_VERDICT).flat();
 
+// Your verdict is never silently rewritten: when you change it, the earlier one
+// is kept in `history` ([{ verdict, date }], oldest first, up to 10).
 export async function addReview(_user, segment, id, { verdict, vibes, moods, comment }) {
   const db = await load();
-  db.reviews[keyOf(segment, id)] = {
+  const key = keyOf(segment, id);
+  const before = db.reviews[key];
+  const history = [...(before?.history || [])];
+  if (before && before.verdict !== verdict) history.push({ verdict: before.verdict, date: before.date });
+  db.reviews[key] = {
     segment, titleId: id, verdict, vibes: vibes || [], moods: moods || [], comment: comment || "",
     date: new Date().toISOString(),
+    ...(history.length ? { history: history.slice(-10) } : {}),
   };
   return save();
 }
@@ -942,7 +949,8 @@ export async function setSetting(key, value) {
 
 export async function exportData() {
   const db = await load();
-  return JSON.stringify({ app: "voidation", version: 1, exportedAt: new Date().toISOString(), ...db }, null, 2);
+  // "app" says "voidpop" now; backups made before the rename say "voidation" and still restore
+  return JSON.stringify({ app: "voidpop", version: 1, exportedAt: new Date().toISOString(), ...db }, null, 2);
 }
 
 // Replaces everything with the backup. Returns an error message, or null on success.
@@ -951,9 +959,9 @@ export async function importData(json) {
   try {
     data = JSON.parse(json);
   } catch {
-    return "That file isn't a Voidation backup.";
+    return "That file isn't a VoidPop backup.";
   }
-  if (data?.app !== "voidation" || typeof data.library !== "object") return "That file isn't a Voidation backup.";
+  if (!["voidpop", "voidation"].includes(data?.app) || typeof data.library !== "object") return "That file isn't a VoidPop backup.";
   cache = {
     library: data.library || {}, reviews: data.reviews || {}, excited: data.excited || {},
     log: Array.isArray(data.log) ? data.log : [],
@@ -983,10 +991,37 @@ export async function exportLibraryCsv() {
       return [seg === "manga" ? "Manga" : "Anime", e.item.title, label, e.progress || 0, totalFor(e.item) ?? "",
         verdict, (e.cats || []).map((c) => catName[c]).filter(Boolean).join("; "), e.item.url || ""].map(cell).join(",");
     });
-  return ["Type,Title,Status,Progress,Total,Verdict,Categories,AniList", ...rows].join("\n") + "\n";
+  return ["Type,Title,Status,Progress,Total,Verdict,Categories,Link", ...rows].join("\n") + "\n";
 }
 
-// Size of everything Voidation has saved, in bytes (Data & storage).
+// Export → Notes (Markdown): every title as a section with its status, verdict,
+// vibes and your private note. Plain text, so it drops straight into Obsidian or
+// any notes app.
+export async function exportLibraryMarkdown() {
+  const db = await load();
+  const catName = Object.fromEntries(db.categories.map((c) => [c.id, c.name]));
+  const entries = Object.entries(db.library).sort((a, b) => a[1].item.title.localeCompare(b[1].item.title));
+  const out = ["# VoidPop library", "", `${entries.length} titles, exported ${new Date().toISOString().slice(0, 10)}.`, ""];
+  for (const [key, e] of entries) {
+    const seg = e.item.segment;
+    const status = statusesFor(seg).find((s) => s.key === e.status)?.label || e.status;
+    const review = db.reviews[key];
+    const verdict = VERDICTS.find((v) => v.key === review?.verdict)?.label;
+    const total = totalFor(e.item);
+    out.push(`## ${e.item.title}`, "", `- Type: ${seg === "manga" ? "Manga" : "Anime"}`, `- Status: ${status}`,
+      `- Progress: ${e.progress || 0}${total != null ? ` of ${total}` : ""}`);
+    if (verdict) out.push(`- Void Verdict: ${verdict}`);
+    if (review?.vibes?.length) out.push(`- Vibes: ${review.vibes.join(", ")}`);
+    const cats = (e.cats || []).map((c) => catName[c]).filter(Boolean);
+    if (cats.length) out.push(`- Categories: ${cats.join(", ")}`);
+    const note = db.notes?.[key]?.text;
+    if (note) out.push("", ...note.split("\n").map((line) => `> ${line}`));
+    out.push("");
+  }
+  return out.join("\n");
+}
+
+// Size of everything VoidPop has saved, in bytes (Data & storage).
 export async function storageSize() {
   return JSON.stringify(await load()).length;
 }

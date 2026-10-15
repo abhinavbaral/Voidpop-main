@@ -2,8 +2,8 @@
 // with the full air time and time zone for friends elsewhere.
 import { useRef, useState } from "react";
 import { Modal, View, Text, Image, TouchableOpacity, StyleSheet } from "react-native";
-import { formatCountdown, shareAirTime } from "@voidation/shared/lib/format";
-import { useSettings } from "@voidation/shared/backend/SettingsContext";
+import { formatCountdown, shareAirTime } from "@voidpop/shared/lib/format";
+import { useSettings } from "@voidpop/shared/backend/SettingsContext";
 import { shareCardImage } from "../../services/shareCard";
 import { notify } from "../../services/notify";
 import { useTheme } from "../../context/ThemeContext.js";

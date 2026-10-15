@@ -1,4 +1,4 @@
-// Work Voidation does while it's CLOSED (Android's scheduled background jobs,
+// Work VoidPop does while it's CLOSED (Android's scheduled background jobs,
 // roughly every hour when the phone allows it):
 //   - the automatic backup, if one is due
 //   - rebuilding episode alerts (so they don't run out if you don't open the app)
@@ -16,11 +16,11 @@ export const TASK = "voidation-background";
 
 async function runAll() {
   const jobs = [
-    () => require("@voidation/shared/features/excited").promoteExcitedNow(), // Excited anime that came out → Watching
+    () => require("@voidpop/shared/features/excited").promoteExcitedNow(), // Excited anime that came out → Watching
     () => (Platform.OS === "android" ? require("./backup").maybeAutoBackup() : null),
     () => require("./episodeAlerts").rescheduleEpisodeAlerts(),
     () => require("../widget").updateWidget(),
-    () => require("@voidation/shared/sync/anilist").syncNow({ reason: "background" }),
+    () => require("@voidpop/shared/sync/anilist").syncNow({ reason: "background" }),
   ];
   // one failing job (no network, folder permission lost…) doesn't stop the rest
   for (const job of jobs) {

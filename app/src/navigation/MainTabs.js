@@ -2,7 +2,7 @@
 // (Browse opens from Explore.)
 import { useEffect, useState } from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { onDataChange, getPending } from "@voidation/shared/backend/store";
+import { onDataChange, getPending } from "@voidpop/shared/backend/store";
 import { useTheme } from "../context/ThemeContext";
 import Icon from "../components/ui/Icon";
 import ExploreScreen from "../screens/explore/ExploreScreen";

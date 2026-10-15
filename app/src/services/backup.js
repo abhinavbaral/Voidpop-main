@@ -1,5 +1,5 @@
 // Automatic backups, the way Mihon does them: you pick a folder once (say
-// Downloads/Voidation), and a backup file is written there on a schedule.
+// Downloads/VoidPop), and a backup file is written there on a schedule.
 // Files in a folder you chose survive uninstalling the app, unlike app storage.
 //
 // The check runs when the app starts, when it comes back to the foreground,
@@ -13,7 +13,7 @@ import {
   StorageAccessFramework as SAF, writeAsStringAsync, readAsStringAsync,
 } from "expo-file-system/legacy";
 import * as DocumentPicker from "expo-document-picker";
-import { exportData, importData } from "@voidation/shared/backend/store";
+import { exportData, importData } from "@voidpop/shared/backend/store";
 
 const KEY = "voidation:backup:v1";
 const HOUR = 3600e3;
@@ -24,7 +24,7 @@ export const FREQUENCIES = [
   { key: "weekly", label: "Weekly", ms: 7 * 24 * HOUR },
 ];
 export const KEEP = 5; // newest backup files kept in the folder
-const PREFIX = "voidation-backup-";
+const PREFIX = "voidpop-backup-";
 
 const DEFAULT = { dirUri: null, dirName: null, freq: "daily", last: null, lastError: null };
 
@@ -44,7 +44,7 @@ async function saveConfig(patch) {
 
 export const setFrequency = (freq) => saveConfig({ freq });
 
-// A readable name for a SAF folder URI, e.g. ".../tree/primary%3ADownload%2FVoidation" → "Download/Voidation"
+// A readable name for a SAF folder URI, e.g. ".../tree/primary%3ADownload%2FVoidPop" → "Download/VoidPop"
 function folderName(uri) {
   try {
     const tail = decodeURIComponent(uri.split("/tree/")[1] || "");

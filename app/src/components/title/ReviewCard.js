@@ -1,14 +1,17 @@
-// Your verdict on a title (Voidation has no public reviews: this is yours alone):
+// Your verdict on a title (VoidPop has no public reviews: this is yours alone):
 // verdict chip, vibe tags, comment, plus Edit and Share.
 
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import { VERDICTS, timeAgo } from "@voidation/shared/backend/store";
+import { VERDICTS, timeAgo } from "@voidpop/shared/backend/store";
 import { useTheme } from "../../context/ThemeContext.js";
 
 export default function ReviewCard({ review, onEdit, onShare }) {
   const { C } = useTheme();
   const styles = makeStyles(C);
   const verdict = VERDICTS.find((v) => v.key === review.verdict);
+  // the verdicts you gave before this one, oldest first, ending with the current one
+  const label = (k) => VERDICTS.find((v) => v.key === k)?.label || k;
+  const chain = [...(review.history || []).map((h) => label(h.verdict)), label(review.verdict)].join(" → ");
 
   return (
     <View style={styles.card}>
@@ -48,6 +51,11 @@ export default function ReviewCard({ review, onEdit, onShare }) {
       </View>
 
       {!!review.comment && <Text style={styles.comment}>{review.comment}</Text>}
+      {review.history?.length > 0 && (
+        <Text style={[styles.meta, { marginTop: 8 }]} accessibilityLabel={`Your verdict over time: ${chain}`}>
+          Over time: {chain}
+        </Text>
+      )}
     </View>
   );
 }

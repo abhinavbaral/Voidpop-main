@@ -1,9 +1,9 @@
 {
-  "name": "@voidation/shared",
+  "name": "@voidpop/shared",
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Logic shared by the Voidation app and website: on-device data layer, AniList client, tiers, countdowns, demo data.",
+  "description": "Logic shared by the VoidPop app and website: on-device data layer, AniList client, tiers, countdowns, demo data.",
   "exports": {
     "./*": "./*.js"
   },
