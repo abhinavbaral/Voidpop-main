@@ -21,7 +21,7 @@ import { loadAnnounced, daysLeft, ANNOUNCED_DAYS } from "@voidpop/shared/feature
 import { useAuth } from "@voidpop/shared/backend/AuthContext";
 import { releaseLabel, durationLabel } from "@voidpop/shared/lib/format";
 import {
-  FREQUENCIES, getBackupConfig, setFrequency, chooseFolder, backupNow, restoreFromFile,
+  FREQUENCIES, getBackupConfig, setFrequency, chooseFolder, backupNow, restoreFromFile, listBackups, restoreFromUri,
 } from "../../services/backup";
 import { ensurePermission, rescheduleEpisodeAlerts } from "../../services/episodeAlerts";
 import AniListSync from "../../components/library/AniListSync.js";
@@ -318,6 +318,7 @@ function DataStorage({ styles, C }) {
   const [importing, setImporting] = useState(false);
   const [message, setMessage] = useState("");
   const [freqOpen, setFreqOpen] = useState(false);
+  const [restoreFiles, setRestoreFiles] = useState(null); // the files in the Voidpop folder, while choosing one
   const measure = useCallback(() => {
     storageSize().then(setSize);
     cacheSize().then(setOfflineSize);
@@ -335,8 +336,8 @@ function DataStorage({ styles, C }) {
   const pickFolder = () => run(async () => {
     const next = await chooseFolder();
     if (next) {
-      await backupNow().catch(() => {}); // first backup right away, so the folder is proven writable
-      setMessage("Backups will be saved to that folder.");
+      const saved = await backupNow().catch(() => null); // first backup right away, so the folder is proven writable
+      setMessage(saved ? `Backups go to the ${next.dirName} folder. First one saved as ${saved.lastFile}.` : `Backups will go to the ${next.dirName} folder.`);
     }
   });
   const shareFile = async (name, text, mime) => {
@@ -345,20 +346,37 @@ function DataStorage({ styles, C }) {
     if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri, { mimeType: mime, dialogTitle: name });
     else await Share.share({ title: name, message: text });
   };
-  // Create backup: into your backup folder if you've chosen one, otherwise share the file
+  // Create backup: the first time (Android) you pick where, and a "Voidpop" folder is
+  // made there; every backup after that is the next popv number in the same folder.
+  // Where there's no folder to choose (iPhone), the file is shared instead.
   const create = () => run(async () => {
     try {
-      if (cfg?.dirUri) { await backupNow(); setMessage("Backup saved to your backup folder."); }
+      if (AUTO_BACKUP) {
+        let dir = cfg?.dirUri ? cfg : await chooseFolder();
+        if (!dir) { setMessage("No folder chosen, so no backup was made."); return; }
+        const saved = await backupNow();
+        setMessage(`Backup saved as ${saved.lastFile} in ${dir.dirName}.`);
+      }
       else await shareFile(`voidpop-backup-${new Date().toISOString().slice(0, 10)}.json`, await exportData(), "application/json");
     } catch { setMessage("Couldn't create the backup. Choose the backup folder again."); }
   });
+  const afterRestore = (err) => {
+    if (err === "cancelled") return;
+    setMessage(err || "Library restored from backup.");
+    if (!err) { reload(); rescheduleEpisodeAlerts(); }
+  };
+  const pickAnyFile = () => run(async () => afterRestore(await restoreFromFile()));
+  // Restore: opens your Voidpop folder as a list (newest first); tap a file and it restores.
+  // With no folder yet, or nothing in it, the system file picker opens instead.
   const restore = () => Alert.alert("Replace your library?", "Everything on this phone will be replaced by the backup you pick.", [
     { text: "Cancel", style: "cancel" },
-    { text: "Pick backup file", style: "destructive", onPress: () => run(async () => {
-      const err = await restoreFromFile();
-      if (err === "cancelled") return;
-      setMessage(err || "Library restored from backup.");
-      if (!err) { reload(); rescheduleEpisodeAlerts(); }
+    { text: "Choose backup", style: "destructive", onPress: () => run(async () => {
+      const files = AUTO_BACKUP ? await listBackups() : null;
+      if (files?.length) setRestoreFiles(files);
+      else {
+        if (files) setMessage("No backups found in your Voidpop folder. Pick a file instead.");
+        afterRestore(await restoreFromFile());
+      }
     }) },
   ]);
   const exportList = () => run(async () => {
@@ -408,9 +426,9 @@ function DataStorage({ styles, C }) {
     <>
       {AUTO_BACKUP && cfg && (
         <>
-          <Row title="Storage location" sub={cfg.dirUri ? cfg.dirName : "Tap to choose a folder, e.g. Download/VoidPop"} onPress={pickFolder} />
+          <Row title="Storage location" sub={cfg.dirUri ? cfg.dirName : "Tap to choose where the Voidpop folder goes, e.g. Documents"} onPress={pickFolder} />
           <Icon name="info" size={18} color={C.faint} />
-          <Text style={[styles.note, { fontSize: 13, marginTop: 4 }]}>Used for automatic backups. A folder you choose survives uninstalling the app.</Text>
+          <Text style={[styles.note, { fontSize: 13, marginTop: 4 }]}>Backups are saved here as popv1, popv2 and so on. A folder you choose survives uninstalling the app.</Text>
         </>
       )}
 
@@ -457,6 +475,20 @@ function DataStorage({ styles, C }) {
       {importing && <VoidmonLoading text="Bringing your MyAnimeList list over…" />}
       {!!message && <Text style={[styles.note, { marginTop: 12 }]}>{message}</Text>}
 
+      <OptionsSheet
+        visible={restoreFiles !== null}
+        title="Choose a backup to restore"
+        options={[
+          ...(restoreFiles || []).map((f, i) => ({ key: f.uri, label: `${f.name}${i === 0 ? "  (newest)" : ""}` })),
+          { key: "__other", label: "Choose another file…" },
+        ]}
+        onPick={(k) => {
+          setRestoreFiles(null);
+          if (k === "__other") pickAnyFile();
+          else run(async () => afterRestore(await restoreFromUri(k)));
+        }}
+        onClose={() => setRestoreFiles(null)}
+      />
       <OptionsSheet
         visible={freqOpen}
         title="Automatic backup frequency"
@@ -809,7 +841,7 @@ function AniListPage({ styles, C }) {
 
 const FAQ = [
   ["Where is my library saved?", "On this phone. There is no account and nothing is uploaded. Use Data and storage to back it up."],
-  ["How do I move to a new phone?", "Copy a backup file from your backup folder (or Share backup), then use Restore from file on the new phone."],
+  ["How do I move to a new phone?", "Copy the Voidpop folder (or one popv file) to the new phone, then tap Restore backup and choose the file."],
   ["Can I bring my AniList lists?", "Yes, two ways under More → AniList: sign in to keep them in sync both ways, or import once by username (public lists; nothing is changed on AniList)."],
   ["What does Delayed mean?", "The next episode was going to air earlier, and its date has since moved later. VoidPop shows the original date next to the new one."],
   ["Does uninstalling delete my library?", "The library inside the app, yes. Backups in the folder you chose under Data and storage stay, so you can restore them after reinstalling."],

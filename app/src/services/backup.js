@@ -1,6 +1,7 @@
-// Automatic backups, the way Mihon does them: you pick a folder once (say
-// Downloads/VoidPop), and a backup file is written there on a schedule.
-// Files in a folder you chose survive uninstalling the app, unlike app storage.
+// Backups, the way Mihon does them: the first time, you pick where; the app
+// creates a folder called "Voidpop" there and saves popv1, popv2, popv3 … into it,
+// by hand (Create backup) or on a schedule. Restore opens that same folder and
+// you tap a file. Files in a folder you chose survive uninstalling the app.
 //
 // The check runs when the app starts, when it comes back to the foreground,
 // and in Android's background jobs while it's closed (see backgroundWork.js).
@@ -14,6 +15,7 @@ import {
 } from "expo-file-system/legacy";
 import * as DocumentPicker from "expo-document-picker";
 import { exportData, importData } from "@voidpop/shared/backend/store";
+import { BACKUP_FOLDER, backupNumber, nextBackupNumber, sortBackups } from "@voidpop/shared/lib/backupNames";
 
 const KEY = "voidation:backup:v1";
 const HOUR = 3600e3;
@@ -23,10 +25,9 @@ export const FREQUENCIES = [
   { key: "daily", label: "Daily", ms: 24 * HOUR },
   { key: "weekly", label: "Weekly", ms: 7 * 24 * HOUR },
 ];
-export const KEEP = 5; // newest backup files kept in the folder
-const PREFIX = "voidpop-backup-";
+export const KEEP = 5; // newest numbered backups kept in the folder
 
-const DEFAULT = { dirUri: null, dirName: null, freq: "daily", last: null, lastError: null };
+const DEFAULT = { dirUri: null, dirName: null, freq: "daily", last: null, lastFile: null, lastError: null };
 
 export async function getBackupConfig() {
   try {
@@ -54,23 +55,44 @@ function folderName(uri) {
   }
 }
 
-// Android's folder picker. Returns the new config, or null if cancelled.
+// the last part of a SAF uri, decoded: ".../document/primary%3ADocuments%2FVoidpop%2Fpopv1.json" → "popv1.json"
+function leafName(uri) {
+  try {
+    return decodeURIComponent(uri).split("/").pop().split(":").pop();
+  } catch {
+    return "";
+  }
+}
+
+// Android's folder picker: you choose where, and the backups go in a "Voidpop"
+// folder inside it (reused if it is already there, e.g. after reinstalling; used
+// as is if you picked a folder with that name). Returns the config, or null if cancelled.
 export async function chooseFolder() {
   const res = await SAF.requestDirectoryPermissionsAsync();
   if (!res.granted) return null;
-  return saveConfig({ dirUri: res.directoryUri, dirName: folderName(res.directoryUri), lastError: null });
+  const picked = res.directoryUri;
+  let dirUri = picked;
+  let dirName = folderName(picked);
+  if (leafName(picked).toLowerCase() !== BACKUP_FOLDER.toLowerCase()) {
+    const existing = (await SAF.readDirectoryAsync(picked)).find((u) => leafName(u).toLowerCase() === BACKUP_FOLDER.toLowerCase());
+    dirUri = existing || (await SAF.makeDirectoryAsync(picked, BACKUP_FOLDER));
+    dirName = `${dirName}/${BACKUP_FOLDER}`;
+  }
+  return saveConfig({ dirUri, dirName, lastError: null });
 }
 
-// Writes one backup file now, then deletes all but the newest KEEP.
+// Writes the next numbered backup (popv1, popv2 …) into the Voidpop folder, then
+// deletes all but the newest KEEP. Returns the config; `lastFile` is the new name.
 export async function backupNow() {
   const cfg = await getBackupConfig();
   if (!cfg.dirUri) throw new Error("Choose a backup folder first.");
   try {
-    const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-"); // 2026-09-28-16-21
-    const fileUri = await SAF.createFileAsync(cfg.dirUri, `${PREFIX}${stamp}`, "application/json");
+    const names = (await SAF.readDirectoryAsync(cfg.dirUri)).map(leafName);
+    const name = `popv${nextBackupNumber(names)}`;
+    const fileUri = await SAF.createFileAsync(cfg.dirUri, name, "application/json");
     await writeAsStringAsync(fileUri, await exportData());
     await prune(cfg.dirUri);
-    return saveConfig({ last: new Date().toISOString(), lastError: null });
+    return saveConfig({ last: new Date().toISOString(), lastFile: name, lastError: null });
   } catch (e) {
     // most often: the folder was deleted or its permission revoked
     await saveConfig({ lastError: "Couldn't write to the backup folder. Choose it again." });
@@ -79,11 +101,12 @@ export async function backupNow() {
 }
 
 async function prune(dirUri) {
-  const files = (await SAF.readDirectoryAsync(dirUri))
-    .filter((u) => decodeURIComponent(u).includes(PREFIX))
-    .sort(); // timestamped names sort oldest → newest
-  const extra = files.slice(0, Math.max(0, files.length - KEEP));
-  for (const uri of extra) {
+  // only the numbered popv files are ever deleted; anything else in the folder is left alone
+  const numbered = (await SAF.readDirectoryAsync(dirUri))
+    .map((uri) => ({ uri, name: leafName(uri) }))
+    .filter((f) => backupNumber(f.name) != null);
+  const extra = sortBackups(numbered).slice(KEEP); // sorted newest first
+  for (const { uri } of extra) {
     try { await SAF.deleteAsync(uri); } catch { /* keep going */ }
   }
 }
@@ -102,7 +125,32 @@ export async function maybeAutoBackup() {
   }
 }
 
-// Pick any backup file (from the backup folder, Downloads, Drive…) and restore it.
+// The backups in your Voidpop folder, newest first: [{ uri, name }]. Null when no
+// folder has been chosen yet; [] when it can't be read.
+export async function listBackups() {
+  const cfg = await getBackupConfig();
+  if (!cfg.dirUri) return null;
+  try {
+    const files = (await SAF.readDirectoryAsync(cfg.dirUri))
+      .map((uri) => ({ uri, file: leafName(uri) }))
+      .filter((f) => backupNumber(f.file) != null || /\.json$/i.test(f.file))
+      .map((f) => ({ uri: f.uri, name: f.file.replace(/\.json$/i, "") }));
+    return sortBackups(files);
+  } catch {
+    return [];
+  }
+}
+
+// Restore the file you tapped in that list. Returns an error message or null on success.
+export async function restoreFromUri(uri) {
+  try {
+    return await importData(await readAsStringAsync(uri));
+  } catch {
+    return "Couldn't read that file.";
+  }
+}
+
+// Pick any backup file (Downloads, Drive, another phone's copy…) and restore it.
 // Returns an error message, "cancelled", or null on success.
 export async function restoreFromFile() {
   const res = await DocumentPicker.getDocumentAsync({ type: ["application/json", "text/plain", "*/*"], copyToCacheDirectory: true });
