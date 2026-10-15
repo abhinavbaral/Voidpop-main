@@ -695,6 +695,7 @@ export function kindOf(item) {
   return item.format === "NOVEL" ? "novel" : "manga";
 }
 export const kindLabel = (item) => LIBRARY_KINDS.find((k) => k.key === kindOf(item))?.label;
+const KIND_NAME = { anime: "Anime", manga: "Manga", novel: "Novel" };
 
 // keys of library manga that don't know their format yet (so a novel
 // can't be told apart from a manga)
@@ -988,7 +989,7 @@ export async function exportLibraryCsv() {
       const seg = e.item.segment;
       const label = statusesFor(seg).find((s) => s.key === e.status)?.label || e.status;
       const verdict = VERDICTS.find((v) => v.key === db.reviews[key]?.verdict)?.label || "";
-      return [seg === "manga" ? "Manga" : "Anime", e.item.title, label, e.progress || 0, totalFor(e.item) ?? "",
+      return [KIND_NAME[kindOf(e.item)], e.item.title, label, e.progress || 0, totalFor(e.item) ?? "",
         verdict, (e.cats || []).map((c) => catName[c]).filter(Boolean).join("; "), e.item.url || ""].map(cell).join(",");
     });
   return ["Type,Title,Status,Progress,Total,Verdict,Categories,Link", ...rows].join("\n") + "\n";
@@ -1008,7 +1009,7 @@ export async function exportLibraryMarkdown() {
     const review = db.reviews[key];
     const verdict = VERDICTS.find((v) => v.key === review?.verdict)?.label;
     const total = totalFor(e.item);
-    out.push(`## ${e.item.title}`, "", `- Type: ${seg === "manga" ? "Manga" : "Anime"}`, `- Status: ${status}`,
+    out.push(`## ${e.item.title}`, "", `- Type: ${KIND_NAME[kindOf(e.item)]}`, `- Status: ${status}`,
       `- Progress: ${e.progress || 0}${total != null ? ` of ${total}` : ""}`);
     if (verdict) out.push(`- Void Verdict: ${verdict}`);
     if (review?.vibes?.length) out.push(`- Vibes: ${review.vibes.join(", ")}`);
