@@ -17,6 +17,7 @@
 // the account version didn't have to change. It is always the local user.
 
 import { readKey, writeKey } from "./storage.js";
+import { fillerFor, canSkip, countIn, inRanges, addRange, removeRange, lastListed } from "../features/fillers.js";
 
 const DB_KEY = "voidation:db:v1";
 // notifyEpisodes only matters in the app (the website can't schedule alerts)
@@ -93,16 +94,19 @@ export function statusesFor(segment) {
     { key: "completed", label: reading ? "Finished" : "Completed" },
     { key: "rewatching", label: reading ? "Rereading" : "Rewatching" },
     { key: "plan", label: reading ? "Plan to Read" : "Plan to Watch" },
+    // Undecided: you're not sure you'll watch/read it. Kept on this phone only (AniList has no
+    // such status), left off Schedule, alerts, the widget and the stats.
+    { key: "considering", label: "Considering" },
     { key: "onhold", label: "On Hold" },
     { key: "dropped", label: "Dropped" },
   ];
 }
 
-// Not out yet: you can only plan it (and mark Excited). Watching, Completed,
+// Not out yet: you can only plan or consider it (and mark Excited). Watching, Completed,
 // On Hold, Dropped, progress and verdicts open once it starts airing.
 export function statusesAllowed(item) {
   const all = statusesFor(item.segment);
-  return item.unreleased ? all.filter((s) => s.key === "plan") : all;
+  return item.unreleased ? all.filter((s) => s.key === "plan" || s.key === "considering") : all;
 }
 
 export async function getLibrary() {
@@ -186,6 +190,60 @@ export function pastWrapUp(item, now = Date.now()) {
   return Number.isNaN(end) ? true : now - end > WRAP_UP_DAYS * 86400000;
 }
 
+/* ---------- skipped episodes: filler / anime canon you chose not to watch ---------- */
+// entry.skipped = episode ranges, e.g. [[54, 61]]. Skipped episodes count toward
+// finishing a show but are not "watched": they stay out of the stats, the
+// achievements and the "behind" counts. progress is still the episode you're up to.
+// Anime only, and local only (AniList has no such thing, so nothing is synced).
+
+export const skippedOf = (entry) => entry?.skipped || [];
+// how many of the first `upTo` episodes you skipped
+export const skippedUpTo = (entry, upTo) => countIn(skippedOf(entry), 1, upTo);
+// episodes you actually watched up to there (default: up to your progress)
+export const watchedOf = (entry, upTo = entry?.progress || 0) => Math.max(0, upTo - skippedUpTo(entry, upTo));
+// the next episode you still have to watch: after your progress, past any skipped ones
+export function nextToWatch(entry) {
+  const skipped = skippedOf(entry);
+  let n = (entry?.progress || 0) + 1;
+  while (inRanges(skipped, n)) n++;
+  return n;
+}
+
+// Skip episodes from..to. Only filler and anime-canon episodes (per the filler
+// database) that you haven't reached yet can be skipped; anything else in the
+// range is left alone. Returns how many were newly skipped.
+export async function skipEpisodes(item, from, to = from) {
+  const db = await load();
+  const e = db.library[keyOf("anime", item.id)];
+  const info = fillerFor({ ...item, segment: "anime" });
+  if (!e || !info || e.item.segment !== "anime") return { skipped: 0 };
+  const last = Math.min(to, totalFor(item) || lastListed(info));
+  let next = skippedOf(e);
+  let skipped = 0;
+  for (let ep = Math.max(from, (e.progress || 0) + 1); ep <= last; ep++) {
+    if (canSkip(info, ep) && !inRanges(next, ep)) { next = addRange(next, ep); skipped++; }
+  }
+  if (!skipped) return { skipped: 0 };
+  e.skipped = next;
+  e.updatedAt = new Date().toISOString();
+  await save();
+  return { skipped };
+}
+
+// Put skipped episodes back (they become unseen again).
+export async function unskipEpisodes(item, from, to = from) {
+  const db = await load();
+  const e = db.library[keyOf("anime", item.id)];
+  if (!e || !skippedOf(e).length) return { unskipped: 0 };
+  const before = countIn(e.skipped, from, to);
+  if (!before) return { unskipped: 0 };
+  const next = removeRange(e.skipped, from, to);
+  if (next.length) e.skipped = next; else delete e.skipped;
+  e.updatedAt = new Date().toISOString();
+  await save();
+  return { unskipped: before };
+}
+
 // Library badge: episodes (or chapters) that are out and you haven't watched.
 // 24-episode show, 23 out, watched 3 → 20. Watched all 23 → 0 (no badge).
 // Completed → 0. Ongoing manga (no known chapter count) → null (no badge).
@@ -194,7 +252,9 @@ export function leftToWatch(entry) {
   const item = entry.item;
   const out = item.segment === "anime" ? airedFor(item) ?? totalFor(item) : totalFor(item);
   if (out == null) return null;
-  return Math.max(0, out - (entry.progress || 0));
+  if (entry.status === "considering") return null; // undecided: no "new episodes" badge
+  const progress = entry.progress || 0;
+  return Math.max(0, out - progress - countIn(skippedOf(entry), progress + 1, out)); // skipped ones aren't "to watch"
 }
 
 // Completed means everything is watched / read: "✓ All 12 watched".
@@ -222,7 +282,9 @@ export async function fillCompleted(item) {
 // How many aired episodes you haven't watched yet (anime only).
 export function behindBy(entry) {
   const aired = airedFor(entry.item);
-  return aired == null ? 0 : Math.max(0, aired - (entry.progress || 0));
+  if (aired == null) return 0;
+  const progress = entry.progress || 0;
+  return Math.max(0, aired - progress - countIn(skippedOf(entry), progress + 1, aired));
 }
 
 // The highest progress allowed: anime can't pass what has aired; manga can't
@@ -258,14 +320,20 @@ export async function setProgress(_user, item, n, source = "plus") {
   const total = totalFor(item);
   const max = maxProgress(item);
   let progress = Math.max(0, Math.floor(Number(n) || 0));
+  const was = prev?.progress || 0;
+  const skipped = skippedOf(prev);
+  // "+1" means the next episode you actually watch: jump over skipped ones
+  if (source === "plus" && progress === was + 1) { while (inRanges(skipped, progress)) progress++; }
   if (max != null) progress = Math.min(progress, max);
   let status = prev?.status || null;
-  if (progress > (prev?.progress || 0) && (!status || ["plan", "onhold", "dropped"].includes(status))) status = "watching";
+  if (progress > (prev?.progress || 0) && (!status || ["plan", "considering", "onhold", "dropped"].includes(status))) status = "watching";
   if (!status) status = "watching";
   // finishing a rewatch: back to Completed, one more rewatch counted, no verdict prompt
   const rewatchDone = status === "rewatching" && !!total && progress >= total;
   if (rewatchDone) status = "completed";
-  logChange(db, key, progress - (prev?.progress || 0), source);
+  // the log counts episodes WATCHED: skipped ones in between don't count (stats, streaks, achievements)
+  const change = progress >= was ? (progress - was) - countIn(skipped, was + 1, progress) : -((was - progress) - countIn(skipped, progress + 1, was));
+  logChange(db, key, change, source);
   logStatus(db, key, prev?.status, status);
   db.library[key] = {
     ...(prev ? {} : { addedAt: new Date().toISOString() }), // when it joined your library (Library → Date added)
@@ -395,8 +463,8 @@ export async function bulkSetStatus(keys, status) {
   const db = await load();
   for (const k of keys) {
     const e = db.library[k];
-    // a title that isn't out yet can only be planned
-    if (e && (status === "plan" || !e.item.unreleased)) await setStatus(null, e.item.segment, e.item, status);
+    // a title that isn't out yet can only be planned or considered
+    if (e && (status === "plan" || status === "considering" || !e.item.unreleased)) await setStatus(null, e.item.segment, e.item, status);
   }
 }
 export async function bulkCategory(keys, catId, add) {
@@ -646,7 +714,7 @@ export async function importMalEntries(entries) {
 
 export async function getStats() {
   const entries = Object.values((await load()).library);
-  const sum = (seg) => entries.filter((e) => (e.item.segment === "manga") === (seg === "manga")).reduce((n, e) => n + (e.progress || 0), 0);
+  const sum = (seg) => entries.filter((e) => (e.item.segment === "manga") === (seg === "manga")).reduce((n, e) => n + (seg === "manga" ? e.progress || 0 : watchedOf(e)), 0);
   const completed = entries.filter((e) => isDone(e.status)); // rewatching still counts as finished
   const by = (seg) => completed.filter((e) => e.item.segment === seg).length;
   // per list, per status: { anime: { watching: 3, completed: 9, … }, manga: {…} }
@@ -666,7 +734,7 @@ export async function getStats() {
     // your entries (a title without a known length counts what you've marked)
     episodesTotal: entries.filter((e) => e.item.segment !== "manga").reduce((n, e) => n + Math.max(totalFor(e.item) || 0, e.progress || 0), 0),
     chaptersTotal: entries.filter((e) => e.item.segment === "manga").reduce((n, e) => n + Math.max(totalFor(e.item) || 0, e.progress || 0), 0),
-    minutesWatched: entries.filter((e) => e.item.segment !== "manga").reduce((n, e) => n + (e.progress || 0) * (e.item.duration || 24), 0),
+    minutesWatched: entries.filter((e) => e.item.segment !== "manga").reduce((n, e) => n + watchedOf(e) * (e.item.duration || 24), 0),
     inLibrary: { anime: entries.filter((e) => e.item.segment !== "manga").length, manga: entries.filter((e) => e.item.segment === "manga").length },
     byStatus,
     verdicts: Object.keys((await load()).reviews).length,
@@ -695,6 +763,7 @@ export function kindOf(item) {
   return item.format === "NOVEL" ? "novel" : "manga";
 }
 export const kindLabel = (item) => LIBRARY_KINDS.find((k) => k.key === kindOf(item))?.label;
+// the three library headings: Manga covers manga, manhwa and manhua; Novel covers light and web novels
 const KIND_NAME = { anime: "Anime", manga: "Manga", novel: "Novel" };
 
 // keys of library manga that don't know their format yet (so a novel

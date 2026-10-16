@@ -13,6 +13,7 @@ import WhereToWatch from "../../components/title/WhereToWatch";
 import WhereToRead from "../../components/title/WhereToRead";
 import SourceLine from "../../components/title/SourceLine.js";
 import CastCrew from "../../components/title/CastCrew.js";
+import FillerGuide from "../../components/title/FillerGuide.js";
 import { loadFamiliarFaces } from "@voidpop/shared/features/peopleStats";
 import EpisodeList from "../../components/title/EpisodeList.js";
 import { NoteBox, WatchOrder } from "../../components/title/TitleExtras.js";
@@ -378,6 +379,7 @@ function DetailBody({ item, navigation }) {
           {!unreleased && status !== "completed" && (status || progress > 0) && (
             <ProgressBox item={{ ...item, nextEpisode }} progress={progress} onChange={changeProgress} styles={styles} C={C} />
           )}
+          {item.segment === "anime" && <FillerGuide item={item} progress={progress} />}
 
           {item.segment === "manga" ? <WhereToRead links={read} /> : <WhereToWatch links={watch} youtube={youtube} segment={item.segment} />}
           <NoteBox item={item} />

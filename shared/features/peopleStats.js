@@ -30,9 +30,12 @@ async function loadCredits() {
   try { return JSON.parse((await readKey(KEY)) || "{}"); } catch { return {}; }
 }
 
+// titles you haven't started or may never start: they don't count as watched
+const NOT_WATCHED = new Set(["plan", "considering"]);
+
 // Pure: turn library entries + credits into ranked lists. Exported for tests.
 export function tallyPeople(entries, credits, limit = 10) {
-  const counted = entries.filter((e) => e.status !== "plan");
+  const counted = entries.filter((e) => !NOT_WATCHED.has(e.status));
   const tally = { genres: new Map(), studios: new Map(), voices: new Map(), directors: new Map(), creators: new Map() };
   const add = (kind, key, base, item) => {
     const row = tally[kind].get(key) || { ...base, titles: [] };
@@ -68,7 +71,7 @@ export function tallyPeople(entries, credits, limit = 10) {
 export function familiarFaces(entries, credits, exceptKey) {
   const counts = {};
   for (const e of entries) {
-    if (e.status === "plan") continue;
+    if (NOT_WATCHED.has(e.status)) continue;
     const key = `${e.item.segment}:${e.item.id}`;
     const c = credits[key];
     if (key === exceptKey || !c) continue;
@@ -89,7 +92,7 @@ export async function loadPeopleStats({ onProgress } = {}) {
   const entries = Object.values(await getLibrary());
   const credits = await loadCredits();
   const now = Date.now();
-  const need = entries.filter((e) => e.status !== "plan")
+  const need = entries.filter((e) => !NOT_WATCHED.has(e.status))
     .map((e) => `${e.item.segment}:${e.item.id}`)
     .filter((k) => !credits[k] || now - credits[k].at > STALE_MS);
   let missing = 0;

@@ -122,6 +122,9 @@ async function push() {
   const s = await loadState();
   if (!s?.token) return;
   for (const [key, op] of Object.entries({ ...(s.queue || {}) })) {
+    // Considering lives on this phone only: AniList has no such status, so it is never sent
+    // (a title already on AniList stays there as it was)
+    if (op.status === "considering") { delete s.queue[key]; await saveState(); continue; }
     try {
       if (op.status === null) {
         await deleteListEntry(s.token, { listId: s.ids?.[key], userId: s.user.id, mediaId: op.mediaId });

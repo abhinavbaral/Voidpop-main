@@ -11,7 +11,7 @@
 //   through several goals; it also has { levels, level, maxLevel }. `need` is then the
 //   next goal, and `done` means the top level is reached.
 
-import { getLog, getLibrary, getReviews, totalFor, isDone, getRanksCollected } from "../backend/store.js";
+import { getLog, getLibrary, getReviews, totalFor, isDone, skippedUpTo, getRanksCollected } from "../backend/store.js";
 
 const dayStart = (t) => { const d = new Date(t); return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(); };
 const isProgress = ([, , change, source]) => change > 0 && source !== "complete" && !String(source).startsWith("status:");
@@ -45,7 +45,11 @@ export function longestStreak(log) {
 export async function computeAchievements() {
   const [log, lib, reviews] = await Promise.all([getLog(), getLibrary(), getReviews()]);
   const entries = Object.values(lib);
-  const amount = (e) => (isDone(e.status) ? Math.max(e.progress || 0, totalFor(e.item) || 0) : e.progress || 0);
+  // episodes watched: skipped filler is not counted (chapters have no skipping)
+  const amount = (e) => {
+    const n = isDone(e.status) ? Math.max(e.progress || 0, totalFor(e.item) || 0) : e.progress || 0;
+    return e.item.segment === "anime" ? Math.max(0, n - skippedUpTo(e, n)) : n;
+  };
   const episodes = entries.filter((e) => e.item.segment === "anime").reduce((n, e) => n + amount(e), 0);
   const chapters = entries.filter((e) => e.item.segment === "manga").reduce((n, e) => n + amount(e), 0);
   const doneAll = entries.filter((e) => isDone(e.status)).length;

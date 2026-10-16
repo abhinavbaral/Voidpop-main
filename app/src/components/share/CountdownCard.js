@@ -2,6 +2,7 @@
 // DAY / HOURS / MINS / SECS countdown, and your pending episodes with +1.
 import { View, Text, Image, TouchableOpacity, StyleSheet } from "react-native";
 import { countdownParts, dayLabel, airTime } from "@voidpop/shared/lib/format";
+import { nextToWatch } from "@voidpop/shared/backend/store";
 import { useTheme } from "../../context/ThemeContext.js";
 
 const STATUS = { plan: "Plan to Watch", onhold: "On Hold" };
@@ -49,7 +50,7 @@ export default function CountdownCard({ show, now, clock24, onPlus, onOpen, widt
               <>
                 <Text style={styles.pending}>{pending} pending</Text>
                 <TouchableOpacity onPress={() => onPlus(entry)} style={styles.plus} hitSlop={6}
-                  accessibilityLabel={`Watched episode ${(entry.progress || 0) + 1} of ${item.title}`}>
+                  accessibilityLabel={`Watched episode ${nextToWatch(entry)} of ${item.title}`}>
                   <Text style={styles.plusText}>+1</Text>
                 </TouchableOpacity>
               </>

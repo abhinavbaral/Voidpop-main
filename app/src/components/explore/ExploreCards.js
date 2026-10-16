@@ -9,7 +9,7 @@ import { useCallback, useEffect, useState } from "react";
 import { View, Text, Image, ScrollView, Pressable, StyleSheet, useWindowDimensions } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import Svg, { Defs, LinearGradient, Stop, Rect } from "react-native-svg";
-import { getLibrary, getExcited, yourShows, onDataChange, noteAiring, behindBy, setProgress, setStatus, addReview } from "@voidpop/shared/backend/store";
+import { getLibrary, getExcited, yourShows, onDataChange, noteAiring, behindBy, nextToWatch, setProgress, setStatus, addReview } from "@voidpop/shared/backend/store";
 import { useAuth } from "@voidpop/shared/backend/AuthContext";
 import { fetchNextEpisodes } from "@voidpop/shared/api/anilist";
 import { useNow } from "@voidpop/shared/lib/useNow";
@@ -49,7 +49,7 @@ export function NewEpisodeCards({ onOpen }) {
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingHorizontal: 14, paddingTop: 14 }}>
       {shows.map(({ item, entry, pending }) => {
-        const nextEp = (entry.progress || 0) + 1;
+        const nextEp = nextToWatch(entry); // past any skipped filler
         return (
           <Pressable key={item.id} onPress={() => onOpen(item)} style={s.epCard} accessibilityRole="button"
             accessibilityLabel={`${item.title}: ${pending} new episode${pending === 1 ? "" : "s"}, next is episode ${nextEp}`}>
@@ -173,7 +173,7 @@ export function Countdowns({ onOpen }) {
                   <View style={{ flex: 1 }} />
                   {behind(item.id) > 0 && (
                     <Pressable onPress={() => plus(item.id)} hitSlop={8} style={[s.plus, { backgroundColor: C.orange }]} accessibilityRole="button"
-                      accessibilityLabel={`Mark episode ${(watching[item.id].progress || 0) + 1} watched, ${behind(item.id)} to catch up`}>
+                      accessibilityLabel={`Mark episode ${nextToWatch(watching[item.id])} watched, ${behind(item.id)} to catch up`}>
                       <Text style={s.plusText}>+1</Text>
                       <Text style={s.plusSub}>{behind(item.id)} to watch</Text>
                     </Pressable>

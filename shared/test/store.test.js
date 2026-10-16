@@ -11,7 +11,7 @@ const lib = async () => s.getLibrary();
 test("Completed fills progress; statuses include Rewatching / Rereading", async () => {
   await s.setStatus(null, "anime", anime(1), "completed");
   assert.equal((await lib())["anime:1"].progress, 12);
-  assert.deepEqual(s.statusesFor("manga").map((x) => x.label), ["Reading", "Finished", "Rereading", "Plan to Read", "On Hold", "Dropped"]);
+  assert.deepEqual(s.statusesFor("manga").map((x) => x.label), ["Reading", "Finished", "Rereading", "Plan to Read", "Considering", "On Hold", "Dropped"]);
 });
 
 test("progress is capped at what has aired and starts a planned title", async () => {

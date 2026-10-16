@@ -1,9 +1,14 @@
-
+// More > Compare: set 1 to 5 titles against 1 to 5 others (1 v 1 up to 5 v 5).
+// A title can come from your library or not: search finds anything on AniList, so
+// you can also compare things you haven't watched yet. Each side is shown with
+// status, progress, your Void Verdict, length, genres and your note, and a side
+// with several titles gets a short total. Nothing here is a score.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import { View, Text, Image, Modal, FlatList, TextInput, TouchableOpacity, StyleSheet } from "react-native";
 import { fetchAniList } from "@voidpop/shared/api/anilist";
 import { getLibrary, getReviews, getNote, statusesFor, totalFor, isDone, kindOf, VERDICTS } from "@voidpop/shared/backend/store";
+import { fillerFor, fillerSummary } from "@voidpop/shared/features/fillers";
 import { useTheme } from "../../context/ThemeContext.js";
 
 const MAX = 5; // titles per side
@@ -99,11 +104,14 @@ export default function CompareTitles() {
     const r = reviews[key];
     const v = VERDICTS.find((x) => x.key === r?.verdict);
     const total = totalFor(item);
+    const fi = fillerFor(item);
+    const fs = fi ? fillerSummary(fi, item) : null;
     return {
       Type: KIND[kindOf(item)],
       Status: entry ? (statusesFor(item.segment).find((s) => s.key === entry.status)?.label || entry.status) : "Not in your library",
       Progress: entry ? `${entry.progress || 0}${total != null ? ` of ${total}` : ""}` : "Not started",
       "Void Verdict": v ? { text: v.label, color: v.color } : "Not given yet",
+      Filler: fs ? `${fs.filler} of ${fs.total} (${fs.percent}%)${fs.animeCanon ? ` · ${fs.animeCanon} anime canon` : ""}` : null, // only for shows in the filler database
       Length: total != null ? `${total} ${item.segment === "manga" ? "chapters" : "episodes"}` : "Unknown",
       Genres: (item.genres || []).slice(0, 3).join(", ") || "None listed",
       Aired: (item.date || "").slice(0, 4) || "Unknown",
@@ -113,7 +121,7 @@ export default function CompareTitles() {
   };
   const ready = groups[0].length > 0 && groups[1].length > 0;
   const facts = groups.map((g) => g.map(factsOf));
-  const labels = ["Type", "Status", "Progress", "Void Verdict", "Length", "Genres", "Aired", ...(facts.flat().some((f) => f.Vibes) ? ["Vibes"] : []), "Your note"];
+  const labels = ["Type", "Status", "Progress", "Void Verdict", "Length", ...(facts.flat().some((f) => f.Filler) ? ["Filler"] : []), "Genres", "Aired", ...(facts.flat().some((f) => f.Vibes) ? ["Vibes"] : []), "Your note"];
   const several = groups.some((g) => g.length > 1);
   const tally = (g) => VERDICTS.map((v) => [v.label, g.filter((t) => reviews[t.key]?.verdict === v.key).length]).filter(([, n]) => n).map(([l, n]) => `${l} ${n}`).join(" · ") || "None given";
   const totals = several ? [
@@ -196,7 +204,7 @@ export default function CompareTitles() {
         <View key={label} style={styles.block}>
           <Text style={styles.label}>{label}</Text>
           <View style={{ flexDirection: "row", gap: 12 }}>
-            {facts.map((f, i) => <Cell key={i} side={i} styles={styles} values={f.map((x) => x[label] ?? "None")} />)}
+            {facts.map((f, i) => <Cell key={i} side={i} styles={styles} values={f.map((x) => x[label] ?? (label === "Filler" ? "No filler data" : "None"))} />)}
           </View>
         </View>
       ))}
