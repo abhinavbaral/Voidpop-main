@@ -1,14 +1,18 @@
-// EXPLORE — the homepage. Pull down for new picks (everything reshuffles
-// except Anime of the Year). Browse opens from the button at the top.
+// EXPLORE — the homepage. Your live trackers on top (new episodes, Coming up), then a
+// fixed grid of category tiles like Spotify's Search page. The tile titles never change
+// or disappear; tap one for its shows. Pull down (or press Reroll in a category) for new
+// shows in every tile that can be rerolled; fixed lists (Most loved, Trending, Coming soon,
+// Anime of the Year, Jump back in, New seasons) just reload.
+// Browse opens from the button at the top.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import { FlatList, View, Text, TouchableOpacity, StyleSheet, RefreshControl, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import PosterRow from "../../components/ui/PosterRow.js";
 import { loadCategoryRows } from "@voidpop/shared/backend/store";
 import Brand from "../../components/brand/Brand.js";
-import { loadExplorePools, buildExplore, knownKeys, loadVerdictRows, loadNewSeasons, loadAnimeOfTheYear, loadJumpBackIn } from "@voidpop/shared/features/explore";
+import { buildExplore } from "@voidpop/shared/features/explore";
 import { greetingFor } from "@voidpop/shared/lib/greeting";
 import { useSettings } from "@voidpop/shared/backend/SettingsContext";
 import NamePrompt from "../../components/welcome/NamePrompt.js";
@@ -19,121 +23,43 @@ import Icon from "../../components/ui/Icon.js";
 import AnimatedBanner from "../../components/brand/AnimatedBanner.js";
 import { NewEpisodeCards, Countdowns } from "../../components/explore/ExploreCards.js";
 import Billboard from "../../components/explore/Billboard.js";
-import { COUNTRIES } from "./TrendsScreen.js";
-import { fetchAniList } from "@voidpop/shared/api/anilist";
-
+import TileGrid from "../../components/explore/TileGrid.js";
+import { useExplore, initExplore, refreshPersonal, rerollAll } from "../../state/explore";
 
 export default function ExploreScreen({ navigation }) {
   const { C, dark } = useTheme();
   const styles = makeStyles(C);
   const wide = useIsWide();
   const { settings } = useSettings();
-  const [data, setData] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [verdictRows, setVerdictRows] = useState([]);
-  const [newSeasons, setNewSeasons] = useState([]);
-  const [jump, setJump] = useState({ anime: [], manga: [] }); // titles you started and left
+  const ex = useExplore();
   const [catRows, setCatRows] = useState([]); // your categories (500+ completed), days 15–21
+  const [refreshing, setRefreshing] = useState(false);
 
-  // your verdicts change as you use the app, so these rows refresh on every visit
+  useEffect(() => { initExplore(); }, []);
+  // what's in your library and your verdicts change as you use the app, so these refresh on every visit
   useFocusEffect(useCallback(() => {
-    loadVerdictRows().then(setVerdictRows).catch(() => {});
-    loadNewSeasons().then(setNewSeasons).catch(() => {});
-    loadJumpBackIn().then(setJump).catch(() => {});
+    refreshPersonal();
     loadCategoryRows().then(setCatRows).catch(() => {});
   }, []));
 
-  const [pools, setPools] = useState(null);
-  const [known, setKnown] = useState(new Set()); // library + Excited keys
-  const [seed, setSeed] = useState(undefined); // undefined = today's picks; a number after pull-to-refresh
-  const [aoty, setAoty] = useState([]);
-  const [refreshing, setRefreshing] = useState(false);
-  useEffect(() => {
-    // same sections, same daily picks as the website
-    loadExplorePools()
-      .then(setPools)
-      .catch(() => setLoading(false));
-    loadAnimeOfTheYear().then(setAoty).catch(() => {});
-  }, []);
-  // anything you add to your library disappears from Explore when you come back
-  useFocusEffect(useCallback(() => {
-    if (!pools) return;
-    knownKeys().then((k) => { setKnown(k); setData(buildExplore(pools, k, seed)); setLoading(false); }).catch(() => {});
-  }, [pools, seed]));
-
-  // pull to refresh: different pages from AniList and a new mix
   const refresh = async () => {
     setRefreshing(true);
-    try {
-      const fresh = await loadExplorePools({ shuffle: true });
-      setSeed(Math.floor(Math.random() * 1e6));
-      setPools(fresh);
-      loadVerdictRows().then(setVerdictRows).catch(() => {});
-      loadNewSeasons().then(setNewSeasons).catch(() => {});
-      loadJumpBackIn().then(setJump).catch(() => {});
-    } catch { /* offline: keep what's shown */ }
+    try { await initExplore(); await rerollAll(); } catch { /* offline: keep what's shown */ }
     setRefreshing(false);
   };
 
   const open = (item) => openDetail(navigation, item);
+  // the Billboard is the one thing that still changes by itself: a new trending show each day
+  const featured = useMemo(() => (ex.pools ? buildExplore(ex.pools, ex.known).featured : null), [ex.pools, ex.known]);
 
-  // "Trending in [Japan]": tap the pill to switch Japan → Korea → China
-  const [country, setCountry] = useState("JP");
-  const [trend, setTrend] = useState(null);
-  const nextCountry = () => {
-    const list = COUNTRIES.filter((c) => c.key);
-    setCountry(list[(list.findIndex((c) => c.key === country) + 1) % list.length].key);
-  };
-  // "Most loved": the anime most AniList users have favourited (a count of fans, not a score)
-  const [mostLoved, setMostLoved] = useState(null);
-  useEffect(() => {
-    fetchAniList("anime", { sort: "loved", perPage: 30 }).then((r) => setMostLoved(r.items)).catch(() => setMostLoved([]));
-  }, []);
-  useEffect(() => {
-    let alive = true;
-    setTrend(null);
-    fetchAniList("anime", { sort: "trending", origin: country, perPage: 30 }).then((r) => alive && setTrend(r.items)).catch(() => alive && setTrend([]));
-    return () => { alive = false; };
-  }, [country]);
-
-
-  // discovery rows never show what's in your library or on your Excited list
-  const unmarked = (items) => (items ? items.filter((it) => !known.has(`${it.segment}:${it.id}`)) : items);
-
-  // Coming soon: new titles of this and next season, including sequels of
-  // shows you haven't watched. Sequels of shows you HAVE watched never show
-  // here; they live in "New seasons of shows you watched". Nothing marked.
-  const yourSequels = new Set(newSeasons.map((it) => it.id));
-  const comingSoon = (data.coming || []).filter((it) => !yourSequels.has(it.id));
-
-  // Explore's rows in order. Each one renders only when it's near the screen.
   const row = (key, render) => ({ key, render });
   const sections = [
-    data.featured && row("billboard", () => <Billboard item={data.featured} onOpen={open} />),
+    featured && row("billboard", () => <Billboard item={featured} onOpen={open} />),
     row("new-eps", () => <NewEpisodeCards onOpen={open} />),
     ...catRows.map((r) => ({ ...r, items: r.items.filter((it) => it.segment === "anime") })).filter((r) => r.items.length)
       .map((r) => row(`cat-${r.id}`, () => <PosterRow title={r.title} items={r.items} onOpen={open} />)),
     row("coming-up", () => <Countdowns onOpen={open} />),
-    // right under Coming up on purpose: mark one of these Excited and it
-    // leaves this row and starts counting down in Coming up
-    comingSoon.length > 0 && row("coming-soon", () => <PosterRow title={data.comingTitle} chip={data.comingChip} items={comingSoon} onOpen={open} />),
-    // the one row that may include shows you've watched
-    aoty.length > 0 && row("aoty", () => <PosterRow title="Anime of the Year (Crunchyroll Awards)" items={aoty} onOpen={open} />),
-    jump.anime.length > 0 && row("jump-anime", () => <PosterRow title="Jump back in" items={jump.anime} onOpen={open} />),
-    newSeasons.length > 0 && row("new-seasons", () => <PosterRow title="New seasons of shows you watched" items={newSeasons} onOpen={open} />),
-    ...verdictRows.map((r) => row(`verdict-${r.verdict}`, () => <PosterRow title={r.title} dot={r.color} items={r.items} onOpen={open} />)),
-    row("talk", () => <PosterRow title="Talk of the Week" items={data.talk} loading={loading} onOpen={open} onMore={() => navigation.navigate("Trends")} />),
-    row("most-loved", () => <PosterRow title="Most loved" items={unmarked(mostLoved)?.slice(0, 15)} loading={mostLoved === null} onOpen={open}
-      onMore={() => navigation.navigate("Browse", { sort: "loved" })} />),
-    row("trending-in", () => <PosterRow title="Trending in" items={unmarked(trend)?.slice(0, 15)} loading={trend === null} onOpen={open}
-      chip={{ label: COUNTRIES.find((c) => c.key === country)?.label, onPress: nextCountry, a11y: "Change country" }}
-      onMore={() => navigation.navigate("Trends", { country })} />),
-    row("dont-miss-anime", () => <PosterRow title="Don't Miss This — Anime" items={data.dontMissAnime} loading={loading} onOpen={open} />),
-    row("dont-miss-manga", () => <PosterRow title="Don't Miss This — Manga" items={data.dontMissManga} loading={loading} onOpen={open} />),
-    row("dont-miss-novels", () => <PosterRow title="Don't Miss This — Novels" items={data.dontMissNovels} loading={loading} onOpen={open} />),
-    row("isekai", () => <PosterRow title="Isekai Heaven" items={data.isekai} loading={loading} onOpen={open} />),
-    row("shonen", () => <PosterRow title="Shonen Feast" items={data.shonen} loading={loading} onOpen={open} />),
-    row("angles", () => <PosterRow title="VoidPop Angles" items={data.voidpicks} loading={loading} onOpen={open} />),
+    row("tiles", () => <TileGrid state={ex} onOpen={(key) => navigation.navigate("ExploreCategory", { key })} />),
   ].filter(Boolean);
 
   const header = !wide && (

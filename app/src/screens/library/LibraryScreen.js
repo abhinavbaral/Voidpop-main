@@ -1,59 +1,56 @@
-// LIBRARY — two separate lists, because watching and reading are different:
-//   one kind at a time, picked from a dropdown: Anime (Watching / Completed /
-//   Plan to Watch …), Manga (incl. manhwa, manhua) or Novels (light and web
-//   novels) (Reading / Finished / Plan to Read …)
-// Saved on this phone. Airing anime get a fresh next-episode countdown on open.
-// Search, sort, four layouts (compact, comfortable, covers, list), and
-// "Pick for me" for a random title from the list you're on.
+// YOUR LIBRARY — laid out like Spotify's: the VoidPop logo, "Your Library", a search icon
+// and a + button on top; Anime / Manga / Novels as chips; then your playlists.
+//   - Every status is a playlist made by VoidPop (Watching, Completed, Plan to Watch…), with a
+//     cover collage. Tap one to open its titles (PlaylistScreen).
+//   - The + button makes a playlist of your own (a category). Long-press one to rename or delete it.
+//   - The search icon searches your titles in the chosen kind, across every playlist, like it always has.
+//   - "Recents" sorts the playlists; the icon on the right switches between a list and a grid.
+// Saved on this phone. Airing anime get a fresh next-episode countdown when this opens.
 
 import { useCallback, useMemo, useState } from "react";
-import { View, Text, TextInput, FlatList, StyleSheet, TouchableOpacity, Alert } from "react-native";
+import { View, Text, TextInput, FlatList, StyleSheet, TouchableOpacity, Alert, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import { useAuth } from "@voidpop/shared/backend/AuthContext";
 import {
-  getLibrary, statusesFor, LIBRARY_KINDS as KINDS, kindOf, kindsMissing, fillKinds,
-  setStatus, addReview, noteAiring, LIBRARY_SORTS, LIBRARY_LAYOUTS, sortEntries, getLibraryDates,
-  getCategories, categoriesUnlocked, bulkSetStatus, bulkCategory, bulkRemove,
+  getLibrary, statusesFor, LIBRARY_KINDS as KINDS, kindOf, kindsMissing, fillKinds, noteAiring,
+  getCategories, addCategory, renameCategory, deleteCategory,
 } from "@voidpop/shared/backend/store";
-import OptionsSheet from "../../components/ui/OptionsSheet.js";
-import VerdictModal from "../../components/title/VerdictModal.js";
+import { buildPlaylists, searchEntries, PLAYLIST_SORTS } from "@voidpop/shared/features/playlists";
 import { fetchNextEpisodes, fetchKinds } from "@voidpop/shared/api/anilist";
-import Chips from "../../components/ui/Chips.js";
-import LibraryCard from "../../components/library/LibraryCard.js";
-import { useTheme } from "../../context/ThemeContext.js";
-import { useGridColumns } from "../../utils/layout";
-import { openDetail } from "../../utils/nav";
-import { VoidmonEmpty } from "../../components/brand/Voidmon.js";
-import PickForMe from "../../components/explore/PickForMe.js";
-import Icon from "../../components/ui/Icon.js";
 import { useSettings } from "@voidpop/shared/backend/SettingsContext";
-
+import { useTheme } from "../../context/ThemeContext.js";
+import { openDetail } from "../../utils/nav";
+import Brand from "../../components/brand/Brand.js";
+import Chips from "../../components/ui/Chips.js";
+import Icon from "../../components/ui/Icon.js";
+import OptionsSheet from "../../components/ui/OptionsSheet.js";
+import LibraryCard from "../../components/library/LibraryCard.js";
+import PlaylistItem from "../../components/library/PlaylistItem.js";
+import NamePlaylistModal from "../../components/library/NamePlaylistModal.js";
+import { VoidmonEmpty } from "../../components/brand/Voidmon.js";
 
 export default function LibraryScreen({ navigation }) {
   const { C } = useTheme();
   const styles = makeStyles(C);
+  const { width } = useWindowDimensions();
   const { settings, update } = useSettings();
-  const layout = settings.libraryLayout || "compact";
-  const gridCols = useGridColumns(layout === "cover" ? 120 : 190);
-  const cols = layout === "list" ? 1 : gridCols;
-  const [dates, setDates] = useState({});
-  const [picking, setPicking] = useState(false);
+  const grid = settings.libraryHome === "grid";
+  const columns = width >= 900 ? 4 : width >= 600 ? 3 : 2;
+  const tile = (width - 28 - 14 * (columns - 1)) / columns;
   const { user } = useAuth();
   const [kind, setKind] = useState("anime");
-  const [tab, setTab] = useState("watching");
   const [entries, setEntries] = useState([]);
-  const [query, setQuery] = useState("");
-  const [sort, setSort] = useState("updated");
-  const [finishing, setFinishing] = useState(null); // item whose last episode you just marked
   const [cats, setCats] = useState([]);
-  const [selected, setSelected] = useState(null); // null = not selecting; Set of keys while selecting
-  const [sheet, setSheet] = useState(null); // "status" | "category" | "sort" | "layout" | "kind"
+  const [sort, setSort] = useState("recents");
+  const [searching, setSearching] = useState(false);
+  const [query, setQuery] = useState("");
+  const [sheet, setSheet] = useState(null); // "sort" | a custom playlist (rename / delete)
+  const [naming, setNaming] = useState(null); // { id?, name }: making a new playlist, or renaming
 
   const reload = useCallback(async () => {
     setEntries(Object.values(await getLibrary(user).catch(() => ({}))));
-    setDates(await getLibraryDates().catch(() => ({})));
-    setCats((await categoriesUnlocked()) ? await getCategories() : []); // categories unlock at 500 completed anime
+    setCats(await getCategories().catch(() => []));
   }, [user]);
 
   useFocusEffect(
@@ -77,215 +74,125 @@ export default function LibraryScreen({ navigation }) {
     }, [user, reload])
   );
 
-  const keyOf = (e) => `${e.item.segment}:${e.item.id}`;
-  const selecting = selected !== null;
-  const toggle = (e) => setSelected((prev) => {
-    const next = new Set(prev || []);
-    if (next.has(keyOf(e))) next.delete(keyOf(e)); else next.add(keyOf(e));
-    return next;
-  });
-  const bulk = async (fn) => { const keys = [...(selected || [])]; setSheet(null); setSelected(null); await fn(keys); reload(); };
-
-  const finish = async ({ verdict, vibes, moods, comment }) => {
-    await setStatus(user, finishing.segment, finishing, "completed");
-    await addReview(user, finishing.segment, finishing.id, { verdict, vibes, moods, comment });
-    setFinishing(null);
-    reload();
-  };
-
   const current = KINDS.find((k) => k.key === kind);
-  const q = query.trim().toLowerCase();
-  // search narrows every status, so the chip counts show where the matches are
-  const listEntries = useMemo(
-    () => entries.filter((e) => kindOf(e.item) === kind
-      && (!q || e.item.title.toLowerCase().includes(q))
-),
-    [entries, kind, q]
-  );
-  const sorts = LIBRARY_SORTS.filter((s) => !s.anime || current.segment === "anime");
+  const kindEntries = useMemo(() => entries.filter((e) => kindOf(e.item) === kind), [entries, kind]);
+  const playlists = useMemo(() => buildPlaylists(kindEntries, statusesFor(current.segment), cats, sort), [kindEntries, current.segment, cats, sort]);
+  const results = useMemo(() => searchEntries(kindEntries, query), [kindEntries, query]);
+  const q = query.trim();
 
-  // status chips named for this list, with counts: "Reading 3", "Plan to Watch 5"
-  const tabs = statusesFor(current.segment).map((s) => ({
-    key: s.key,
-    label: `${s.label} ${listEntries.filter((e) => e.status === s.key).length}`,
-  }));
-  const filtered = sortEntries(listEntries.filter((e) => e.status === tab), sort, dates);
-  const sortLabel = sorts.find((x) => x.key === sort)?.label || "Sort";
-  const tabLabel = statusesFor(current.segment).find((s) => s.key === tab)?.label;
+  const open = (p) => navigation.navigate("Playlist", { kind, type: p.type, ref: p.ref, title: p.name });
+  const createPlaylist = async (name) => {
+    const made = await addCategory(name);
+    if (!made) return name.trim() ? "You already have a playlist with that name." : "Give it a name.";
+    reload();
+    return null;
+  };
+  const rename = async (name) => {
+    const id = naming.id;
+    const clean = name.trim();
+    if (!clean) return "Give it a name.";
+    if (cats.some((c) => c.id !== id && c.name.toLowerCase() === clean.toLowerCase())) return "You already have a playlist with that name.";
+    await renameCategory(id, clean);
+    reload();
+    return null;
+  };
+  const askDelete = (p) => Alert.alert(`Delete "${p.name}"?`, "The titles stay in your library; only the playlist goes.", [
+    { text: "Cancel", style: "cancel" },
+    { text: "Delete", style: "destructive", onPress: async () => { await deleteCategory(p.ref); reload(); } },
+  ]);
+
+  const toggleSearch = () => { setSearching((s) => !s); setQuery(""); };
+  const sortLabel = PLAYLIST_SORTS.find((s) => s.key === sort)?.label;
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <View style={styles.header}>
-        <Text style={styles.title}>Library</Text>
+        <View style={styles.logo}><Brand size={18} /></View>
+        <Text style={styles.title} accessibilityRole="header" numberOfLines={1}>Your Library</Text>
+        <TouchableOpacity onPress={toggleSearch} hitSlop={10} accessibilityRole="button" accessibilityLabel={searching ? "Close search" : "Search your library"}>
+          <Icon name={searching ? "close" : "search"} size={24} color={C.text} />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => setNaming({ name: "" })} hitSlop={10} accessibilityRole="button" accessibilityLabel="Make a playlist">
+          <Icon name="plus" size={26} color={C.text} />
+        </TouchableOpacity>
       </View>
-
-      {/* which kind: a dropdown (Japanese Animation, Manhwa, Light Novel…) */}
-      <TouchableOpacity onPress={() => setSheet("kind")} style={styles.kindBtn} accessibilityRole="button"
-        accessibilityLabel={`Showing ${current.label}. Change`}>
-        <Icon name={{ anime: "tv", manga: "book", novel: "novel" }[kind]} size={17} color={C.purple} />
-        <Text style={styles.kindText}>{current.label}</Text>
-        <Text style={[styles.switchCount, { color: C.sub }]}>{entries.filter((e) => kindOf(e.item) === kind).length}</Text>
-        <View style={{ flex: 1 }} />
-        <Icon name="down" size={16} color={C.sub} />
-      </TouchableOpacity>
-
-      <TextInput
-        value={query}
-        onChangeText={setQuery}
-        placeholder={`Search in ${current.label}`}
-        placeholderTextColor={C.faint}
-        style={styles.search}
-        returnKeyType="search"
-        clearButtonMode="while-editing"
-      />
 
       <View style={{ paddingHorizontal: 14 }}>
-        <Chips options={tabs} value={tab} onChange={setTab} />
-        <View style={styles.tools}>
-          <TouchableOpacity onPress={() => setSheet("sort")} style={[styles.tool, { flexShrink: 1 }]} accessibilityRole="button" accessibilityLabel={`Sort: ${sortLabel}`}>
-            <Icon name="sort" size={15} color={C.sub} />
-            <Text style={styles.toolText} numberOfLines={1}>{sortLabel}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setSheet("layout")} style={styles.tool} accessibilityRole="button"
-            accessibilityLabel={`Layout: ${LIBRARY_LAYOUTS.find((l) => l.key === layout)?.label}`}>
-            <Icon name={layout === "list" ? "list" : "browse"} size={15} color={C.sub} />
-          </TouchableOpacity>
-          <View style={{ flex: 1 }} />
-          {filtered.length > 1 && !selecting && (
-            <TouchableOpacity onPress={() => setPicking(true)} style={[styles.tool, { borderColor: C.purple }]} accessibilityRole="button">
-              <Icon name="shuffle" size={15} color={C.purple} />
-              <Text style={[styles.toolText, { color: C.purple }]}>Pick for me</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        <Chips options={KINDS.map((k) => ({ key: k.key, label: k.label }))} value={kind} onChange={(k) => { setKind(k); setQuery(""); }} />
       </View>
 
-      {selecting && (
-        <View style={styles.bulkBar}>
-          <Text style={styles.bulkCount}>{selected.size} selected</Text>
-          <Text style={styles.bulkBtn} onPress={() => setSelected(new Set(filtered.map(keyOf)))}>All</Text>
-          <Text style={[styles.bulkBtn, !selected.size && styles.bulkOff]} onPress={selected.size ? () => setSheet("status") : undefined}>Move</Text>
-          {cats.length > 0 && (
-            <Text style={[styles.bulkBtn, !selected.size && styles.bulkOff]} onPress={selected.size ? () => setSheet("category") : undefined}>Category</Text>
-          )}
-          <Text style={[styles.bulkBtn, { color: C.rose }, !selected.size && styles.bulkOff]}
-            onPress={selected.size ? () => Alert.alert(`Remove ${selected.size} from your library?`, "Their progress and categories are lost.", [
-              { text: "Cancel", style: "cancel" },
-              { text: "Remove", style: "destructive", onPress: () => bulk(bulkRemove) },
-            ]) : undefined}>Remove</Text>
-          <Text style={[styles.bulkBtn, { color: C.sub }]} onPress={() => setSelected(null)}>Done</Text>
-        </View>
+      {searching && (
+        <TextInput value={query} onChangeText={setQuery} autoFocus placeholder={`Search in ${current.label}`} placeholderTextColor={C.faint}
+          style={styles.search} returnKeyType="search" clearButtonMode="while-editing" accessibilityLabel={`Search in ${current.label}`} />
       )}
 
-      <FlatList
-        data={filtered}
-        key={`${layout}-${cols}`}
-        keyExtractor={(e) => `${e.item.segment}-${e.item.id}`}
-        numColumns={cols}
-        contentContainerStyle={{ padding: 6, paddingBottom: 30 }}
-        renderItem={({ item: entry }) => (
-          <LibraryCard
-            entry={entry}
-            columns={cols}
-            layout={layout}
-            selecting={selecting}
-            selected={selecting && selected.has(keyOf(entry))}
-            onLongPress={() => (selecting ? toggle(entry) : setSelected(new Set([keyOf(entry)])))}
-            onPress={() => (selecting ? toggle(entry) : openDetail(navigation, entry.item))}
+      {searching && q ? (
+        <FlatList
+          data={results}
+          keyExtractor={(e) => `${e.item.segment}-${e.item.id}`}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ padding: 6, paddingBottom: 30 }}
+          renderItem={({ item: entry }) => <LibraryCard entry={entry} columns={1} layout="list" onPress={() => openDetail(navigation, entry.item)} />}
+          ListEmptyComponent={<VoidmonEmpty pose="peeking" text={`No ${current.label} titles match "${q}".`} />}
+        />
+      ) : (
+        <>
+          <View style={styles.sortRow}>
+            <TouchableOpacity onPress={() => setSheet("sort")} style={styles.sortBtn} accessibilityRole="button" accessibilityLabel={`Sort playlists: ${sortLabel}`}>
+              <Icon name="sort" size={20} color={C.text} />
+              <Text style={styles.sortText}>{sortLabel}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => update("libraryHome", grid ? "list" : "grid")} hitSlop={10} accessibilityRole="button"
+              accessibilityLabel={grid ? "Show as a list" : "Show as a grid"}>
+              <Icon name={grid ? "list" : "browse"} size={22} color={C.text} />
+            </TouchableOpacity>
+          </View>
+          <FlatList
+            data={playlists}
+            key={grid ? `grid-${columns}` : "list"}
+            numColumns={grid ? columns : 1}
+            keyExtractor={(p) => p.id}
+            columnWrapperStyle={grid ? { gap: 14, paddingHorizontal: 14, marginBottom: 16 } : undefined}
+            contentContainerStyle={{ paddingBottom: 30, paddingTop: grid ? 4 : 0 }}
+            renderItem={({ item: p }) => (
+              <PlaylistItem playlist={p} kind={kind} grid={grid} width={tile} onPress={() => open(p)}
+                onLongPress={p.type === "custom" ? () => setSheet(p) : undefined} />
+            )}
           />
-        )}
-        ListEmptyComponent={
-          <VoidmonEmpty pose="peeking"
-            text={q ? `No ${tabLabel} titles match "${query.trim()}".` : `Nothing in ${tabLabel} yet. ${current.segment === "manga" ? "Find something to read!" : "Tag some titles!"}`} />
-        }
-      />
-      <OptionsSheet
-        visible={sheet === "status"}
-        title={`Move ${selected?.size || 0} to`}
-        options={statusesFor(current.segment).map((st) => ({ key: st.key, label: st.label }))}
-        onPick={(status) => bulk((keys) => bulkSetStatus(keys, status))}
-        onClose={() => setSheet(null)}
-      />
-      <OptionsSheet
-        visible={sheet === "category"}
-        title="Categories"
-        options={[
-          ...cats.map((c) => ({ key: `+${c.id}`, label: `Add to ${c.name}` })),
-        ]}
-        onPick={(k) => bulk((keys) => bulkCategory(keys, k.slice(1), k[0] === "+"))}
-        onClose={() => setSheet(null)}
-      />
-      <OptionsSheet
-        visible={sheet === "kind"}
-        title="Show"
-        options={KINDS.map((k) => ({ key: k.key, label: `${k.label}  ${entries.filter((e) => kindOf(e.item) === k.key).length}${k.key === kind ? "  (now)" : ""}` }))}
-        onPick={(k) => {
-          const next = KINDS.find((x) => x.key === k);
-          if (next.segment !== current.segment) { setTab("watching"); if (sort === "airing" || sort === "behind") setSort("updated"); }
-          setKind(k); setSelected(null); setSheet(null);
-        }}
-        onClose={() => setSheet(null)}
-      />
+        </>
+      )}
+
       <OptionsSheet
         visible={sheet === "sort"}
-        title="Sort by"
-        options={sorts.map((x) => ({ key: x.key, label: x.key === sort ? `${x.label}  (now)` : x.label }))}
+        title="Sort playlists by"
+        options={PLAYLIST_SORTS.map((s) => ({ key: s.key, label: s.key === sort ? `${s.label}  (now)` : s.label }))}
         onPick={(k) => { setSort(k); setSheet(null); }}
         onClose={() => setSheet(null)}
       />
       <OptionsSheet
-        visible={sheet === "layout"}
-        title="Layout"
-        options={LIBRARY_LAYOUTS.map((x) => ({ key: x.key, label: x.key === layout ? `${x.label}  (now)` : x.label }))}
-        onPick={(k) => { update("libraryLayout", k); setSheet(null); }}
+        visible={!!sheet && sheet !== "sort"}
+        title={sheet?.name}
+        options={[{ key: "rename", label: "Rename" }, { key: "delete", label: "Delete playlist", danger: true }]}
+        onPick={(k) => {
+          const p = sheet;
+          setSheet(null);
+          if (k === "rename") setNaming({ id: p.ref, name: p.name }); else askDelete(p);
+        }}
         onClose={() => setSheet(null)}
       />
-      <PickForMe visible={picking} entries={filtered} onClose={() => setPicking(false)}
-        onOpen={(item) => { setPicking(false); openDetail(navigation, item); }} />
-      {finishing && (
-        <VerdictModal visible initial={null} onSave={finish} onClose={() => { setFinishing(null); reload(); }} />
-      )}
+      <NamePlaylistModal visible={!!naming} title={naming?.id ? "Rename playlist" : "Make a playlist"} initial={naming?.name || ""}
+        onSave={naming?.id ? rename : createPlaylist} onClose={() => setNaming(null)} />
     </SafeAreaView>
   );
 }
 
 const makeStyles = (C) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
-  header: {
-    flexDirection: "row", alignItems: "center", gap: 12,
-    paddingHorizontal: 14, paddingTop: 8,
-  },
-  title: { color: C.text, fontSize: 20, fontWeight: "800" },
-  kindBtn: {
-    flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: 14, marginTop: 14, marginBottom: 4,
-    paddingHorizontal: 14, height: 46, backgroundColor: C.card, borderRadius: 12, borderWidth: 1, borderColor: C.border,
-  },
-  kindText: { color: C.text, fontWeight: "800", fontSize: 15 },
-  switcher: {
-    flexDirection: "row", gap: 4, marginHorizontal: 14, marginTop: 14, marginBottom: 4, padding: 4,
-    backgroundColor: C.card, borderRadius: 12, borderWidth: 1, borderColor: C.border,
-  },
-  switchBtn: { flex: 1, borderRadius: 9, paddingVertical: 9, alignItems: "center" },
-  switchActive: { backgroundColor: C.purple, borderColor: C.purple },
-  switchLabel: { color: C.text, fontWeight: "800", fontSize: 14 },
-  switchCount: { fontWeight: "600", opacity: 0.7 },
-  switchHint: { color: C.faint, fontSize: 10, marginTop: 3 },
-  bulkBar: {
-    flexDirection: "row", alignItems: "center", gap: 16, marginHorizontal: 14, marginTop: 8, paddingHorizontal: 12, paddingVertical: 10,
-    borderRadius: 12, borderWidth: 1, borderColor: C.purple, backgroundColor: C.card, flexWrap: "wrap",
-  },
-  bulkCount: { color: C.text, fontWeight: "800", flex: 1 },
-  bulkBtn: { color: C.purple, fontWeight: "800" },
-  bulkOff: { opacity: 0.4 },
-  empty: { color: C.faint, textAlign: "center", marginTop: 40, paddingHorizontal: 20 },
-  tools: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 },
-  tool: {
-    flexDirection: "row", alignItems: "center", gap: 6, height: 34, paddingHorizontal: 11,
-    borderRadius: 999, borderWidth: 1, borderColor: C.border, backgroundColor: C.card,
-  },
-  toolText: { color: C.sub, fontWeight: "700", fontSize: 13 },
-  search: {
-    marginHorizontal: 14, marginTop: 8, height: 40, borderRadius: 10, borderWidth: 1, borderColor: C.border,
-    backgroundColor: C.card, color: C.text, paddingHorizontal: 12, fontSize: 14,
-  },
+  header: { flexDirection: "row", alignItems: "center", gap: 18, paddingHorizontal: 14, paddingTop: 8, paddingBottom: 6 },
+  logo: { width: 40, height: 40, borderRadius: 20, backgroundColor: C.card, borderWidth: 1, borderColor: C.border, alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  title: { flex: 1, color: C.text, fontSize: 24, fontWeight: "900" },
+  search: { marginHorizontal: 14, marginTop: 10, height: 42, borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.card, color: C.text, paddingHorizontal: 12, fontSize: 15 },
+  sortRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 14, paddingVertical: 12 },
+  sortBtn: { flexDirection: "row", alignItems: "center", gap: 8 },
+  sortText: { color: C.text, fontWeight: "700", fontSize: 14 },
 });

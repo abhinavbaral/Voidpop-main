@@ -155,6 +155,27 @@ export async function loadVerdictRows() {
   return rows;
 }
 
+// The three verdict tiles on Explore ("Peak like …", "Dive in like …", "One time like …").
+// → { peak: [titles], divein: [titles], onetime: [titles] }: your anime you gave that verdict, most recent
+// first. A tile starts on the first one; Reroll (or pulling down) moves it to another, and the tile's
+// title and its picks change with it: "Peak like Death Note" → "Peak like One Piece".
+export async function loadVerdictSources() {
+  const [reviews, lib] = await Promise.all([getReviews(), getLibrary()]);
+  const out = {};
+  for (const verdict of ["peak", "divein", "onetime"]) {
+    out[verdict] = reviews
+      .filter((r) => r.verdict === verdict && r.segment === "anime" && lib[`${r.segment}:${r.titleId}`])
+      .sort((a, b) => (b.date || "").localeCompare(a.date || ""))
+      .map((r) => lib[`${r.segment}:${r.titleId}`].item);
+  }
+  return out;
+}
+
+// Picks like one of those titles (from AniList's recommendations): raw, the tile leaves out what you already have.
+export async function loadRecsLike(source) {
+  return fetchRecommendations(source.segment, source.id, 25);
+}
+
 // "New seasons of shows you watched": sequels of anime you've completed or are
 // watching that are airing now, announced, or came out in the last 12 months,
 // and aren't in your library yet. Airing first, then announced, then recent.
@@ -235,4 +256,14 @@ export async function loadJumpBackIn(now = Date.now()) {
     .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
   const pick = (seg) => entries.filter((e) => e.item.segment === seg).slice(0, 12).map((e) => e.item);
   return { anime: pick("anime"), manga: [] }; // Explore is anime only
+}
+
+// "Jump back in" when nothing is left behind: your anime still in progress (Watching, Rewatching,
+// On Hold), most recent first, then Plan to Watch. Up to 18, so the tile always has something of yours.
+export async function loadInProgress() {
+  const entries = Object.values(await getLibrary()).filter((e) => e.item.segment === "anime");
+  const recent = (a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || "");
+  const started = entries.filter((e) => ["watching", "rewatching", "onhold"].includes(e.status)).sort(recent);
+  const planned = entries.filter((e) => e.status === "plan").sort(recent);
+  return [...started, ...planned].slice(0, 18).map((e) => e.item);
 }

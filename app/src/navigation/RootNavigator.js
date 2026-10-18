@@ -8,6 +8,8 @@ import SearchScreen from "../screens/explore/SearchScreen";
 import SeasonScreen from "../screens/explore/SeasonScreen";
 import BrowseScreen from "../screens/explore/BrowseScreen";
 import TrendsScreen from "../screens/explore/TrendsScreen";
+import ExploreCategoryScreen from "../screens/explore/ExploreCategoryScreen";
+import PlaylistScreen from "../screens/library/PlaylistScreen";
 import MorePageScreen from "../screens/more/MorePageScreen";
 import WelcomeScreen from "../screens/welcome/WelcomeScreen";
 import OnboardingScreen from "../screens/welcome/OnboardingScreen";
@@ -34,6 +36,8 @@ export default function RootNavigator({ initialRouteName }) {
       <Stack.Screen name="Onboarding" component={OnboardingScreen} options={fade} />
       <Stack.Screen name="Person" component={PersonScreen} getId={({ params }) => (params ? String(params.id) : undefined)} />
       <Stack.Screen name="Trends" component={TrendsScreen} />
+      <Stack.Screen name="ExploreCategory" component={ExploreCategoryScreen} />
+      <Stack.Screen name="Playlist" component={PlaylistScreen} />
     </Stack.Navigator>
   );
 }

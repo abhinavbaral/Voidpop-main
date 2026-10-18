@@ -50,7 +50,7 @@ import { loadPeopleStats, PEOPLE_KINDS } from "@voidpop/shared/features/peopleSt
 const VERSION = appConfig.expo.version;
 const TITLES = {
   statistics: "Statistics", appearance: "Appearance and Settings", settings: "Appearance and Settings",
-  data: "Data and storage", youwatching: "You're watching", announced: "New announcements", badge: "Ranks and achievements", categories: "Categories", compare: "Compare", anilist: "Sync", help: "Help", about: "About",
+  data: "Data and storage", youwatching: "You're watching", announced: "New announcements", badge: "Ranks and achievements", categories: "Playlists", compare: "Compare", anilist: "Sync", help: "Help", about: "About",
 };
 
 export default function MorePageScreen({ route, navigation }) {
@@ -751,7 +751,7 @@ function Announced({ styles, C, navigation }) {
 }
 
 // Your own Library groups ("Favourites", "Rewatch", "With friends"…), like
-// Mihon's categories. Titles can be in several; deleting one keeps the titles.
+// Your own playlists (categories). Titles can be in several; deleting one keeps the titles.
 function Categories({ styles, C }) {
   const [cats, setCats] = useState(null);
   const [name, setName] = useState("");
@@ -763,11 +763,11 @@ function Categories({ styles, C }) {
 
   const add = async () => {
     const cat = await addCategory(name);
-    setMessage(cat ? "" : name.trim() ? "You already have a category with that name." : "");
+    setMessage(cat ? "" : name.trim() ? "You already have a playlist with that name." : "");
     if (cat) setName("");
     refresh();
   };
-  const remove = (c) => Alert.alert(`Delete "${c.name}"?`, "Its Explore row goes; the titles stay in your library.", [
+  const remove = (c) => Alert.alert(`Delete "${c.name}"?`, "Only the playlist goes; the titles stay in your library.", [
     { text: "Cancel", style: "cancel" },
     { text: "Delete", style: "destructive", onPress: async () => { await deleteCategory(c.id); refresh(); } },
   ]);
@@ -777,7 +777,7 @@ function Categories({ styles, C }) {
       <View style={[styles.card, { borderColor: C.amber, opacity: 0.85 }]}>
         <Text style={styles.cardTitle}>Unlocks at {CATEGORY_MIN} completed anime</Text>
         <Text style={[styles.note, { marginTop: 4 }]}>
-          Then you can make your own categories, and each one becomes a row at the top of Explore during the third week
+          Then each playlist you make also becomes a row at the top of Explore during the third week
           of every month. {access.needed} to go ({access.animeCompleted} completed).
         </Text>
       </View>
@@ -786,11 +786,11 @@ function Categories({ styles, C }) {
   return (
     <>
       <Text style={styles.note}>
-        Each category is your own row at the top of Explore during the third week of every month (days 15–21). Add
-        titles from a title's page, or long-press in the Library to select several.
+        Playlists show in Your Library (the + button there makes one too). With {CATEGORY_MIN} completed anime each one is also your own row at the top of Explore during
+        the third week of every month (days 15–21). Add titles from a title's page, or long-press in a Library playlist to select several.
       </Text>
       <View style={[styles.modeRow, { marginTop: 12 }]}>
-        <TextInput value={name} onChangeText={setName} placeholder="New category, e.g. Hidden gems" placeholderTextColor={C.faint} maxLength={40}
+        <TextInput value={name} onChangeText={setName} placeholder="New playlist, e.g. Hidden gems" placeholderTextColor={C.faint} maxLength={40}
           onSubmitEditing={add} returnKeyType="done"
           style={[styles.btn, { color: C.text, paddingHorizontal: 12, flex: 2, alignItems: undefined }]} />
         <TouchableOpacity style={[styles.btn, styles.btnOn, !name.trim() && { opacity: 0.5 }]} disabled={!name.trim()} onPress={add}>
@@ -798,7 +798,7 @@ function Categories({ styles, C }) {
         </TouchableOpacity>
       </View>
       {!!message && <Text style={{ color: C.rose, fontSize: 12, marginTop: 6 }}>{message}</Text>}
-      {cats.length === 0 ? <Text style={[styles.note, { marginTop: 16 }]}>No categories yet.</Text> : (
+      {cats.length === 0 ? <Text style={[styles.note, { marginTop: 16 }]}>No playlists yet.</Text> : (
         <View style={styles.card}>
           {cats.map((c, i) => (
             <View key={c.id} style={[styles.trackerRow, i === 0 && { borderTopWidth: 0, marginTop: 0 }, { alignItems: "center", gap: 10 }]}>

@@ -1,7 +1,7 @@
 // MORE — laid out like the "More" tab in reader apps: Voidmon on top, your
 // badge, then menu rows that open Statistics, Data and storage,
 // Appearance and Settings (24-hour clock, countdown badges, welcome tour…),
-// Help and About (MorePageScreen). Categories shows at 500+ completed.
+// Help and About (MorePageScreen).
 
 import { ScrollView, View, Text, Pressable, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -16,7 +16,7 @@ import Icon from "../../components/ui/Icon.js";
 const GROUPS = [
   [["statistics", "stats", "Statistics"], ["compare", "list", "Compare"], ["data", "storage", "Data and storage"]],
   [["youwatching", "play", "You're watching"], ["announced", "bell", "New announcements"]],
-  [["categories", "browse", "Categories"], ["anilist", "sync", "Sync"]],
+  [["categories", "browse", "Playlists"], ["anilist", "sync", "Sync"]],
   [["settings", "palette", "Appearance and Settings"], ["help", "help", "Help"], ["about", "info", "About"]],
 ];
 
@@ -24,7 +24,7 @@ export default function MoreScreen({ navigation }) {
   const { C, dark } = useTheme();
   const styles = makeStyles(C);
   const [rank, setRank] = useState(null);
-  const [catsOpen, setCatsOpen] = useState(false); // Categories unlock at 500 completed anime
+  const [catsOpen, setCatsOpen] = useState(false); // Playlists are open to everyone
   useFocusEffect(useCallback(() => {
     getUserTier().then(setRank).catch(() => {});
     categoriesUnlocked().then(setCatsOpen).catch(() => {});

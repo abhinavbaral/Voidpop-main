@@ -545,8 +545,8 @@ export function scheduleOrder(a, b) {
   return dayMinute(a.next) - dayMinute(b.next) || (a.next?.airingAt ?? Infinity) - (b.next?.airingAt ?? Infinity);
 }
 
-/* ---------- Categories: a reward for 500+ completed anime ---------- */
-// Categories unlock at 500 completed anime. Each one you make becomes a row at
+/* ---------- Playlists (categories): your own lists ---------- */
+// Anyone can make them. With 500 completed anime each one also becomes a row at
 // the top of Explore during the third week of every month (days 15–21).
 
 export const CATEGORY_MIN = 500;
@@ -558,13 +558,15 @@ export async function getCategoryAccess() {
   const anime = Object.values(db.library).filter((e) => e.item.segment === "anime" && isDone(e.status)).length;
   return { unlocked: anime >= CATEGORY_MIN, animeCompleted: anime, needed: Math.max(0, CATEGORY_MIN - anime) };
 }
-export const categoriesUnlocked = async () => (await getCategoryAccess()).unlocked;
+// Playlists (categories) are for everyone now: the Library's + button makes one. Only the Explore
+// rows below stay a reward for 500 completed anime (getCategoryAccess still counts toward them).
+export const categoriesUnlocked = async () => true;
 export const getSpotlight = getCategoryAccess; // older name
 
 // The Explore rows: one per category with titles in it, or [] when they aren't
 // showing (locked, none made, or not the third week).
 export async function loadCategoryRows(date = new Date()) {
-  if (!spotlightWeek(date) || !(await categoriesUnlocked())) return [];
+  if (!spotlightWeek(date) || !(await getCategoryAccess()).unlocked) return [];
   const db = await load();
   return db.categories.map((c) => ({
     id: c.id,
