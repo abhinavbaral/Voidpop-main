@@ -13,9 +13,10 @@ const base = () => ({
   newSeasons: [], jump: { anime: [show(800), show(801)], manga: [] }, seeds: {}, saved: {}, extra: {}, busy: {},
 });
 
-test("16 tiles with unique keys; the fixed lists can't be rerolled", () => {
-  assert.equal(TILES.length, 16);
-  assert.equal(new Set(TILES.map((t) => t.key)).size, 16);
+test("14 tiles with unique keys; the fixed lists can't be rerolled", () => {
+  assert.equal(TILES.length, 14);
+  assert.equal(new Set(TILES.map((t) => t.key)).size, 14);
+  assert.ok(!TILES.some((t) => ["isekai", "shonen"].includes(t.key))); // Isekai Heaven and Shonen Feast are gone: those are genres in Browse now
   assert.deepEqual(TILES.filter((t) => !t.reroll).map((t) => t.key), ["loved", "trending", "coming", "aoty", "jump", "seasons"]);
   Object.keys(EXTRA).forEach((k) => assert.ok(TILES.find((t) => t.key === k), k)); // every Reroll source belongs to a tile
 });
@@ -29,8 +30,8 @@ test("a shuffle keeps the same shows, is the same for the same seed, and differs
 });
 
 test("while loading a tile keeps its title and has no shows yet", () => {
-  const v = viewTile("isekai", { ...base(), pools: null });
-  assert.deepEqual([v.title, v.loading, v.items], ["Isekai Heaven", true, null]);
+  const v = viewTile("dmAnime", { ...base(), pools: null });
+  assert.deepEqual([v.title, v.loading, v.items], ["Don't Miss This — Anime", true, null]);
   assert.equal(viewTile("loved", { ...base(), mostLoved: null }).loading, true);
 });
 
@@ -45,10 +46,10 @@ test("verdict tiles: titled after the title they are like, and still there with 
 
 test("the picks stay the same until you reroll: a new seed changes them, and rankings ignore it", () => {
   const st = base();
-  assert.deepEqual(ids(viewTile("isekai", st).items), ids(viewTile("isekai", st).items));
-  assert.equal(viewTile("isekai", st).items.length, PICK_COUNT);
-  const rerolled = { ...st, seeds: { isekai: 4242 } };
-  assert.notDeepEqual(ids(viewTile("isekai", rerolled).items), ids(viewTile("isekai", st).items));
+  assert.deepEqual(ids(viewTile("dmAnime", st).items), ids(viewTile("dmAnime", st).items));
+  assert.equal(viewTile("dmAnime", st).items.length, PICK_COUNT);
+  const rerolled = { ...st, seeds: { dmAnime: 4242 } };
+  assert.notDeepEqual(ids(viewTile("dmAnime", rerolled).items), ids(viewTile("dmAnime", st).items));
   // Most loved and Trending are rankings: same order whatever the seed
   const ranked = { ...st, seeds: { loved: 99, trending: 99 } };
   assert.deepEqual(ids(viewTile("loved", ranked).items), ids(st.mostLoved.slice(0, 30)));
@@ -79,20 +80,20 @@ test("VoidPop Angles never repeats Don't Miss This — Anime", () => {
 
 test("picks kept from the last Reroll are used while most of them are still unmarked", () => {
   const kept = many(450, 18);
-  const st = { ...base(), saved: { shonen: kept } };
-  assert.deepEqual(ids(viewTile("shonen", st).items), ids(kept));
+  const st = { ...base(), saved: { dmAnime: kept } };
+  assert.deepEqual(ids(viewTile("dmAnime", st).items), ids(kept));
   const mostlyAdded = { ...st, known: new Set(kept.slice(0, 15).map((x) => `anime:${x.id}`)) };
-  assert.notDeepEqual(ids(viewTile("shonen", mostlyAdded).items), ids(kept.slice(15))); // too few left: back to the pool
-  assert.ok(viewTile("shonen", mostlyAdded).items.length >= 6);
+  assert.notDeepEqual(ids(viewTile("dmAnime", mostlyAdded).items), ids(kept.slice(15))); // too few left: back to the pool
+  assert.ok(viewTile("dmAnime", mostlyAdded).items.length >= 6);
 });
 
 test("a tile is never empty: it tops up, falls back, or shows what it showed last time", () => {
   const st = base();
   // pool nearly used up by your library: topped up from popular shows, and says so
-  const allKnown = new Set(st.pools.isekai.slice(0, 28).map((x) => `anime:${x.id}`));
-  const thin = viewTile("isekai", { ...st, known: allKnown });
-  assert.ok(thin.items.length >= 6);
-  assert.match(thin.subtitle, /Popular picks too/);
+  const allKnown = new Set(st.pools.popA.slice(0, 57).map((x) => `anime:${x.id}`)); // only 3 of the pool left
+  const thin = viewTile("dmAnime", { ...st, known: allKnown });
+  assert.ok(thin.items.length >= 6); // topped up from related shows
+  assert.ok(thin.items.every((x) => !allKnown.has(`anime:${x.id}`)));
   // Jump back in with nothing left behind: what's still on your list, then trending
   const empty = { ...st, jump: { anime: [], manga: [] } };
   assert.match(viewTile("jump", empty).subtitle, /Nothing started yet/);
@@ -102,20 +103,20 @@ test("a tile is never empty: it tops up, falls back, or shows what it showed las
   assert.ok(nothing.items.length >= 6);
   assert.match(viewTile("aoty", { ...st, aoty: [] }).subtitle, /Most loved instead/);
   // offline on a later launch: the pools are empty but each tile shows what it showed last time
-  const offline = { ...st, pools: { trA: [], popA: [], popM: [], popN: [], coming: [], isekai: [], shonen: [] }, mostLoved: [], trend: [], aoty: [], verdicts: { peak: { source: null, items: [] }, divein: { source: null, items: [] }, onetime: { source: null, items: [] } }, last: { isekai: { title: "Isekai Heaven", subtitle: null, items: many(300, 18) } } };
-  assert.deepEqual(ids(viewTile("isekai", offline).items), ids(many(300, 18)));
+  const offline = { ...st, pools: { trA: [], popA: [], popM: [], popN: [], coming: [] }, mostLoved: [], trend: [], aoty: [], verdicts: { peak: { source: null, items: [] }, divein: { source: null, items: [] }, onetime: { source: null, items: [] } }, last: { dmAnime: { title: "Don't Miss This — Anime", subtitle: null, items: many(300, 18) } } };
+  assert.deepEqual(ids(viewTile("dmAnime", offline).items), ids(many(300, 18)));
   // and while a tile is still loading, last time's title and shows are there at once
   const loading = viewTile("peak", { ...st, verdicts: null, last: { peak: { title: "Peak like Death Note", subtitle: null, items: many(700, 10) } } });
   assert.deepEqual([loading.title, loading.loading, loading.items.length], ["Peak like Death Note", false, 10]);
   // truly nothing and nothing remembered (first launch, offline): say so
-  assert.match(viewTile("isekai", offline.last ? { ...offline, last: {} } : offline).empty, /Can't load shows/);
+  assert.match(viewTile("dmAnime", { ...offline, last: {} }).empty, /Can't load shows/);
 });
 
 test("fixed lists ignore a seed, and poolFor leaves out what you've marked", () => {
   const st = { ...base(), seeds: { coming: 5, aoty: 5, jump: 5, seasons: 5 } };
   assert.deepEqual(ids(viewTile("aoty", st).items), [900, 901]);
   assert.deepEqual(ids(viewTile("jump", st).items), [800, 801]);
-  assert.equal(poolFor("isekai", { ...st, known: new Set(["anime:300"]) }).length, 29);
+  assert.equal(poolFor("dmAnime", { ...st, known: new Set(["anime:100"]) }).length, 59);
 });
 
 test("Peak like / Dive in like / One time like move to another of your titles, and the title follows", () => {

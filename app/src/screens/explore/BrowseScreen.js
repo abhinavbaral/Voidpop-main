@@ -11,8 +11,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Sidebar from "../../components/ui/Sidebar.js";
 import Card from "../../components/ui/Card.js";
 import {
-  fetchAniList, SORTS, SEASONS, GENRES, ANIME_ORIGINS, MANGA_ORIGINS, NOVEL_ORIGINS,
+  fetchAniList, fetchFilterNames, SORTS, SEASONS, ANIME_ORIGINS, MANGA_ORIGINS, NOVEL_ORIGINS,
 } from "@voidpop/shared/api/anilist";
+import { resolveGenreFilters } from "@voidpop/shared/features/genres";
 import { useTheme } from "../../context/ThemeContext.js";
 import { useGridColumns } from "../../utils/layout";
 import { openDetail } from "../../utils/nav";
@@ -54,7 +55,15 @@ export default function BrowseScreen({ navigation, route }) {
   const [season, setSeason] = useState("");
   const [year, setYear] = useState(String(THIS_YEAR));
   const [sort, setSort] = useState(route?.params?.sort || "popular"); // "See all" from Most loved opens it sorted by favourites
-  const [genre, setGenre] = useState("");
+  const [genre, setGenre] = useState(""); // a genre filter's label ("Isekai"), or "" for all
+  // the genre filters, each checked against the genres and tags AniList really has (trusted as listed until that loads)
+  const [genres, setGenres] = useState(() => resolveGenreFilters(null, null));
+  useEffect(() => {
+    let alive = true;
+    fetchFilterNames().then((n) => { if (alive) setGenres(resolveGenreFilters(n.genres, n.tags)); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+  const pickedGenre = genres.find((x) => x.key === genre) || null;
 
   const [items, setItems] = useState([]);
   const [page, setPage] = useState(1);
@@ -70,7 +79,7 @@ export default function BrowseScreen({ navigation, route }) {
       setLoading(true);
       setError(null);
       try {
-        const opts = { page: pageToLoad, sort, origin, genre };
+        const opts = { page: pageToLoad, sort, origin, ...(pickedGenre ? { [pickedGenre.kind]: pickedGenre.value } : {}) };
         const result = await fetchAniList(segment, {
           ...opts,
           season: segment === "anime" ? season : "",
@@ -91,7 +100,7 @@ export default function BrowseScreen({ navigation, route }) {
         loadingRef.current = false;
       }
     },
-    [segment, sort, origin, season, year, genre]
+    [segment, sort, origin, season, year, pickedGenre]
   );
   const retryFirst = useCallback(() => load(1, true), [load]);
 
@@ -115,8 +124,9 @@ export default function BrowseScreen({ navigation, route }) {
     {
       label: "Genres",
       value: genre,
-      options: [{ key: "", label: "All" }, ...GENRES.map((g) => ({ key: g, label: g }))],
+      options: [{ key: "", label: "All" }, ...genres.map((g) => ({ key: g.key, label: g.label }))],
       onSelect: setGenre,
+      hint: pickedGenre ? `${pickedGenre.label}: ${pickedGenre.hint}.` : null,
     },
     ...(segment === "anime"
       ? [
@@ -141,7 +151,7 @@ export default function BrowseScreen({ navigation, route }) {
   const summary = [
     SEGMENTS.find((s) => s.key === segment)?.label,
     ORIGIN_MAP[segment].find((o) => o.key === origin && o.key !== "")?.label,
-    genre || null,
+    pickedGenre?.label || null,
     segment === "anime" && season
       ? `${season[0].toUpperCase() + season.slice(1)} ${year}`
       : null,

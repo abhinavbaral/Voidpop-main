@@ -11,8 +11,6 @@
 // Plain functions, no storage and no screens: viewTile() turns the Explore state
 // into what one tile (and its category page) shows.
 
-import { genreFilter } from "./genreRows.js";
-
 export const PICK_COUNT = 18; // shows in a category
 const RANKING_COUNT = 30; // Most loved and Trending
 
@@ -31,8 +29,6 @@ export const TILES = [
   { key: "dmAnime", title: "Don't Miss This — Anime", color: "#148a08", reroll: true },
   { key: "dmManga", title: "Don't Miss This — Manga", color: "#af2896", reroll: true },
   { key: "dmNovels", title: "Don't Miss This — Novels", color: "#0d73ec", reroll: true },
-  { key: "isekai", title: "Isekai Heaven", color: "#608108", reroll: true },
-  { key: "shonen", title: "Shonen Feast", color: "#d84000", reroll: true },
   { key: "angles", title: "VoidPop Angles", color: "#509bf5", reroll: true },
 ];
 
@@ -43,8 +39,6 @@ export const EXTRA = {
   dmAnime: { segment: "anime", sort: "popular", maxPage: 8 },
   dmManga: { segment: "manga", sort: "popular", maxPage: 8 },
   dmNovels: { segment: "novel", sort: "popular", maxPage: 8 },
-  isekai: { segment: "anime", sort: "popular", maxPage: 4 }, // + genreQuery("isekai")
-  shonen: { segment: "anime", sort: "popular", maxPage: 3 }, // + genreQuery("shonen"): the top pages
   angles: { segment: "anime", sort: "popular", maxPage: 10 },
 };
 
@@ -78,12 +72,12 @@ const COUNTRY_LABEL = { JP: "Japan", KR: "Korea", CN: "China" };
 const MIN_SHOWN = 6; // a tile with fewer shows than this gets topped up
 
 // the unmarked shows a Reroll tile draws from (its AniList pages plus anything Reroll fetched)
-const POOL_OF = { talk: "trA", dmAnime: "popA", dmManga: "popM", dmNovels: "popN", isekai: "isekai", shonen: "shonen", angles: "popA" };
+const POOL_OF = { talk: "trA", dmAnime: "popA", dmManga: "popM", dmNovels: "popN", angles: "popA" };
 export function poolFor(key, st) {
   const base = st.pools?.[POOL_OF[key]];
   if (!base) return [];
   const known = st.known || new Set();
-  return dedupe(genreFilter(key, [...base, ...(st.extra?.[key] || [])])).filter((it) => !known.has(keyOf(it)));
+  return dedupe([...base, ...(st.extra?.[key] || [])]).filter((it) => !known.has(keyOf(it)));
 }
 
 // Which of your titles a verdict tile is "like": the one you reached last time if you still have it with that
@@ -196,11 +190,11 @@ function compute(key, st) {
       const t = topUp([], [...dedupe(st.pools?.coming || []).sort(byDate), ...(st.pools?.trA || [])]);
       return out(t.items, { subtitle: "No new seasons of your shows yet. Coming soon instead" });
     }
-    case "talk": case "dmAnime": case "dmManga": case "dmNovels": case "isekai": case "shonen": {
+    case "talk": case "dmAnime": case "dmManga": case "dmNovels": {
       if (!st.pools) return wait();
       const backups = key === "dmManga" ? st.pools.popM : key === "dmNovels" ? st.pools.popN : popular();
       const t = topUp(draw(poolFor(key, st)), backups);
-      return out(t.items, { subtitle: t.topped && (key === "isekai" || key === "shonen") ? "Not many left. Popular picks too" : null });
+      return out(t.items);
     }
     case "angles": {
       if (!st.pools) return wait();

@@ -5,7 +5,6 @@ import { useSyncExternalStore } from "react";
 import { readKey, writeKey } from "@voidpop/shared/backend/storage";
 import { fetchAniList } from "@voidpop/shared/api/anilist";
 import { loadExplorePools, knownKeys, loadVerdictSources, loadRecsLike, loadNewSeasons, loadAnimeOfTheYear, loadJumpBackIn, loadInProgress } from "@voidpop/shared/features/explore";
-import { genreQuery, genreFilter } from "@voidpop/shared/features/genreRows";
 import { TILES, EXTRA, PICK_COUNT, viewTile, dedupe, poolFor, chosenSource, nextSource } from "@voidpop/shared/features/exploreTiles";
 
 const SEEDS_KEY = "voidation:explore:seeds:v1"; // { tileKey: seed }: the order each tile was last rerolled to
@@ -90,8 +89,8 @@ async function topUpPools() {
     let extra = state.extra[key] || [];
     for (let page = 2; page <= 3 && poolFor(key, { ...state, extra }).length < PICK_COUNT; page++) {
       try {
-        const r = await fetchAniList(src.segment, { sort: src.sort, perPage: 25, page, ...genreQuery(key) });
-        extra = dedupe([...extra, ...genreFilter(key, r.items)]);
+        const r = await fetchAniList(src.segment, { sort: src.sort, perPage: 25, page, ...(src.tag ? { tag: src.tag } : {}) });
+        extra = dedupe([...extra, ...r.items]);
       } catch { break; }
     }
     if (extra.length !== (state.extra[key] || []).length) set({ extra: { ...state.extra, [key]: extra.slice(0, 150) } });
@@ -108,7 +107,7 @@ export async function initExplore() {
     try { set({ verdictChoice: JSON.parse((await readKey(VERDICT_KEY)) || "{}") }); } catch { /* start fresh */ }
   }
   await Promise.all([
-    loadExplorePools().then((pools) => set({ pools })).then(topUpPools).catch(() => set({ pools: state.pools || { trA: [], popA: [], popM: [], popN: [], coming: [], isekai: [], shonen: [] } })),
+    loadExplorePools({ extras: false }).then((pools) => set({ pools })).then(topUpPools).catch(() => set({ pools: state.pools || { trA: [], popA: [], popM: [], popN: [], coming: [] } })),
     loadAnimeOfTheYear().then((aoty) => set({ aoty })).catch(() => set({ aoty: state.aoty || [] })),
     fetchAniList("anime", { sort: "loved", perPage: 50 }).then((r) => set({ mostLoved: r.items })).catch(() => set({ mostLoved: state.mostLoved || [] })),
     loadTrend(state.country),
@@ -127,10 +126,10 @@ export async function reroll(key) {
     try {
       const page = 1 + Math.floor(Math.random() * src.maxPage);
       const r = await Promise.race([
-        fetchAniList(src.segment, { sort: src.sort, perPage: 25, page, ...genreQuery(key) }),
+        fetchAniList(src.segment, { sort: src.sort, perPage: 25, page, ...(src.tag ? { tag: src.tag } : {}) }),
         sleep(6000).then(() => { throw new Error("slow"); }),
       ]);
-      more = genreFilter(key, r.items);
+      more = r.items;
     } catch { /* offline or slow: reshuffle what we already have */ }
   }
   // Peak like / Dive in like / One time like: move to another of your titles, so the title changes too

@@ -29,6 +29,13 @@ const sortMap = {
 
 export const SEASONS = ["winter", "spring", "summer", "fall"];
 
+// Every genre and (non-adult) tag AniList has, so a filter is only used with a name AniList knows.
+// → { genres: [...], tags: [...] }. Saved like other requests, so it's fetched rarely.
+export async function fetchFilterNames() {
+  const d = await gql("query { GenreCollection MediaTagCollection { name isAdult } }", {});
+  return { genres: d.GenreCollection || [], tags: (d.MediaTagCollection || []).filter((x) => !x.isAdult).map((x) => x.name) };
+}
+
 // AniList's genre list (its adult genre left out)
 export const GENRES = [
   "Action", "Adventure", "Comedy", "Drama", "Ecchi", "Fantasy", "Horror", "Mahou Shoujo", "Mecha", "Music",
@@ -240,7 +247,7 @@ export async function fetchAniList(segment, opts = {}) {
   const kind = novel ? "manga" : segment;
   const {
     page = 1, sort = "popular", search = "", origin = "",
-    season = "", year = null, unreleasedOnly = false, perPage = 24, genre = "", tag = "", tags = [], genreNotIn = [],
+    season = "", year = null, unreleasedOnly = false, perPage = 24, genre = "", tag = "",
   } = opts;
 
   const args = ["type: $type", "isAdult: false", "sort: $sort"];
@@ -261,10 +268,6 @@ export async function fetchAniList(segment, opts = {}) {
 // with one voter-added "Isekai" tag (like Fullmetal Alchemist: Brotherhood)
 // lands in Isekai Heaven. 60 keeps only shows the tag really describes.
   if (tag) { varDefs.push("$tag: String"); args.push("tag: $tag", "tagMinimumRank: 60"); variables.tag = tag; }
-  // tags: several at once, matching ANY of them (Isekai Heaven: "Isekai" or "Reincarnation")
-  if (tags.length) { varDefs.push("$tags: [String]"); args.push("tag_in: $tags", "tagMinimumRank: 60"); variables.tags = tags; }
-  // genreNotIn: leave out any title with one of these genres (Shonen Feast: no romance or sports)
-  if (genreNotIn.length) { varDefs.push("$genreNotIn: [String]"); args.push("genre_not_in: $genreNotIn"); variables.genreNotIn = genreNotIn; }
   if (segment === "anime" && season) {
     varDefs.push("$season: MediaSeason", "$seasonYear: Int");
     args.push("season: $season", "seasonYear: $seasonYear");

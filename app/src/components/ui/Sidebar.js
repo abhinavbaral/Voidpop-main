@@ -2,7 +2,7 @@
 // then each filter as tappable chips (Genres, Origin, Sort), Season as four
 // tiles with the season's icon, Year as a sideways row. Changes apply
 // instantly; tap outside or ✕ to close.
-//   sections: [{ label, value, options: [{ key, label, icon? }], onSelect, layout?: "chips" | "tiles" | "row" }]
+//   sections: [{ label, value, options: [{ key, label, icon? }], onSelect, layout?: "chips" | "tiles" | "row", hint? }]
 
 import { useEffect, useRef } from "react";
 import {
@@ -35,6 +35,7 @@ function Section({ sec, C }) {
       ) : (
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>{sec.options.map(chip)}</View>
       )}
+      {!!sec.hint && <Text style={{ color: C.faint, fontSize: 12, marginTop: 8, lineHeight: 17 }}>{sec.hint}</Text>}
     </View>
   );
 }

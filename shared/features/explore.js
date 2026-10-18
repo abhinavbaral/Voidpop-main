@@ -5,7 +5,6 @@
 // shows you've watched. Picks are the same all day; pulling to refresh
 // shuffles everything except Anime of the Year.
 
-import { genreQuery, genreFilter } from "./genreRows.js";
 import { fetchAniList, fetchAnimeOfTheYear, fetchRecommendations, fetchSequels } from "../api/anilist.js";
 import { readKey, writeKey } from "../backend/storage.js";
 import { seasonOf, shiftSeason, seasonTitle } from "./seasonChart.js";
@@ -22,7 +21,7 @@ const rotate = (arr, by) =>
 // than the rows so they stay full after that.
 // shuffle: a pull-to-refresh asks for different pages, so the rows change.
 // Without it (first load of the day) the picks are the same all day.
-export async function loadExplorePools({ shuffle = false } = {}) {
+export async function loadExplorePools({ shuffle = false, extras = true } = {}) {
   const page = (max) => (shuffle ? 1 + Math.floor(Math.random() * max) : 1);
   const get = (segment, sort, p, extra = {}) =>
     fetchAniList(segment, { sort, perPage: 25, page: p, ...extra }).then((r) => r.items).catch(() => []);
@@ -40,8 +39,9 @@ export async function loadExplorePools({ shuffle = false } = {}) {
     get("manga", "popular", popPage), get("manga", "popular", popPage + 1),
     get("novel", "popular", popPage), get("novel", "popular", popPage + 1),
     coming(now), coming(next),
-    get("anime", "popular", page(4), genreQuery("isekai")).then((xs) => genreFilter("isekai", xs)),
-    get("anime", "popular", page(3), genreQuery("shonen")).then((xs) => genreFilter("shonen", xs)), // the top pages: the big names
+    // the website's Isekai / Shonen rows; the app left them out, so it asks with extras: false
+    extras ? get("anime", "popular", page(4), { tag: "Isekai" }) : [],
+    extras ? get("anime", "popular", page(6), { tag: "Shounen" }) : [],
   ]);
   return {
     trA, popA: [...popA1, ...popA2], popM: [...popM1, ...popM2], popN: [...popN1, ...popN2],
