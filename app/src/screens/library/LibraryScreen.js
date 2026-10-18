@@ -1,21 +1,18 @@
-// YOUR LIBRARY — laid out like Spotify's: the VoidPop logo, "Your Library", a search icon
-// and a + button on top; Anime / Manga / Novels as chips; then your playlists.
-//   - Every status is a playlist made by VoidPop (Watching, Completed, Plan to Watch…), with a
-//     cover collage. Tap one to open its titles (PlaylistScreen).
-//   - The + button makes a playlist of your own (a category). Long-press one to rename or delete it.
+// YOUR LIBRARY — laid out like Spotify's: the VoidPop logo, "Your Library" and a search
+// icon on top; Anime / Manga / Novels as chips; then your playlists.
+//   - Every status that has titles in it is a playlist made by VoidPop (Watching, Completed,
+//     Plan to Watch…), with one cover: the show you touched last. A status with no titles
+//     isn't shown. Tap one to open its titles (PlaylistScreen).
 //   - The search icon searches your titles in the chosen kind, across every playlist, like it always has.
 //   - "Recents" sorts the playlists; the icon on the right switches between a list and a grid.
 // Saved on this phone. Airing anime get a fresh next-episode countdown when this opens.
 
 import { useCallback, useMemo, useState } from "react";
-import { View, Text, TextInput, FlatList, StyleSheet, TouchableOpacity, Alert, useWindowDimensions } from "react-native";
+import { View, Text, TextInput, FlatList, StyleSheet, TouchableOpacity, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import { useAuth } from "@voidpop/shared/backend/AuthContext";
-import {
-  getLibrary, statusesFor, LIBRARY_KINDS as KINDS, kindOf, kindsMissing, fillKinds, noteAiring,
-  getCategories, addCategory, renameCategory, deleteCategory,
-} from "@voidpop/shared/backend/store";
+import { getLibrary, statusesFor, LIBRARY_KINDS as KINDS, kindOf, kindsMissing, fillKinds, noteAiring } from "@voidpop/shared/backend/store";
 import { buildPlaylists, searchEntries, PLAYLIST_SORTS } from "@voidpop/shared/features/playlists";
 import { fetchNextEpisodes, fetchKinds } from "@voidpop/shared/api/anilist";
 import { useSettings } from "@voidpop/shared/backend/SettingsContext";
@@ -27,7 +24,6 @@ import Icon from "../../components/ui/Icon.js";
 import OptionsSheet from "../../components/ui/OptionsSheet.js";
 import LibraryCard from "../../components/library/LibraryCard.js";
 import PlaylistItem from "../../components/library/PlaylistItem.js";
-import NamePlaylistModal from "../../components/library/NamePlaylistModal.js";
 import { VoidmonEmpty } from "../../components/brand/Voidmon.js";
 
 export default function LibraryScreen({ navigation }) {
@@ -41,16 +37,13 @@ export default function LibraryScreen({ navigation }) {
   const { user } = useAuth();
   const [kind, setKind] = useState("anime");
   const [entries, setEntries] = useState([]);
-  const [cats, setCats] = useState([]);
   const [sort, setSort] = useState("recents");
   const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState("");
-  const [sheet, setSheet] = useState(null); // "sort" | a custom playlist (rename / delete)
-  const [naming, setNaming] = useState(null); // { id?, name }: making a new playlist, or renaming
+  const [sheet, setSheet] = useState(null); // "sort"
 
   const reload = useCallback(async () => {
     setEntries(Object.values(await getLibrary(user).catch(() => ({}))));
-    setCats(await getCategories().catch(() => []));
   }, [user]);
 
   useFocusEffect(
@@ -76,30 +69,11 @@ export default function LibraryScreen({ navigation }) {
 
   const current = KINDS.find((k) => k.key === kind);
   const kindEntries = useMemo(() => entries.filter((e) => kindOf(e.item) === kind), [entries, kind]);
-  const playlists = useMemo(() => buildPlaylists(kindEntries, statusesFor(current.segment), cats, sort), [kindEntries, current.segment, cats, sort]);
+  const playlists = useMemo(() => buildPlaylists(kindEntries, statusesFor(current.segment), sort), [kindEntries, current.segment, sort]);
   const results = useMemo(() => searchEntries(kindEntries, query), [kindEntries, query]);
   const q = query.trim();
 
-  const open = (p) => navigation.navigate("Playlist", { kind, type: p.type, ref: p.ref, title: p.name });
-  const createPlaylist = async (name) => {
-    const made = await addCategory(name);
-    if (!made) return name.trim() ? "You already have a playlist with that name." : "Give it a name.";
-    reload();
-    return null;
-  };
-  const rename = async (name) => {
-    const id = naming.id;
-    const clean = name.trim();
-    if (!clean) return "Give it a name.";
-    if (cats.some((c) => c.id !== id && c.name.toLowerCase() === clean.toLowerCase())) return "You already have a playlist with that name.";
-    await renameCategory(id, clean);
-    reload();
-    return null;
-  };
-  const askDelete = (p) => Alert.alert(`Delete "${p.name}"?`, "The titles stay in your library; only the playlist goes.", [
-    { text: "Cancel", style: "cancel" },
-    { text: "Delete", style: "destructive", onPress: async () => { await deleteCategory(p.ref); reload(); } },
-  ]);
+  const open = (p) => navigation.navigate("Playlist", { kind, ref: p.ref, title: p.name });
 
   const toggleSearch = () => { setSearching((s) => !s); setQuery(""); };
   const sortLabel = PLAYLIST_SORTS.find((s) => s.key === sort)?.label;
@@ -111,9 +85,6 @@ export default function LibraryScreen({ navigation }) {
         <Text style={styles.title} accessibilityRole="header" numberOfLines={1}>Your Library</Text>
         <TouchableOpacity onPress={toggleSearch} hitSlop={10} accessibilityRole="button" accessibilityLabel={searching ? "Close search" : "Search your library"}>
           <Icon name={searching ? "close" : "search"} size={24} color={C.text} />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setNaming({ name: "" })} hitSlop={10} accessibilityRole="button" accessibilityLabel="Make a playlist">
-          <Icon name="plus" size={26} color={C.text} />
         </TouchableOpacity>
       </View>
 
@@ -154,10 +125,10 @@ export default function LibraryScreen({ navigation }) {
             keyExtractor={(p) => p.id}
             columnWrapperStyle={grid ? { gap: 14, paddingHorizontal: 14, marginBottom: 16 } : undefined}
             contentContainerStyle={{ paddingBottom: 30, paddingTop: grid ? 4 : 0 }}
-            renderItem={({ item: p }) => (
-              <PlaylistItem playlist={p} kind={kind} grid={grid} width={tile} onPress={() => open(p)}
-                onLongPress={p.type === "custom" ? () => setSheet(p) : undefined} />
-            )}
+            renderItem={({ item: p }) => <PlaylistItem playlist={p} kind={kind} grid={grid} width={tile} onPress={() => open(p)} />}
+            ListEmptyComponent={
+              <VoidmonEmpty pose="peeking" text={`Your ${current.label} library is empty. Add a title from Explore or Search and it shows up here.`} />
+            }
           />
         </>
       )}
@@ -169,19 +140,6 @@ export default function LibraryScreen({ navigation }) {
         onPick={(k) => { setSort(k); setSheet(null); }}
         onClose={() => setSheet(null)}
       />
-      <OptionsSheet
-        visible={!!sheet && sheet !== "sort"}
-        title={sheet?.name}
-        options={[{ key: "rename", label: "Rename" }, { key: "delete", label: "Delete playlist", danger: true }]}
-        onPick={(k) => {
-          const p = sheet;
-          setSheet(null);
-          if (k === "rename") setNaming({ id: p.ref, name: p.name }); else askDelete(p);
-        }}
-        onClose={() => setSheet(null)}
-      />
-      <NamePlaylistModal visible={!!naming} title={naming?.id ? "Rename playlist" : "Make a playlist"} initial={naming?.name || ""}
-        onSave={naming?.id ? rename : createPlaylist} onClose={() => setNaming(null)} />
     </SafeAreaView>
   );
 }

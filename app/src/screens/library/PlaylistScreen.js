@@ -1,7 +1,6 @@
-// One playlist opened from Your Library: a status (Watching, Completed, Plan to Watch…)
-// or a playlist you made. Its titles with the sort, four layouts (compact, comfortable,
-// covers, list), "Pick for me" and long-press to select several (move them to another status,
-// add them to or take them out of a playlist, or remove them from your library).
+// One playlist opened from Your Library: a status (Watching, Completed, Plan to Watch…).
+// Its titles with the sort, four layouts (compact, comfortable, covers, list), "Pick for me"
+// and long-press to select several (move them to another status, or remove them from your library).
 
 import { useCallback, useMemo, useState } from "react";
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert } from "react-native";
@@ -10,7 +9,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useAuth } from "@voidpop/shared/backend/AuthContext";
 import {
   getLibrary, statusesFor, LIBRARY_KINDS as KINDS, kindOf, LIBRARY_SORTS, LIBRARY_LAYOUTS, sortEntries, getLibraryDates,
-  getCategories, renameCategory, deleteCategory, bulkSetStatus, bulkCategory, bulkRemove,
+  bulkSetStatus, bulkRemove,
 } from "@voidpop/shared/backend/store";
 import { playlistEntries } from "@voidpop/shared/features/playlists";
 import { useSettings } from "@voidpop/shared/backend/SettingsContext";
@@ -19,13 +18,12 @@ import { useGridColumns } from "../../utils/layout";
 import { openDetail, goBackOrHome } from "../../utils/nav";
 import OptionsSheet from "../../components/ui/OptionsSheet.js";
 import LibraryCard from "../../components/library/LibraryCard.js";
-import NamePlaylistModal from "../../components/library/NamePlaylistModal.js";
 import PickForMe from "../../components/explore/PickForMe.js";
 import { VoidmonEmpty } from "../../components/brand/Voidmon.js";
 import Icon from "../../components/ui/Icon.js";
 
 export default function PlaylistScreen({ navigation, route }) {
-  const { kind, type, ref } = route.params;
+  const { kind, ref, title } = route.params;
   const { C } = useTheme();
   const styles = makeStyles(C);
   const { settings, update } = useSettings();
@@ -33,20 +31,16 @@ export default function PlaylistScreen({ navigation, route }) {
   const gridCols = useGridColumns(layout === "cover" ? 120 : 190);
   const cols = layout === "list" ? 1 : gridCols;
   const { user } = useAuth();
-  const [title, setTitle] = useState(route.params.title);
   const [entries, setEntries] = useState([]);
   const [dates, setDates] = useState({});
-  const [cats, setCats] = useState([]);
   const [sort, setSort] = useState("updated");
   const [picking, setPicking] = useState(false);
   const [selected, setSelected] = useState(null); // null = not selecting; Set of keys while selecting
-  const [sheet, setSheet] = useState(null); // "status" | "category" | "sort" | "layout" | "more"
-  const [renaming, setRenaming] = useState(false);
+  const [sheet, setSheet] = useState(null); // "status" | "sort" | "layout"
 
   const reload = useCallback(async () => {
     setEntries(Object.values(await getLibrary(user).catch(() => ({}))));
     setDates(await getLibraryDates().catch(() => ({})));
-    setCats(await getCategories().catch(() => []));
   }, [user]);
   useFocusEffect(useCallback(() => { reload(); }, [reload]));
 
@@ -60,24 +54,10 @@ export default function PlaylistScreen({ navigation, route }) {
   const bulk = async (fn) => { const keys = [...(selected || [])]; setSheet(null); setSelected(null); await fn(keys); reload(); };
 
   const current = KINDS.find((k) => k.key === kind);
-  const custom = type === "custom";
   const sorts = LIBRARY_SORTS.filter((s) => !s.anime || current.segment === "anime");
-  const list = useMemo(() => playlistEntries(entries.filter((e) => kindOf(e.item) === kind), type, ref), [entries, kind, type, ref]);
+  const list = useMemo(() => playlistEntries(entries.filter((e) => kindOf(e.item) === kind), ref), [entries, kind, ref]);
   const filtered = sortEntries(list, sort, dates);
   const sortLabel = sorts.find((x) => x.key === sort)?.label || "Sort";
-
-  const askDelete = () => Alert.alert(`Delete "${title}"?`, "The titles stay in your library; only the playlist goes.", [
-    { text: "Cancel", style: "cancel" },
-    { text: "Delete", style: "destructive", onPress: async () => { await deleteCategory(ref); goBackOrHome(navigation); } },
-  ]);
-  const rename = async (name) => {
-    const clean = name.trim();
-    if (!clean) return "Give it a name.";
-    if (cats.some((c) => c.id !== ref && c.name.toLowerCase() === clean.toLowerCase())) return "You already have a playlist with that name.";
-    await renameCategory(ref, clean);
-    setTitle(clean);
-    return null;
-  };
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -85,13 +65,8 @@ export default function PlaylistScreen({ navigation, route }) {
         <TouchableOpacity onPress={() => goBackOrHome(navigation)} hitSlop={12} accessibilityLabel="Back"><Icon name="back" size={22} color={C.text} /></TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={styles.title} numberOfLines={1} accessibilityRole="header">{title}</Text>
-          <Text style={styles.sub}>Playlist • {custom ? "You" : "VoidPop"} • {list.length} {list.length === 1 ? "title" : "titles"}</Text>
+          <Text style={styles.sub}>Playlist • VoidPop • {list.length} {list.length === 1 ? "title" : "titles"}</Text>
         </View>
-        {custom && (
-          <TouchableOpacity onPress={() => setSheet("more")} hitSlop={12} accessibilityRole="button" accessibilityLabel="Playlist options">
-            <Icon name="more" size={22} color={C.text} />
-          </TouchableOpacity>
-        )}
       </View>
 
       <View style={styles.tools}>
@@ -117,11 +92,8 @@ export default function PlaylistScreen({ navigation, route }) {
           <Text style={styles.bulkCount}>{selected.size} selected</Text>
           <Text style={styles.bulkBtn} onPress={() => setSelected(new Set(filtered.map(keyOf)))}>All</Text>
           <Text style={[styles.bulkBtn, !selected.size && styles.bulkOff]} onPress={selected.size ? () => setSheet("status") : undefined}>Move</Text>
-          {(cats.length > 0 || custom) && (
-            <Text style={[styles.bulkBtn, !selected.size && styles.bulkOff]} onPress={selected.size ? () => setSheet("category") : undefined}>Playlist</Text>
-          )}
           <Text style={[styles.bulkBtn, { color: C.rose }, !selected.size && styles.bulkOff]}
-            onPress={selected.size ? () => Alert.alert(`Remove ${selected.size} from your library?`, "Their progress and playlists are lost.", [
+            onPress={selected.size ? () => Alert.alert(`Remove ${selected.size} from your library?`, "Their progress is lost.", [
               { text: "Cancel", style: "cancel" },
               { text: "Remove", style: "destructive", onPress: () => bulk(bulkRemove) },
             ]) : undefined}>Remove</Text>
@@ -148,9 +120,7 @@ export default function PlaylistScreen({ navigation, route }) {
         )}
         ListEmptyComponent={
           <VoidmonEmpty pose="peeking"
-            text={custom
-              ? "Nothing in this playlist yet. Open a title and add it here, or long-press titles in another playlist and choose Playlist."
-              : `Nothing in ${title} yet. ${current.segment === "manga" ? "Find something to read!" : "Tag some titles!"}`} />
+            text={`Nothing in ${title} yet. ${current.segment === "manga" ? "Find something to read!" : "Tag some titles!"}`} />
         }
       />
 
@@ -159,16 +129,6 @@ export default function PlaylistScreen({ navigation, route }) {
         title={`Move ${selected?.size || 0} to`}
         options={statusesFor(current.segment).map((st) => ({ key: st.key, label: st.label }))}
         onPick={(status) => bulk((keys) => bulkSetStatus(keys, status))}
-        onClose={() => setSheet(null)}
-      />
-      <OptionsSheet
-        visible={sheet === "category"}
-        title="Playlists"
-        options={[
-          ...cats.map((c) => ({ key: `+${c.id}`, label: `Add to ${c.name}` })),
-          ...(custom ? [{ key: `-${ref}`, label: `Take out of ${title}` }] : []),
-        ]}
-        onPick={(k) => bulk((keys) => bulkCategory(keys, k.slice(1), k[0] === "+"))}
         onClose={() => setSheet(null)}
       />
       <OptionsSheet
@@ -185,14 +145,6 @@ export default function PlaylistScreen({ navigation, route }) {
         onPick={(k) => { update("libraryLayout", k); setSheet(null); }}
         onClose={() => setSheet(null)}
       />
-      <OptionsSheet
-        visible={sheet === "more"}
-        title={title}
-        options={[{ key: "rename", label: "Rename" }, { key: "delete", label: "Delete playlist", danger: true }]}
-        onPick={(k) => { setSheet(null); if (k === "rename") setRenaming(true); else askDelete(); }}
-        onClose={() => setSheet(null)}
-      />
-      <NamePlaylistModal visible={renaming} title="Rename playlist" initial={title} onSave={rename} onClose={() => setRenaming(false)} />
       <PickForMe visible={picking} entries={filtered} onClose={() => setPicking(false)}
         onOpen={(item) => { setPicking(false); openDetail(navigation, item); }} />
     </SafeAreaView>

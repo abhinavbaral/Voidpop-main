@@ -9,8 +9,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import { FlatList, View, Text, TouchableOpacity, StyleSheet, RefreshControl, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import PosterRow from "../../components/ui/PosterRow.js";
-import { loadCategoryRows } from "@voidpop/shared/backend/store";
 import Brand from "../../components/brand/Brand.js";
 import { buildExplore } from "@voidpop/shared/features/explore";
 import { greetingFor } from "@voidpop/shared/lib/greeting";
@@ -32,14 +30,12 @@ export default function ExploreScreen({ navigation }) {
   const wide = useIsWide();
   const { settings } = useSettings();
   const ex = useExplore();
-  const [catRows, setCatRows] = useState([]); // your categories (500+ completed), days 15–21
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => { initExplore(); }, []);
   // what's in your library and your verdicts change as you use the app, so these refresh on every visit
   useFocusEffect(useCallback(() => {
     refreshPersonal();
-    loadCategoryRows().then(setCatRows).catch(() => {});
   }, []));
 
   const refresh = async () => {
@@ -56,8 +52,6 @@ export default function ExploreScreen({ navigation }) {
   const sections = [
     featured && row("billboard", () => <Billboard item={featured} onOpen={open} />),
     row("new-eps", () => <NewEpisodeCards onOpen={open} />),
-    ...catRows.map((r) => ({ ...r, items: r.items.filter((it) => it.segment === "anime") })).filter((r) => r.items.length)
-      .map((r) => row(`cat-${r.id}`, () => <PosterRow title={r.title} items={r.items} onOpen={open} />)),
     row("coming-up", () => <Countdowns onOpen={open} />),
     row("tiles", () => <TileGrid state={ex} onOpen={(key) => navigation.navigate("ExploreCategory", { key })} />),
   ].filter(Boolean);

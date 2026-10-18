@@ -19,8 +19,8 @@ Android app, built from one codebase. No sign-up and no API keys: open it and us
 - **Library search and sort** (recently updated, A–Z, airing soonest, most to catch up)
 - **Delayed label** when a followed show's next episode moves later, with the original date
 - **AniList sync (two-way):** sign in with AniList; status and progress stay the same on the app, the website and
-  AniList. Verdicts, categories, Excited and the watch log stay on the device. See "Set up AniList sync" below.
-- **Categories + Select:** your own Library groups (More → Categories), bulk move / categorise / remove
+  AniList. Verdicts, Excited and the watch log stay on the device. See "Set up AniList sync" below.
+- **Select:** long-press titles in a playlist to bulk move or remove them
 - **Genre and studio filters** on the Season chart and Schedule; genre filter in Browse
 - **Background work (Android):** about hourly while closed: backup, episode alerts, widget, sync
 - **Explore only shows new things:** titles in your library or marked Excited are left out

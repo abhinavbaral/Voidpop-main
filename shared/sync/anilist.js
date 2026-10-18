@@ -2,7 +2,7 @@
 // holds the list, so the app and the website (and AniList's own site) all agree.
 //
 //   Synced:        status and progress of every anime and manga in your library
-//   Not synced:    verdicts, categories, Excited, the watch log (AniList has no
+//   Not synced:    verdicts, Excited, the watch log (AniList has no
 //                  place for them; they stay on this device and in your backups)
 //
 // How it works:

@@ -1,7 +1,7 @@
 // Library as playlists (like Spotify's Your Library). Each status is a playlist of
-// your titles (Watching, Completed, Plan to Watch…), made by VoidPop, and the lists
-// you make yourself (categories) are playlists too. Plain functions: the Library
-// screen shows what buildPlaylists() returns.
+// your titles (Watching, Completed, Plan to Watch…), made by VoidPop. A status with no
+// titles in it is not shown. Plain functions: the Library screen shows what
+// buildPlaylists() returns.
 
 export const PLAYLIST_SORTS = [
   { key: "recents", label: "Recents" },
@@ -11,26 +11,23 @@ export const PLAYLIST_SORTS = [
 
 const keyOf = (e) => `${e.item.segment}:${e.item.id}`;
 
-// statuses: [{ key, label }] for this kind (statusesFor), cats: [{ id, name }], entries: library entries of ONE kind.
-// → [{ id, type: "status" | "custom", ref (status key or category id), name, owner, count, covers (up to 4 cover urls), touched }]
-// Playlists are never left out: an empty one still shows (with no covers).
-export function buildPlaylists(entries, statuses, cats, sort = "recents") {
+// statuses: [{ key, label }] for this kind (statusesFor); entries: library entries of ONE kind.
+// → [{ id, ref (the status key), name, owner, count, cover (ONE cover url, or null), touched }]
+export function buildPlaylists(entries, statuses, sort = "recents") {
   const cover = (e) => e.item.imageSmall || e.item.image;
   const recent = (a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || "");
-  const make = (id, type, ref, name, owner, list) => {
-    const sorted = [...list].sort(recent);
-    return {
-      id, type, ref, name, owner, count: list.length,
-      covers: sorted.map(cover).filter(Boolean).slice(0, 4),
-      touched: sorted[0]?.updatedAt || "",
-    };
-  };
-  const out = [
-    ...statuses.map((s) => make(`status:${s.key}`, "status", s.key, s.label, "VoidPop", entries.filter((e) => e.status === s.key))),
-    ...cats.map((c) => make(`custom:${c.id}`, "custom", c.id, c.name, "You", entries.filter((e) => (e.cats || []).includes(c.id)))),
-  ];
+  const out = statuses
+    .map((s) => {
+      const sorted = entries.filter((e) => e.status === s.key).sort(recent);
+      return {
+        id: `status:${s.key}`, ref: s.key, name: s.label, owner: "VoidPop", count: sorted.length,
+        cover: sorted.map(cover).find(Boolean) || null, // one show: the one you touched last
+        touched: sorted[0]?.updatedAt || "",
+      };
+    })
+    .filter((p) => p.count > 0); // a status with no titles isn't shown
   const by = {
-    recents: (a, b) => (!a.count) - (!b.count) || b.touched.localeCompare(a.touched), // empty ones sink
+    recents: (a, b) => b.touched.localeCompare(a.touched),
     alpha: (a, b) => a.name.localeCompare(b.name),
     size: (a, b) => b.count - a.count || a.name.localeCompare(b.name),
   }[sort] || (() => 0);
@@ -38,8 +35,7 @@ export function buildPlaylists(entries, statuses, cats, sort = "recents") {
 }
 
 // The titles in one playlist (of one kind)
-export const playlistEntries = (entries, type, ref) =>
-  entries.filter((e) => (type === "custom" ? (e.cats || []).includes(ref) : e.status === ref));
+export const playlistEntries = (entries, ref) => entries.filter((e) => e.status === ref);
 
 // How many of the titles in a list match a search, for the "N found" line
 export function searchEntries(entries, query) {

@@ -4,7 +4,8 @@
 // There are no accounts. Everything lives in one JSON document on this device
 // (see storage.js):
 //   library  {"segment:id" -> { status, progress, cats, item snapshot, updatedAt, addedAt?, delay? }}
-//   categories [{ id, name }]  your own groups, like Mihon's ("Favourites", "Rewatch"…)
+//   categories [{ id, name }]  no longer used: the feature was removed. Kept as is so old backups restore
+//                              and export unchanged (entries may carry a matching `cats` list too)
 //   reviews  {"segment:id" -> { verdict, vibes, moods, comment, date }}
 //   excited  {"segment:id" -> { item, at }}
 //   settings { clock24, posterBadges, notifyEpisodes }
@@ -405,57 +406,7 @@ export function sortEntries(list, sort, dates = {}) {
   return s;
 }
 
-/* ---------- categories (your own groups) and bulk actions ---------- */
-
-export async function getCategories() {
-  return [...(await load()).categories];
-}
-
-export async function addCategory(name) {
-  const db = await load();
-  const clean = String(name || "").trim().slice(0, 40);
-  if (!clean) return null;
-  if (db.categories.some((c) => c.name.toLowerCase() === clean.toLowerCase())) return null;
-  const cat = { id: `c${Date.now().toString(36)}`, name: clean };
-  db.categories = [...db.categories, cat];
-  await save();
-  return cat;
-}
-
-export async function renameCategory(id, name) {
-  const db = await load();
-  const clean = String(name || "").trim().slice(0, 40);
-  if (!clean) return;
-  db.categories = db.categories.map((c) => (c.id === id ? { ...c, name: clean } : c));
-  await save();
-}
-
-export async function moveCategory(id, by) {
-  const db = await load();
-  const i = db.categories.findIndex((c) => c.id === id);
-  const j = i + by;
-  if (i < 0 || j < 0 || j >= db.categories.length) return;
-  const list = [...db.categories];
-  [list[i], list[j]] = [list[j], list[i]];
-  db.categories = list;
-  await save();
-}
-
-// Deleting a category never deletes titles; they just leave that category.
-export async function deleteCategory(id) {
-  const db = await load();
-  db.categories = db.categories.filter((c) => c.id !== id);
-  Object.values(db.library).forEach((e) => { if (e.cats?.includes(id)) e.cats = e.cats.filter((c) => c !== id); });
-  await save();
-}
-
-export async function setEntryCategories(segment, id, cats) {
-  const db = await load();
-  const e = db.library[keyOf(segment, id)];
-  if (!e) return;
-  e.cats = [...new Set(cats)];
-  await save();
-}
+/* ---------- bulk actions ---------- */
 
 // keys: ["anime:123", …]. Status changes go through setStatus so sync and
 // progress rules apply exactly as if you'd changed them one by one.
@@ -466,17 +417,6 @@ export async function bulkSetStatus(keys, status) {
     // a title that isn't out yet can only be planned or considered
     if (e && (status === "plan" || status === "considering" || !e.item.unreleased)) await setStatus(null, e.item.segment, e.item, status);
   }
-}
-export async function bulkCategory(keys, catId, add) {
-  const db = await load();
-  keys.forEach((k) => {
-    const e = db.library[k];
-    if (!e) return;
-    const cats = new Set(e.cats || []);
-    if (add) cats.add(catId); else cats.delete(catId);
-    e.cats = [...cats];
-  });
-  await save();
 }
 export async function bulkRemove(keys) {
   const db = await load();
@@ -545,39 +485,6 @@ export function scheduleOrder(a, b) {
   return dayMinute(a.next) - dayMinute(b.next) || (a.next?.airingAt ?? Infinity) - (b.next?.airingAt ?? Infinity);
 }
 
-/* ---------- Playlists (categories): your own lists ---------- */
-// Anyone can make them. With 500 completed anime each one also becomes a row at
-// the top of Explore during the third week of every month (days 15–21).
-
-export const CATEGORY_MIN = 500;
-export const SPOTLIGHT_MIN = CATEGORY_MIN; // older name
-export const spotlightWeek = (date = new Date()) => date.getDate() >= 15 && date.getDate() <= 21;
-
-export async function getCategoryAccess() {
-  const db = await load();
-  const anime = Object.values(db.library).filter((e) => e.item.segment === "anime" && isDone(e.status)).length;
-  return { unlocked: anime >= CATEGORY_MIN, animeCompleted: anime, needed: Math.max(0, CATEGORY_MIN - anime) };
-}
-// Playlists (categories) are for everyone now: the Library's + button makes one. Only the Explore
-// rows below stay a reward for 500 completed anime (getCategoryAccess still counts toward them).
-export const categoriesUnlocked = async () => true;
-export const getSpotlight = getCategoryAccess; // older name
-
-// The Explore rows: one per category with titles in it, or [] when they aren't
-// showing (locked, none made, or not the third week).
-export async function loadCategoryRows(date = new Date()) {
-  if (!spotlightWeek(date) || !(await getCategoryAccess()).unlocked) return [];
-  const db = await load();
-  return db.categories.map((c) => ({
-    id: c.id,
-    title: c.name,
-    items: Object.values(db.library)
-      .filter((e) => (e.cats || []).includes(c.id))
-      .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""))
-      .map((e) => e.item),
-  })).filter((r) => r.items.length);
-}
-
 /* ---------- pending: aired but not watched yet ---------- */
 
 // Your Watching anime that are airing now or that you're behind on, with how
@@ -633,7 +540,7 @@ export async function noteAiring(fresh) {
 //   remote: [{ status, progress, updatedAt, item }]  (your whole AniList list)
 //   skip:   keys with changes of yours still waiting to be sent (yours win)
 //   removed: keys AniList had last time but not now (you deleted them there)
-// Newest change wins, like the import. Categories, verdicts and the log are untouched.
+// Newest change wins, like the import. Verdicts and the log are untouched.
 export async function applyAniListPull(remote, { skip = new Set(), removed = [] } = {}) {
   const db = await load();
   const result = { added: 0, updated: 0, removed: 0, oursNewer: [] };
@@ -1046,14 +953,13 @@ export async function importData(json) {
 }
 
 // Export → Library list: every title as a spreadsheet-friendly CSV
-// (Type, Title, Status, Progress, Total, Verdict, Categories, AniList link).
+// (Type, Title, Status, Progress, Total, Verdict, link).
 export async function exportLibraryCsv() {
   const db = await load();
   const cell = (v) => {
     const s = v == null ? "" : String(v);
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
-  const catName = Object.fromEntries(db.categories.map((c) => [c.id, c.name]));
   const rows = Object.entries(db.library)
     .sort((a, b) => a[1].item.title.localeCompare(b[1].item.title))
     .map(([key, e]) => {
@@ -1061,9 +967,9 @@ export async function exportLibraryCsv() {
       const label = statusesFor(seg).find((s) => s.key === e.status)?.label || e.status;
       const verdict = VERDICTS.find((v) => v.key === db.reviews[key]?.verdict)?.label || "";
       return [KIND_NAME[kindOf(e.item)], e.item.title, label, e.progress || 0, totalFor(e.item) ?? "",
-        verdict, (e.cats || []).map((c) => catName[c]).filter(Boolean).join("; "), e.item.url || ""].map(cell).join(",");
+        verdict, e.item.url || ""].map(cell).join(",");
     });
-  return ["Type,Title,Status,Progress,Total,Verdict,Categories,Link", ...rows].join("\n") + "\n";
+  return ["Type,Title,Status,Progress,Total,Verdict,Link", ...rows].join("\n") + "\n";
 }
 
 // Export → Notes (Markdown): every title as a section with its status, verdict,
@@ -1071,7 +977,6 @@ export async function exportLibraryCsv() {
 // any notes app.
 export async function exportLibraryMarkdown() {
   const db = await load();
-  const catName = Object.fromEntries(db.categories.map((c) => [c.id, c.name]));
   const entries = Object.entries(db.library).sort((a, b) => a[1].item.title.localeCompare(b[1].item.title));
   const out = ["# VoidPop library", "", `${entries.length} titles, exported ${new Date().toISOString().slice(0, 10)}.`, ""];
   for (const [key, e] of entries) {
@@ -1084,8 +989,6 @@ export async function exportLibraryMarkdown() {
       `- Progress: ${e.progress || 0}${total != null ? ` of ${total}` : ""}`);
     if (verdict) out.push(`- Void Verdict: ${verdict}`);
     if (review?.vibes?.length) out.push(`- Vibes: ${review.vibes.join(", ")}`);
-    const cats = (e.cats || []).map((c) => catName[c]).filter(Boolean);
-    if (cats.length) out.push(`- Categories: ${cats.join(", ")}`);
     const note = db.notes?.[key]?.text;
     if (note) out.push("", ...note.split("\n").map((line) => `> ${line}`));
     out.push("");
@@ -1101,7 +1004,7 @@ export async function storageSize() {
 // Wipe the library, verdicts and Excited list. Settings stay.
 export async function clearData() {
   const db = await load();
-  cache = { ...EMPTY(), settings: db.settings, categories: db.categories }; // your categories stay, empty
+  cache = { ...EMPTY(), settings: db.settings };
   await save();
 }
 

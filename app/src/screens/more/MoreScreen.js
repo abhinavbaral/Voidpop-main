@@ -7,7 +7,7 @@ import { ScrollView, View, Text, Pressable, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useCallback, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
-import { getUserTier, TIERS, categoriesUnlocked } from "@voidpop/shared/backend/store";
+import { getUserTier, TIERS } from "@voidpop/shared/backend/store";
 import { useTheme } from "../../context/ThemeContext.js";
 import Voidmon from "../../components/brand/Voidmon.js";
 import AnimatedBanner from "../../components/brand/AnimatedBanner.js";
@@ -16,7 +16,7 @@ import Icon from "../../components/ui/Icon.js";
 const GROUPS = [
   [["statistics", "stats", "Statistics"], ["compare", "list", "Compare"], ["data", "storage", "Data and storage"]],
   [["youwatching", "play", "You're watching"], ["announced", "bell", "New announcements"]],
-  [["categories", "browse", "Playlists"], ["anilist", "sync", "Sync"]],
+  [["anilist", "sync", "Sync"]],
   [["settings", "palette", "Appearance and Settings"], ["help", "help", "Help"], ["about", "info", "About"]],
 ];
 
@@ -24,10 +24,8 @@ export default function MoreScreen({ navigation }) {
   const { C, dark } = useTheme();
   const styles = makeStyles(C);
   const [rank, setRank] = useState(null);
-  const [catsOpen, setCatsOpen] = useState(false); // Playlists are open to everyone
   useFocusEffect(useCallback(() => {
     getUserTier().then(setRank).catch(() => {});
-    categoriesUnlocked().then(setCatsOpen).catch(() => {});
   }, []));
   const next = rank && TIERS.find((t) => t.min > rank.stats.totalCompleted);
 
@@ -58,7 +56,7 @@ export default function MoreScreen({ navigation }) {
         )}
         {GROUPS.map((group, i) => (
           <View key={i} style={styles.group}>
-            {group.filter(([page]) => page !== "categories" || catsOpen).map(([page, icon, label]) => (
+            {group.map(([page, icon, label]) => (
               <Pressable
                 key={page}
                 style={({ pressed }) => [styles.row, pressed && { backgroundColor: C.card }]}

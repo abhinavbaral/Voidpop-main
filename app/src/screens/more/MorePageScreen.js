@@ -10,8 +10,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import {
   getUserTier, TIERS, statusesFor, exportData, clearData, storageSize, importAniListEntries,
-  getCategories, addCategory, renameCategory, moveCategory, deleteCategory,
-  getExcited, toggleExcited, celebrate, getCategoryAccess, CATEGORY_MIN, exportLibraryCsv, exportLibraryMarkdown,
+  getExcited, toggleExcited, celebrate, exportLibraryCsv, exportLibraryMarkdown,
 } from "@voidpop/shared/backend/store";
 import { useSettings } from "@voidpop/shared/backend/SettingsContext";
 import { THEMES, PALETTES, applyPalette } from "@voidpop/shared/lib/theme";
@@ -50,7 +49,7 @@ import { loadPeopleStats, PEOPLE_KINDS } from "@voidpop/shared/features/peopleSt
 const VERSION = appConfig.expo.version;
 const TITLES = {
   statistics: "Statistics", appearance: "Appearance and Settings", settings: "Appearance and Settings",
-  data: "Data and storage", youwatching: "You're watching", announced: "New announcements", badge: "Ranks and achievements", categories: "Playlists", compare: "Compare", anilist: "Sync", help: "Help", about: "About",
+  data: "Data and storage", youwatching: "You're watching", announced: "New announcements", badge: "Ranks and achievements", compare: "Compare", anilist: "Sync", help: "Help", about: "About",
 };
 
 export default function MorePageScreen({ route, navigation }) {
@@ -58,7 +57,7 @@ export default function MorePageScreen({ route, navigation }) {
   const { C } = useTheme();
   const styles = makeStyles(C);
   const page = route.params?.page;
-  const Body = { statistics: Statistics, settings: Settings, appearance: Settings, data: DataStorage, categories: Categories, compare: CompareTitles, anilist: AniListPage, announced: Announced, youwatching: YoureWatching, badge: BadgePage, help: Help, about: About }[page];
+  const Body = { statistics: Statistics, settings: Settings, appearance: Settings, data: DataStorage, compare: CompareTitles, anilist: AniListPage, announced: Announced, youwatching: YoureWatching, badge: BadgePage, help: Help, about: About }[page];
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -467,7 +466,7 @@ function DataStorage({ styles, C }) {
       <Row title="Import from MyAnimeList" sub="On myanimelist.net: Profile → Export Lists, download the anime (and manga) file, then pick it here. Titles already in VoidPop are kept as they are." onPress={importMal} />
 
       <Section>Export</Section>
-      <Row title="Library list" sub="Every title as a spreadsheet (CSV): status, progress, verdict, categories" onPress={exportList} />
+      <Row title="Library list" sub="Every title as a spreadsheet (CSV): status, progress, verdict" onPress={exportList} />
       <Row title="Notes (Markdown)" sub="Every title with its verdict and your note, as plain text for Obsidian or any notes app" onPress={exportNotes} />
 
       <Section>Danger zone</Section>
@@ -751,83 +750,6 @@ function Announced({ styles, C, navigation }) {
 }
 
 // Your own Library groups ("Favourites", "Rewatch", "With friends"…), like
-// Your own playlists (categories). Titles can be in several; deleting one keeps the titles.
-function Categories({ styles, C }) {
-  const [cats, setCats] = useState(null);
-  const [name, setName] = useState("");
-  const [editing, setEditing] = useState(null); // { id, name }
-  const [message, setMessage] = useState("");
-  const [access, setAccess] = useState(null);
-  const refresh = useCallback(() => { getCategories().then(setCats); getCategoryAccess().then(setAccess); }, []);
-  useFocusEffect(refresh);
-
-  const add = async () => {
-    const cat = await addCategory(name);
-    setMessage(cat ? "" : name.trim() ? "You already have a playlist with that name." : "");
-    if (cat) setName("");
-    refresh();
-  };
-  const remove = (c) => Alert.alert(`Delete "${c.name}"?`, "Only the playlist goes; the titles stay in your library.", [
-    { text: "Cancel", style: "cancel" },
-    { text: "Delete", style: "destructive", onPress: async () => { await deleteCategory(c.id); refresh(); } },
-  ]);
-  if (!cats || !access) return <SkeletonList rows={3} thumb={false} style={{ paddingHorizontal: 0 }} />;
-  if (!access.unlocked) {
-    return (
-      <View style={[styles.card, { borderColor: C.amber, opacity: 0.85 }]}>
-        <Text style={styles.cardTitle}>Unlocks at {CATEGORY_MIN} completed anime</Text>
-        <Text style={[styles.note, { marginTop: 4 }]}>
-          Then each playlist you make also becomes a row at the top of Explore during the third week
-          of every month. {access.needed} to go ({access.animeCompleted} completed).
-        </Text>
-      </View>
-    );
-  }
-  return (
-    <>
-      <Text style={styles.note}>
-        Playlists show in Your Library (the + button there makes one too). With {CATEGORY_MIN} completed anime each one is also your own row at the top of Explore during
-        the third week of every month (days 15–21). Add titles from a title's page, or long-press in a Library playlist to select several.
-      </Text>
-      <View style={[styles.modeRow, { marginTop: 12 }]}>
-        <TextInput value={name} onChangeText={setName} placeholder="New playlist, e.g. Hidden gems" placeholderTextColor={C.faint} maxLength={40}
-          onSubmitEditing={add} returnKeyType="done"
-          style={[styles.btn, { color: C.text, paddingHorizontal: 12, flex: 2, alignItems: undefined }]} />
-        <TouchableOpacity style={[styles.btn, styles.btnOn, !name.trim() && { opacity: 0.5 }]} disabled={!name.trim()} onPress={add}>
-          <Text style={[styles.btnText, { color: "#fff" }]}>Add</Text>
-        </TouchableOpacity>
-      </View>
-      {!!message && <Text style={{ color: C.rose, fontSize: 12, marginTop: 6 }}>{message}</Text>}
-      {cats.length === 0 ? <Text style={[styles.note, { marginTop: 16 }]}>No playlists yet.</Text> : (
-        <View style={styles.card}>
-          {cats.map((c, i) => (
-            <View key={c.id} style={[styles.trackerRow, i === 0 && { borderTopWidth: 0, marginTop: 0 }, { alignItems: "center", gap: 10 }]}>
-              {editing?.id === c.id ? (
-                <>
-                  <TextInput value={editing.name} autoFocus maxLength={40} onChangeText={(t) => setEditing({ ...editing, name: t })}
-                    style={[styles.btn, { color: C.text, paddingHorizontal: 10, flex: 1, alignItems: undefined, height: 36 }]} />
-                  <Text style={{ color: C.purple, fontWeight: "800" }}
-                    onPress={async () => { await renameCategory(c.id, editing.name); setEditing(null); refresh(); }}>Save</Text>
-                </>
-              ) : (
-                <>
-                  <Text style={[styles.trackerLabel, { flex: 1, color: C.text, fontWeight: "700" }]}>
-                    {c.name}
-                  </Text>
-                  <Text style={{ color: i === 0 ? C.border : C.sub, fontSize: 16 }} onPress={i === 0 ? undefined : async () => { await moveCategory(c.id, -1); refresh(); }}>↑</Text>
-                  <Text style={{ color: i === cats.length - 1 ? C.border : C.sub, fontSize: 16 }} onPress={i === cats.length - 1 ? undefined : async () => { await moveCategory(c.id, 1); refresh(); }}>↓</Text>
-                  <Text style={{ color: C.purple, fontWeight: "700" }} onPress={() => setEditing({ id: c.id, name: c.name })}>Rename</Text>
-                  <Text style={{ color: C.rose, fontWeight: "700" }} onPress={() => remove(c)}>Delete</Text>
-                </>
-              )}
-            </View>
-          ))}
-        </View>
-      )}
-    </>
-  );
-}
-
 // AniList: two-way sync (sign in) or a one-time import by username.
 function AniListPage({ styles, C }) {
   const { reload } = useSettings();

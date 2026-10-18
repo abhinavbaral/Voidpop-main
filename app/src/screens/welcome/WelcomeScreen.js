@@ -1,12 +1,12 @@
-// The first screen on every launch: a drifting wall of anime covers and a
-// swipe-to-start button (App starts here, see hooks/useInitialRoute). Also
-// opened from More > Help > Welcome tour.
-// Swiping goes to Main, or to Onboarding on a first run and for the tour.
+// The first screen on every launch: a drifting wall of anime covers and an arrow
+// button (App starts here, see hooks/useInitialRoute). Also opened from
+// More > Help > Welcome tour.
+// The button goes to Main, or to Onboarding on a first run and for the tour.
 import { useEffect, useState } from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CoverWall from "../../components/welcome/CoverWall";
-import SwipeButton from "../../components/welcome/SwipeButton";
+import ArrowButton from "../../components/welcome/ArrowButton";
 import { useLogo } from "../../components/brand/Brand";
 import { isOnboarded } from "@voidpop/shared/backend/store";
 import { getCoversForWelcome } from "../../services/swipeCovers";
@@ -44,11 +44,7 @@ export default function WelcomeScreen({ navigation, route }) {
         <Image source={logo} style={s.logo} resizeMode="contain" accessibilityLabel="VoidPop" />
         <Text style={s.title} accessibilityRole="header">{COPY.title}</Text>
         <Text style={s.sub}>{COPY.sub}</Text>
-        <SwipeButton
-          label={COPY.button}
-          knobSource={require("../../../assets/voidmon/voidmon-corrupted-knob.png")}
-          onComplete={start}
-        />
+        <ArrowButton label={COPY.button} onPress={start} />
       </View>
     </View>
   );

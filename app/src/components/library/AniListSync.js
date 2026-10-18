@@ -51,7 +51,7 @@ export default function AniListSync({ styles, C, onChange }) {
         <Text style={styles.cardTitle}>Sync with AniList</Text>
         <Text style={[styles.note, { marginTop: 6 }]}>
           Sign in once and your anime and manga lists stay the same everywhere: this app, the VoidPop website, and
-          AniList itself. Status and progress sync both ways. Verdicts, categories, Excited and your watch log stay on
+          AniList itself. Status and progress sync both ways. Verdicts, Excited and your watch log stay on
           this phone. The first sync merges both sides; nothing is deleted.
         </Text>
         <TouchableOpacity style={[styles.btn, styles.btnOn, { marginTop: 12, flex: undefined }]} onPress={signIn} disabled={signingIn}>
@@ -102,7 +102,7 @@ export default function AniListSync({ styles, C, onChange }) {
         )}
       </View>
       <Text style={[styles.note, { marginTop: 10 }]}>
-        Verdicts, categories, Excited and your watch log aren't synced (AniList has no place for them). They're in your backups.
+        Verdicts, Excited and your watch log aren't synced (AniList has no place for them). They're in your backups.
       </Text>
     </View>
   );

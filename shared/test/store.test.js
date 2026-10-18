@@ -79,12 +79,6 @@ test("MAL import adds new titles and never overwrites yours", async () => {
   assert.equal(l["anime:1"].status, "completed");
 });
 
-test("categories unlock at 500 completed anime", async () => {
-  const a = await s.getCategoryAccess();
-  assert.equal(a.unlocked, false);
-  assert.equal(a.needed, s.CATEGORY_MIN - a.animeCompleted);
-});
-
 test("CSV export quotes fields and has a header", async () => {
   await s.setStatus(null, "anime", anime(30, { title: 'Say "Hi", World' }), "plan");
   const csv = await s.exportLibraryCsv();

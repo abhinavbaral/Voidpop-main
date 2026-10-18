@@ -28,7 +28,7 @@ import { useAuth } from "@voidpop/shared/backend/AuthContext";
 import {
   statusesAllowed, getStatus, setStatus, addReview, getMyReview,
   getExcited, toggleExcited, getEntry, setProgress, noteAiring, totalFor, unitFor, airedFor, maxProgress, checkProgress,
-  getCategories, categoriesUnlocked, setEntryCategories, doneLabel, fillCompleted,
+  doneLabel, fillCompleted,
 } from "@voidpop/shared/backend/store";
 import { fetchAniListDetail, fetchAniListItem, fetchNextEpisodes } from "@voidpop/shared/api/anilist";
 import { readableAccent, withAlpha } from "@voidpop/shared/lib/color";
@@ -120,8 +120,6 @@ function DetailBody({ item, navigation }) {
   const [unreleased, setUnreleased] = useState(!!item.unreleased);
   const [autoMarked, setAutoMarked] = useState([]); // earlier seasons marked Completed for you
   const markEarlier = (s) => completeEarlierSeasons(item, s).then((added) => added.length && setAutoMarked(added)).catch(() => {});
-  const [cats, setCats] = useState([]);
-  const [myCats, setMyCats] = useState([]);
   const [shareOpen, setShareOpen] = useState(false);
   const [countdownOpen, setCountdownOpen] = useState(false);
   const [zoom, setZoom] = useState(false);
@@ -141,8 +139,6 @@ function DetailBody({ item, navigation }) {
     await fillCompleted(item); // completed = all watched, once the count is known
     const entry = await getEntry(item.segment, item.id);
     setProgressState(entry?.progress || 0);
-    setMyCats(entry?.cats || []);
-    setCats((await categoriesUnlocked()) ? await getCategories() : []); // categories unlock at 500 completed anime
     setDelay(entry?.delay?.episode === entry?.item.nextEpisode?.episode ? entry?.delay : null);
     setStatusState(await getStatus(user, item.segment, item.id));
     setMyReview(await getMyReview(user, item.segment, item.id));
@@ -252,24 +248,6 @@ function DetailBody({ item, navigation }) {
         <Text style={{ color: C.faint, fontSize: 11, marginTop: 8 }}>
           Not out yet: plan it or mark Excited. Excited titles move to Watching by themselves the day they come out. Tracking, progress and your verdict open once it starts.
         </Text>
-      )}
-      {!!status && cats.length > 0 && (
-        <View style={[styles.statusRow, { marginTop: 10 }]}>
-          {cats.map((c) => {
-            const on = myCats.includes(c.id);
-            return (
-              <TouchableOpacity key={c.id}
-                onPress={async () => {
-                  const next = on ? myCats.filter((x) => x !== c.id) : [...myCats, c.id];
-                  setMyCats(next);
-                  await setEntryCategories(item.segment, item.id, next);
-                }}
-                style={[styles.catChip, on && { backgroundColor: C.purple, borderColor: C.purple }]}>
-                <Text style={[styles.statusText, { fontSize: 11 }, on && { color: "#fff" }]}>{on ? "✓ " : "+ "}{c.name}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
       )}
     </>
   );
@@ -534,7 +512,6 @@ const makeStyles = (C) => StyleSheet.create({
     flexDirection: "row", alignItems: "center", gap: 12, marginTop: 10, padding: 10, borderRadius: 10,
     borderWidth: 1, borderColor: C.green, backgroundColor: C.card,
   },
-  catChip: { paddingHorizontal: 10, height: 28, borderRadius: 999, borderWidth: 1, borderColor: C.border, justifyContent: "center" },
   progressBox: { flexDirection: "row", alignItems: "center", gap: 8 },
   progressInput: {
     minWidth: 80, height: 40, borderRadius: 8, borderWidth: 1, borderColor: C.purple, backgroundColor: C.bg,
