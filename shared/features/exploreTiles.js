@@ -11,6 +11,8 @@
 // Plain functions, no storage and no screens: viewTile() turns the Explore state
 // into what one tile (and its category page) shows.
 
+import { genreFilter } from "./genreRows.js";
+
 export const PICK_COUNT = 18; // shows in a category
 const RANKING_COUNT = 30; // Most loved and Trending
 
@@ -41,8 +43,8 @@ export const EXTRA = {
   dmAnime: { segment: "anime", sort: "popular", maxPage: 8 },
   dmManga: { segment: "manga", sort: "popular", maxPage: 8 },
   dmNovels: { segment: "novel", sort: "popular", maxPage: 8 },
-  isekai: { segment: "anime", sort: "popular", tag: "Isekai", maxPage: 4 },
-  shonen: { segment: "anime", sort: "popular", tag: "Shounen", maxPage: 6 },
+  isekai: { segment: "anime", sort: "popular", maxPage: 4 }, // + genreQuery("isekai")
+  shonen: { segment: "anime", sort: "popular", maxPage: 3 }, // + genreQuery("shonen"): the top pages
   angles: { segment: "anime", sort: "popular", maxPage: 10 },
 };
 
@@ -81,7 +83,7 @@ export function poolFor(key, st) {
   const base = st.pools?.[POOL_OF[key]];
   if (!base) return [];
   const known = st.known || new Set();
-  return dedupe([...base, ...(st.extra?.[key] || [])]).filter((it) => !known.has(keyOf(it)));
+  return dedupe(genreFilter(key, [...base, ...(st.extra?.[key] || [])])).filter((it) => !known.has(keyOf(it)));
 }
 
 // Which of your titles a verdict tile is "like": the one you reached last time if you still have it with that

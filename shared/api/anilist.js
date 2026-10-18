@@ -240,7 +240,7 @@ export async function fetchAniList(segment, opts = {}) {
   const kind = novel ? "manga" : segment;
   const {
     page = 1, sort = "popular", search = "", origin = "",
-    season = "", year = null, unreleasedOnly = false, perPage = 24, genre = "", tag = "",
+    season = "", year = null, unreleasedOnly = false, perPage = 24, genre = "", tag = "", tags = [], genreNotIn = [],
   } = opts;
 
   const args = ["type: $type", "isAdult: false", "sort: $sort"];
@@ -261,6 +261,10 @@ export async function fetchAniList(segment, opts = {}) {
 // with one voter-added "Isekai" tag (like Fullmetal Alchemist: Brotherhood)
 // lands in Isekai Heaven. 60 keeps only shows the tag really describes.
   if (tag) { varDefs.push("$tag: String"); args.push("tag: $tag", "tagMinimumRank: 60"); variables.tag = tag; }
+  // tags: several at once, matching ANY of them (Isekai Heaven: "Isekai" or "Reincarnation")
+  if (tags.length) { varDefs.push("$tags: [String]"); args.push("tag_in: $tags", "tagMinimumRank: 60"); variables.tags = tags; }
+  // genreNotIn: leave out any title with one of these genres (Shonen Feast: no romance or sports)
+  if (genreNotIn.length) { varDefs.push("$genreNotIn: [String]"); args.push("genre_not_in: $genreNotIn"); variables.genreNotIn = genreNotIn; }
   if (segment === "anime" && season) {
     varDefs.push("$season: MediaSeason", "$seasonYear: Int");
     args.push("season: $season", "seasonYear: $seasonYear");

@@ -5,6 +5,7 @@
 // shows you've watched. Picks are the same all day; pulling to refresh
 // shuffles everything except Anime of the Year.
 
+import { genreQuery, genreFilter } from "./genreRows.js";
 import { fetchAniList, fetchAnimeOfTheYear, fetchRecommendations, fetchSequels } from "../api/anilist.js";
 import { readKey, writeKey } from "../backend/storage.js";
 import { seasonOf, shiftSeason, seasonTitle } from "./seasonChart.js";
@@ -39,8 +40,8 @@ export async function loadExplorePools({ shuffle = false } = {}) {
     get("manga", "popular", popPage), get("manga", "popular", popPage + 1),
     get("novel", "popular", popPage), get("novel", "popular", popPage + 1),
     coming(now), coming(next),
-    get("anime", "popular", page(4), { tag: "Isekai" }),
-    get("anime", "popular", page(6), { tag: "Shounen" }),
+    get("anime", "popular", page(4), genreQuery("isekai")).then((xs) => genreFilter("isekai", xs)),
+    get("anime", "popular", page(3), genreQuery("shonen")).then((xs) => genreFilter("shonen", xs)), // the top pages: the big names
   ]);
   return {
     trA, popA: [...popA1, ...popA2], popM: [...popM1, ...popM2], popN: [...popN1, ...popN2],
