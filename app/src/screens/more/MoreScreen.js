@@ -9,6 +9,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useCallback, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import { getUserTier } from "@voidpop/shared/backend/store";
+import { hasCommunity } from "@voidpop/shared/api/community";
 import { useTheme } from "../../context/ThemeContext.js";
 import Voidmon from "../../components/brand/Voidmon.js";
 import AnimatedBanner from "../../components/brand/AnimatedBanner.js";
@@ -17,7 +18,7 @@ import Icon from "../../components/ui/Icon.js";
 const GROUPS = [
   [["statistics", "stats", "Statistics"], ["compare", "list", "Compare"], ["data", "storage", "Data and storage"]],
   [["youwatching", "play", "You're watching"], ["announced", "bell", "New announcements"]],
-  [["anilist", "sync", "Sync"]],
+  [["anilist", "sync", "Sync"], ["account", "profile", "Account"]],
   [["settings", "palette", "Appearance and Settings"], ["help", "help", "Help"], ["about", "info", "About"]],
 ];
 
@@ -51,11 +52,11 @@ export default function MoreScreen({ navigation }) {
         </View>
         {GROUPS.map((group, i) => (
           <View key={i} style={styles.group}>
-            {group.map(([page, icon, label]) => (
+            {group.filter(([page]) => page !== "account" || hasCommunity()).map(([page, icon, label]) => (
               <Pressable
                 key={page}
                 style={({ pressed }) => [styles.row, pressed && { backgroundColor: C.card }]}
-                onPress={() => navigation.navigate("MorePage", { page })}
+                onPress={() => (page === "account" ? navigation.navigate("Account") : navigation.navigate("MorePage", { page }))}
               >
                 <View style={styles.icon}><Icon name={icon} size={21} color={C.purple} /></View>
                 <Text style={[styles.label, { flex: 1 }]}>{label}</Text>

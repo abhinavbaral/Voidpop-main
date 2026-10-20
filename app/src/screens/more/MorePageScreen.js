@@ -384,7 +384,7 @@ function DataStorage({ styles, C }) {
   });
   const exportNotes = () => run(async () => {
     try { await shareFile(`voidpop-library-${new Date().toISOString().slice(0, 10)}.md`, await exportLibraryMarkdown(), "text/markdown"); }
-    catch { setMessage("Couldn't export the notes."); }
+    catch { setMessage("Couldn't export the list."); }
   });
   // MyAnimeList: the .xml.gz from MAL's Export page (no MAL account link needed)
   const importMal = () => run(async () => {
@@ -467,7 +467,7 @@ function DataStorage({ styles, C }) {
 
       <Section>Export</Section>
       <Row title="Library list" sub="Every title as a spreadsheet (CSV): status, progress, verdict" onPress={exportList} />
-      <Row title="Notes (Markdown)" sub="Every title with its verdict and your note, as plain text for Obsidian or any notes app" onPress={exportNotes} />
+      <Row title="Library (Markdown)" sub="Every title with its verdict, as plain text for Obsidian or any notes app" onPress={exportNotes} />
 
       <Section>Danger zone</Section>
       <Row title="Clear library" sub="Removes every tracked title, verdict and Excited mark from this phone" onPress={clear} danger />
@@ -837,7 +837,7 @@ function About({ styles, C }) {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Your data</Text>
         <Text style={[styles.note, { marginTop: 6 }]}>
-          Your library, verdicts and notes are saved on this phone only. There's no VoidPop account and no server. The app looks up shows online, and talks to your synced account only if you sign in to sync. Back up or move your data in Data and storage.
+          Your library and verdicts are saved on this phone. A VoidPop account is optional. If you make one, your comments and the verdicts you give are visible to others (with your username, never your email), and a cloud backup of your library is private to you. You can delete the account and everything on it from More → Account. The app looks up shows online, and talks to your synced AniList account only if you sign in to sync. Back up or move your data in Data and storage.
         </Text>
       </View>
     </>

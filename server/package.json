@@ -1,0 +1,13 @@
+{
+  "name": "@voidpop/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "VoidPop backend: accounts, community Void Verdicts, comments, cloud sync. No dependencies; needs Node 22.5+ (uses the built-in SQLite).",
+  "engines": { "node": ">=22.5" },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning src/index.js",
+    "dev": "node --disable-warning=ExperimentalWarning --watch src/index.js",
+    "test": "node --disable-warning=ExperimentalWarning --test \"test/*.test.js\""
+  }
+}

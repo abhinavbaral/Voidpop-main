@@ -1,7 +1,7 @@
 {
   "name": "voidpop",
   "private": true,
-  "description": "VoidPop — anime & manga tracker with airing countdowns. Website (web/), mobile app (app/), shared logic (shared/). No accounts, no keys.",
+  "description": "VoidPop — anime & manga tracker with airing countdowns. Website (web/), mobile app (app/), backend (server/), shared logic (shared/). Accounts are optional; no keys needed.",
   "workspaces": [
     "app",
     "web",
@@ -12,10 +12,11 @@
     "app:demo": "npm run demo -w app",
     "web": "npm run dev -w web",
     "web:demo": "npm run demo -w web",
+    "server": "npm start --prefix server",
     "build:web": "npm run build -w web",
     "build:web:demo": "npm run build:demo -w web",
-    "lint": "eslint --no-error-on-unmatched-pattern app/App.js app/index.js app/src shared web/src",
-    "test": "npm test -w shared",
+    "lint": "eslint --no-error-on-unmatched-pattern app/App.js app/index.js app/src shared web/src server/src",
+    "test": "npm test -w shared && npm test --prefix server",
     "check:app": "cd app && npx expo export --platform android --output-dir ../.check-bundle && cd .. && rm -rf .check-bundle",
     "check": "npm run lint && npm test"
   },
