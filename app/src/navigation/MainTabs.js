@@ -1,4 +1,4 @@
-// The five bottom tabs: Explore / Library / History / Schedule / More.
+// The six bottom tabs: Explore / Cinema / Library / History / Schedule / More.
 // (Browse opens from Explore.)
 import { useEffect, useState } from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
@@ -6,6 +6,7 @@ import { onDataChange, getPending } from "@voidpop/shared/backend/store";
 import { useTheme } from "../context/ThemeContext";
 import Icon from "../components/ui/Icon";
 import ExploreScreen from "../screens/explore/ExploreScreen";
+import CinemaScreen from "../screens/cinema/CinemaScreen";
 import LibraryScreen from "../screens/library/LibraryScreen";
 import HistoryScreen from "../screens/schedule/HistoryScreen";
 import ScheduleScreen from "../screens/schedule/ScheduleScreen";
@@ -13,7 +14,7 @@ import MoreScreen from "../screens/more/MoreScreen";
 
 const Tabs = createBottomTabNavigator();
 
-const ICONS = { Explore: "explore", Library: "library", History: "history", Schedule: "schedule", More: "more" };
+const ICONS = { Explore: "explore", Cinema: "film", Library: "library", History: "history", Schedule: "schedule", More: "more" };
 
 // Pending episodes (aired, not watched) for the Schedule tab badge. Rechecked
 // when your library changes and once a minute.
@@ -44,6 +45,7 @@ export default function MainTabs() {
       })}
     >
       <Tabs.Screen name="Explore" component={ExploreScreen} />
+      <Tabs.Screen name="Cinema" component={CinemaScreen} />
       <Tabs.Screen name="Library" component={LibraryScreen} />
       <Tabs.Screen name="History" component={HistoryScreen} />
       <Tabs.Screen

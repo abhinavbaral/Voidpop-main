@@ -1,15 +1,8 @@
 # VoidPop
 
-**Anime, manga, movies and series, with live countdowns to the next episode.** A website, an
-Android app and an optional backend, built from one codebase. No sign-up and no API keys needed:
-open it and use it. Accounts, comments and community verdicts switch on when you run the server.
+**Anime and manga tracker with live countdowns to the next episode.** A website and an
+Android app, built from one codebase. No sign-up and no API keys: open it and use it.
 
-- **Movies & TV (app: Explore → Movies & TV; website: `/cinema`):** discover films and series (hero, trending, curated shelves, browse by
-  type, genre and sort), mark each Watchlist or Watched on its page, and give it a Void Verdict. Sample titles out of the box;
-  a free TMDB key makes it live
-- **Community (optional, needs the server):** accounts, comments with replies and likes on every title, and the
-  **Void Verdict meter** ("58% Peak · 28% Dive In …"), hidden until 20 people who finished or dropped it have given a verdict.
-  Cloud backup and restore between devices
 - **Schedule:** a live countdown for every airing anime you follow, plus everything
   airing this week, grouped by day in your own time zone
 - **Track** anime (Watching / Completed / Plan to Watch / On Hold / Dropped) and manga
