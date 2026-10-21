@@ -4,7 +4,10 @@
 import { useSyncExternalStore } from "react";
 import { readKey, writeKey } from "@voidpop/shared/backend/storage";
 import { fetchAniList } from "@voidpop/shared/api/anilist";
+import { fetchCinema } from "@voidpop/shared/api/tmdb";
 import { loadExplorePools, knownKeys, loadVerdictSources, loadRecsLike, loadNewSeasons, loadAnimeOfTheYear, loadJumpBackIn, loadInProgress } from "@voidpop/shared/features/explore";
+import { loadCinemaPools, loadComingBooks, loadAwards, loadNewSeasonsTv, loadMostLoved } from "@voidpop/shared/features/exploreCinema";
+import { likeMix } from "@voidpop/shared/features/exploreMix";
 import { TILES, EXTRA, PICK_COUNT, viewTile, dedupe, poolFor, chosenSource, nextSource } from "@voidpop/shared/features/exploreTiles";
 
 const SEEDS_KEY = "voidation:explore:seeds:v1"; // { tileKey: seed }: the order each tile was last rerolled to
@@ -14,7 +17,8 @@ const LAST_KEY = "voidation:explore:last:v1"; // { tileKey: { title, subtitle, i
 
 let state = {
   pools: null, known: new Set(), aoty: null, mostLoved: null, trend: null, country: "JP",
-  verdicts: null, verdictSources: null, verdictChoice: {}, newSeasons: null, jump: null, jumpFallback: [],
+  verdicts: null, verdictSources: null, verdictChoice: {}, newSeasons: null, newSeasonsTv: null, jump: null, jumpFallback: [],
+  oscars: null, emmys: null, lovedFrom: "mixed", billboardSeed: Math.floor(Math.random() * 1e9), // a new Billboard title on every refresh
   seeds: {}, saved: {}, extra: {}, busy: {}, last: {},
 };
 const listeners = new Set();
@@ -39,6 +43,14 @@ function scheduleLast() {
 export const getExplore = () => state;
 export const useExplore = () => useSyncExternalStore((cb) => { listeners.add(cb); return () => listeners.delete(cb); }, () => state);
 
+// the pools load in parts (AniList, then movies and TV, then upcoming manga and novels): each part adds to what is there
+const EMPTY_POOLS = { trA: [], popA: [], popM: [], popN: [], coming: [] };
+const mergePools = (patch) => set({ pools: { ...(state.pools || EMPTY_POOLS), ...patch } });
+// one more page of a Reroll source: movies and TV from TMDB, everything else from AniList
+const fetchMore = (src, page) => (src.tmdb
+  ? fetchCinema(src.tmdb, { sort: src.sort, page }).then((r) => r.items)
+  : fetchAniList(src.segment, { sort: src.sort, perPage: 25, page, ...(src.tag ? { tag: src.tag } : {}) }).then((r) => r.items));
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const VERDICTS = ["peak", "divein", "onetime"];
 const srcKey = (it) => `${it.segment}:${it.id}`;
@@ -50,6 +62,11 @@ const recsFor = async (source) => {
 const NO_VERDICTS = { peak: { source: null, items: [] }, divein: { source: null, items: [] }, onetime: { source: null, items: [] } };
 
 // each verdict tile: the title it is "like" (your choice from the last Reroll, else your most recent) and picks like it
+// Peak like One Piece: its own recommendations plus a few movies, series, anime, novels and manga that share its genres
+const mixed = (source, recs) => {
+  const p = state.pools || {};
+  return likeMix(source, recs, { anime: p.popA, manga: p.popM, novel: p.popN, movie: p.popMv, tv: p.popTv });
+};
 async function buildVerdicts() {
   const sources = state.verdictSources || {};
   const out = {};
@@ -57,7 +74,7 @@ async function buildVerdicts() {
     const source = chosenSource(sources[v], state.verdictChoice[v]);
     let items = [];
     if (source) { try { items = await recsFor(source); } catch { /* offline: the tile tops itself up */ } }
-    out[v] = { source, items };
+    out[v] = { source, items: source ? mixed(source, items) : items };
   }));
   set({ verdicts: out });
 }
@@ -69,7 +86,8 @@ export async function refreshPersonal() {
     knownKeys().then((known) => set({ known })).catch(() => {}),
     loadVerdictSources().then((verdictSources) => { set({ verdictSources }); return buildVerdicts(); }).catch(() => set({ verdicts: state.verdicts || NO_VERDICTS })),
     loadNewSeasons().then((newSeasons) => set({ newSeasons })).catch(() => set({ newSeasons: state.newSeasons || [] })),
-    loadJumpBackIn().then((jump) => set({ jump })).catch(() => set({ jump: state.jump || { anime: [], manga: [] } })),
+    loadNewSeasonsTv().then((newSeasonsTv) => set({ newSeasonsTv })).catch(() => set({ newSeasonsTv: state.newSeasonsTv || [] })),
+    loadJumpBackIn().then((jump) => set({ jump })).catch(() => set({ jump: state.jump || { anime: [], manga: [], tv: [] } })),
     loadInProgress().then((jumpFallback) => set({ jumpFallback })).catch(() => {}),
   ]);
 }
@@ -89,8 +107,7 @@ async function topUpPools() {
     let extra = state.extra[key] || [];
     for (let page = 2; page <= 3 && poolFor(key, { ...state, extra }).length < PICK_COUNT; page++) {
       try {
-        const r = await fetchAniList(src.segment, { sort: src.sort, perPage: 25, page, ...(src.tag ? { tag: src.tag } : {}) });
-        extra = dedupe([...extra, ...r.items]);
+        extra = dedupe([...extra, ...(await fetchMore(src, page))]);
       } catch { break; }
     }
     if (extra.length !== (state.extra[key] || []).length) set({ extra: { ...state.extra, [key]: extra.slice(0, 150) } });
@@ -106,12 +123,21 @@ export async function initExplore() {
     try { state = { ...state, last: JSON.parse((await readKey(LAST_KEY)) || "{}") }; listeners.forEach((l) => l()); } catch { /* start fresh */ }
     try { set({ verdictChoice: JSON.parse((await readKey(VERDICT_KEY)) || "{}") }); } catch { /* start fresh */ }
   }
+  set({ billboardSeed: Math.floor(Math.random() * 1e9) }); // every refresh shows a different Billboard title
+  const lovedAnime = fetchAniList("anime", { sort: "loved", perPage: 50 }).then((r) => r.items).catch(() => []);
+  const cinema = loadCinemaPools().then((c) => { mergePools(c); return c; }).catch(() => ({}));
   await Promise.all([
-    loadExplorePools({ extras: false }).then((pools) => set({ pools })).then(topUpPools).catch(() => set({ pools: state.pools || { trA: [], popA: [], popM: [], popN: [], coming: [] } })),
+    loadExplorePools({ extras: false }).then((pools) => mergePools(pools)).then(topUpPools).catch(() => mergePools({})),
+    cinema.then(() => topUpPools()),
+    loadComingBooks().then(mergePools).catch(() => {}),
+    loadAwards().then((a) => set({ oscars: a.oscars, emmys: a.emmys })).catch(() => set({ oscars: state.oscars || [], emmys: state.emmys || [] })),
     loadAnimeOfTheYear().then((aoty) => set({ aoty })).catch(() => set({ aoty: state.aoty || [] })),
-    fetchAniList("anime", { sort: "loved", perPage: 50 }).then((r) => set({ mostLoved: r.items })).catch(() => set({ mostLoved: state.mostLoved || [] })),
+    // Most loved: the VoidPop community once it has enough verdicts, until then a mix of everything's most loved
+    Promise.all([lovedAnime, cinema]).then(([la, c]) => loadMostLoved(la, c.topMv || [], c.topTv || []))
+      .then((r) => set({ mostLoved: r.items, lovedFrom: r.from }))
+      .catch(async () => set({ mostLoved: state.mostLoved || (await lovedAnime) })),
     loadTrend(state.country),
-    refreshPersonal(),
+    refreshPersonal().then(() => (state.verdictSources ? buildVerdicts() : null)), // again, now that movies and TV are in the pools
   ]);
 }
 
@@ -125,11 +151,7 @@ export async function reroll(key) {
   if (src) {
     try {
       const page = 1 + Math.floor(Math.random() * src.maxPage);
-      const r = await Promise.race([
-        fetchAniList(src.segment, { sort: src.sort, perPage: 25, page, ...(src.tag ? { tag: src.tag } : {}) }),
-        sleep(6000).then(() => { throw new Error("slow"); }),
-      ]);
-      more = r.items;
+      more = await Promise.race([fetchMore(src, page), sleep(6000).then(() => { throw new Error("slow"); })]);
     } catch { /* offline or slow: reshuffle what we already have */ }
   }
   // Peak like / Dive in like / One time like: move to another of your titles, so the title changes too
@@ -141,7 +163,7 @@ export async function reroll(key) {
       let items = [];
       try { items = await Promise.race([recsFor(next), sleep(6000).then(() => { throw new Error("slow"); })]); } catch { /* keep the current picks */ items = null; }
       if (items) {
-        verdicts = { ...state.verdicts, [key]: { source: next, items } };
+        verdicts = { ...state.verdicts, [key]: { source: next, items: mixed(next, items) } };
         verdictChoice = { ...state.verdictChoice, [key]: srcKey(next) };
         writeKey(VERDICT_KEY, JSON.stringify(verdictChoice)).catch(() => {});
       }

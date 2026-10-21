@@ -3,13 +3,16 @@
 // pull down to refresh, which rerolls every tile that can be rerolled).
 //
 // Fixed lists have no Reroll: Most loved and Trending (rankings), Coming soon (soonest
-// first), Anime of the Year (the winners), Jump back in and New seasons (your own shows).
+// first), the award winners (Anime of the Year, Oscars, Emmys), Jump back in and New seasons (your own
+// anime and TV). Everything else mixes anime, manga, novels, movies and TV.
 //
 // A tile is never empty: when its own list runs dry it tops up from related shows,
 // or shows what it showed last time (see viewTile).
 //
 // Plain functions, no storage and no screens: viewTile() turns the Explore state
 // into what one tile (and its category page) shows.
+
+import { interleave } from "./exploreMix.js";
 
 export const PICK_COUNT = 18; // shows in a category
 const RANKING_COUNT = 30; // Most loved and Trending
@@ -19,27 +22,36 @@ export const TILES = [
   { key: "peak", title: "Peak like", verdict: "Peak", color: "#e8115b", reroll: true },
   { key: "divein", title: "Dive in like", verdict: "Dive In", color: "#8d67ab", reroll: true },
   { key: "onetime", title: "One time like", verdict: "One Time", color: "#477d95", reroll: true },
-  { key: "talk", title: "Talk of the Week", color: "#dc148c", reroll: true },
+  { key: "talk", title: "Popular in town", color: "#dc148c", reroll: true },
   { key: "loved", title: "Most loved", color: "#e13300", reroll: false },
   { key: "trending", title: "Trending in", color: "#1e3264", reroll: false },
   { key: "coming", title: "Coming soon", color: "#006450", reroll: false },
   { key: "aoty", title: "Anime of the Year", color: "#ba5d07", reroll: false },
+  { key: "oscars", title: "Oscars", color: "#a1741a", reroll: false },
+  { key: "emmys", title: "Emmys", color: "#8c2f39", reroll: false },
   { key: "jump", title: "Jump back in", color: "#503750", reroll: false },
   { key: "seasons", title: "New seasons of shows you watched", color: "#7358ff", reroll: false },
   { key: "dmAnime", title: "Don't Miss This — Anime", color: "#148a08", reroll: true },
   { key: "dmManga", title: "Don't Miss This — Manga", color: "#af2896", reroll: true },
   { key: "dmNovels", title: "Don't Miss This — Novels", color: "#0d73ec", reroll: true },
+  { key: "dmMovies", title: "Don't Miss This — Movies", color: "#c0392b", reroll: true },
+  { key: "dmTv", title: "Don't Miss This — TV", color: "#0e7490", reroll: true },
   { key: "angles", title: "VoidPop Angles", color: "#509bf5", reroll: true },
 ];
+
+// What Explore shows, in order. The grid is the colourful tiles; the rows are posters in lines, each mixing
+// anime, manga, novels, movies and TV.
+export const GRID_KEYS = ["coming", "aoty", "oscars", "emmys", "jump", "seasons", "dmAnime", "dmManga", "dmMovies", "dmNovels", "dmTv", "angles", "trending"];
+export const ROW_KEYS = ["talk", "peak", "divein", "onetime", "loved"];
 
 // Where Reroll can fetch more shows from AniList (a random page; the picks then draw
 // from the bigger pool). Categories not listed here reshuffle what they already have.
 export const EXTRA = {
-  talk: { segment: "anime", sort: "trending", maxPage: 4 },
   dmAnime: { segment: "anime", sort: "popular", maxPage: 8 },
   dmManga: { segment: "manga", sort: "popular", maxPage: 8 },
   dmNovels: { segment: "novel", sort: "popular", maxPage: 8 },
-  angles: { segment: "anime", sort: "popular", maxPage: 10 },
+  dmMovies: { tmdb: "movie", sort: "popular", maxPage: 8 }, // movies and TV come from TMDB, the rest from AniList
+  dmTv: { tmdb: "tv", sort: "popular", maxPage: 8 },
 };
 
 const keyOf = (it) => `${it.segment}:${it.id}`;
@@ -72,9 +84,14 @@ const COUNTRY_LABEL = { JP: "Japan", KR: "Korea", CN: "China" };
 const MIN_SHOWN = 6; // a tile with fewer shows than this gets topped up
 
 // the unmarked shows a Reroll tile draws from (its AniList pages plus anything Reroll fetched)
-const POOL_OF = { talk: "trA", dmAnime: "popA", dmManga: "popM", dmNovels: "popN", angles: "popA" };
+const POOL_OF = { dmAnime: "popA", dmManga: "popM", dmNovels: "popN", dmMovies: "popMv", dmTv: "popTv" };
+// Popular in town and VoidPop Angles mix all five kinds, taken in turns
+const MIXED = {
+  talk: (p) => [p.trA, p.trMv, p.trTv, p.popM, p.popN],
+  angles: (p) => [p.popA, p.popM, p.popN, p.popMv, p.popTv],
+};
 export function poolFor(key, st) {
-  const base = st.pools?.[POOL_OF[key]];
+  const base = MIXED[key] && st.pools ? interleave(MIXED[key](st.pools), 200) : st.pools?.[POOL_OF[key]];
   if (!base) return [];
   const known = st.known || new Set();
   return dedupe([...base, ...(st.extra?.[key] || [])]).filter((it) => !known.has(keyOf(it)));
@@ -128,7 +145,8 @@ function compute(key, st) {
     const more = dedupe(fresh(backups)).filter((it) => !have.has(keyOf(it)));
     return { items: [...items, ...more].slice(0, count), topped: more.length > 0 };
   };
-  const popular = () => [...(st.pools?.popA || []), ...(st.pools?.trA || []), ...(st.mostLoved || [])];
+  // anime only: the anime tiles must never fill up with movies (Most loved now mixes every kind)
+  const popular = () => [...(st.pools?.popA || []), ...(st.pools?.trA || []), ...(st.mostLoved || []).filter((it) => it.segment === "anime")];
   // picks from a pool: the ones kept at the last Reroll if most are still unmarked, else the seeded draw
   const draw = (list, count = PICK_COUNT) => {
     const kept = fresh(st.saved?.[key]);
@@ -152,7 +170,10 @@ function compute(key, st) {
   switch (key) {
     case "loved": {
       if (st.mostLoved == null) return wait();
-      return out(fresh(st.mostLoved).slice(0, RANKING_COUNT));
+      // what the VoidPop community loves once enough people have given verdicts, until then a mix of everything's most loved
+      return out(fresh(st.mostLoved).slice(0, RANKING_COUNT), {
+        subtitle: st.lovedFrom === "community" ? "From the VoidPop community" : "Across anime, manga, novels, movies and TV",
+      });
     }
     case "trending": {
       const where = COUNTRY_LABEL[st.country] || "Japan";
@@ -162,11 +183,13 @@ function compute(key, st) {
     case "coming": {
       if (!st.pools) return wait();
       const yours = new Set((st.newSeasons || []).map((it) => it.id)); // sequels of shows you watched live in "New seasons"
-      const list = dedupe(fresh(st.pools.coming)).filter((it) => !yours.has(it.id));
+      // for everything: anime, manga, novels, movies and TV that haven't come out yet
+      const p = st.pools;
+      const list = dedupe(fresh([...(p.coming || []), ...(p.comingMv || []), ...(p.comingTv || []), ...(p.comingM || []), ...(p.comingN || [])])).filter((it) => !yours.has(it.id));
       const items = [...list].sort(byDate).slice(0, 24); // soonest first
       const label = st.pools.comingChip?.label || null;
       if (items.length < MIN_SHOWN) { // nothing announced: what everyone's watching
-        const t = topUp(items, st.pools.trA);
+        const t = topUp(items, interleave([st.pools.trA, st.pools.trMv, st.pools.trTv], 24));
         return out(t.items, { title: st.pools.comingTitle || def.title, subtitle: t.topped ? "Nothing more announced yet. What everyone's watching" : label });
       }
       return out(items, { title: st.pools.comingTitle || def.title, subtitle: label });
@@ -174,11 +197,18 @@ function compute(key, st) {
     case "aoty": {
       if (st.aoty == null) return wait({ subtitle: "Crunchyroll Awards" });
       if (st.aoty.length) return out(st.aoty, { subtitle: "Crunchyroll Awards" }); // may include shows you've watched
-      return out(fresh(st.mostLoved).slice(0, PICK_COUNT), { subtitle: "Winners can't load yet. Most loved instead" });
+      return out(fresh(st.mostLoved).filter((it) => it.segment === "anime").slice(0, PICK_COUNT), { subtitle: "Winners can't load yet. Most loved instead" });
+    }
+    case "oscars": case "emmys": {
+      const list = st[key];
+      const award = key === "oscars" ? "Best Picture winners" : "Drama and comedy series winners";
+      if (list == null) return wait({ subtitle: award });
+      if (list.length) return out(list, { subtitle: award }); // may include titles you've watched
+      return out(fresh(key === "oscars" ? st.pools?.topMv : st.pools?.topTv).slice(0, PICK_COUNT), { subtitle: "Winners can't load yet. Top rated instead" });
     }
     case "jump": {
       if (st.jump == null) return wait();
-      const left = st.jump.anime || [];
+      const left = interleave([st.jump.anime || [], st.jump.tv || []], 24); // anime and TV
       if (left.length) return out(left); // your own library, so not filtered
       if (st.jumpFallback?.length) return out(st.jumpFallback, { subtitle: "Nothing left behind. Still on your list" });
       const t = topUp([], [...(st.trend || []), ...popular()]);
@@ -186,22 +216,25 @@ function compute(key, st) {
     }
     case "seasons": {
       if (st.newSeasons == null) return wait();
-      if (st.newSeasons.length >= 1) return out(st.newSeasons);
+      const both = dedupe([...st.newSeasons, ...(st.newSeasonsTv || [])]); // anime sequels and new seasons of your series
+      if (both.length >= 1) return out(both);
       const t = topUp([], [...dedupe(st.pools?.coming || []).sort(byDate), ...(st.pools?.trA || [])]);
       return out(t.items, { subtitle: "No new seasons of your shows yet. Coming soon instead" });
     }
-    case "talk": case "dmAnime": case "dmManga": case "dmNovels": {
+    case "talk": case "dmAnime": case "dmManga": case "dmNovels": case "dmMovies": case "dmTv": {
       if (!st.pools) return wait();
-      const backups = key === "dmManga" ? st.pools.popM : key === "dmNovels" ? st.pools.popN : popular();
+      if ((key === "dmMovies" && !st.pools.popMv) || (key === "dmTv" && !st.pools.popTv)) return wait(); // movies and TV load a moment after anime
+      const backups = { dmManga: st.pools.popM, dmNovels: st.pools.popN, dmMovies: st.pools.popMv, dmTv: st.pools.popTv }[key] || popular();
       const t = topUp(draw(poolFor(key, st)), backups);
       return out(t.items);
     }
     case "angles": {
       if (!st.pools) return wait();
-      // never repeats what Don't Miss This — Anime shows right now
-      const shown = new Set((viewTile("dmAnime", { ...st, last: null }).items || []).map(keyOf));
-      const rest = poolFor(key, st).filter((it) => !shown.has(keyOf(it)));
-      const t = topUp(draw(rest.length ? rest : poolFor(key, st)), popular());
+      // never repeats what the Don't Miss This tiles show right now; still takes all five kinds in turns
+      const shown = new Set(["dmAnime", "dmManga", "dmNovels", "dmMovies", "dmTv"].flatMap((k) => (viewTile(k, { ...st, last: null }).items || []).map(keyOf)));
+      const kindLists = MIXED.angles(st.pools).map((l) => (l || []).filter((it) => !known.has(keyOf(it)) && !shown.has(keyOf(it))));
+      const rest = interleave(kindLists, 200);
+      const t = topUp(draw(rest.length ? rest : poolFor(key, st)), interleave([st.pools.popA, st.pools.popM, st.pools.popN, st.pools.popMv, st.pools.popTv], 30));
       return out(t.items);
     }
     default: return out([]);

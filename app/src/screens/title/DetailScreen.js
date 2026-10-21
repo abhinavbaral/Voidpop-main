@@ -16,7 +16,11 @@ import CastCrew from "../../components/title/CastCrew.js";
 import FillerGuide from "../../components/title/FillerGuide.js";
 import { loadFamiliarFaces } from "@voidpop/shared/features/peopleStats";
 import EpisodeList from "../../components/title/EpisodeList.js";
-import { NoteBox, WatchOrder } from "../../components/title/TitleExtras.js";
+import { WatchOrder } from "../../components/title/TitleExtras.js";
+import { hasCommunity, pushVerdict, dropVerdict } from "@voidpop/shared/api/community";
+import { useTitleVerdicts } from "@voidpop/shared/backend/useCommunity";
+import VerdictMeter from "../../components/community/VerdictMeter.js";
+import Comments from "../../components/community/Comments.js";
 import { addToCalendar } from "../../services/calendar";
 import { completeEarlierSeasons, undoEarlierSeasons } from "@voidpop/shared/features/earlierSeasons";
 import { getCachedItem, cacheItem, openDetail, goBackOrHome } from "../../utils/nav";
@@ -170,9 +174,19 @@ function DetailBody({ item, navigation }) {
     return () => { alive = false; };
   }, [item]); // eslint-disable-line react-hooks/exhaustive-deps -- runs once per title; refresh is recreated each render
 
+  // your verdict is saved on this phone first; signed in, the community's split follows your status
+  const community = useTitleVerdicts(item.segment, String(item.id));
+  const share = async (review, nextStatus) => {
+    const ok = review && nextStatus
+      ? await pushVerdict(item.segment, item.id, { verdict: review.verdict, status: nextStatus, moods: review.moods, title: item.title, image: item.imageSmall || item.image })
+      : await dropVerdict(item.segment, item.id);
+    if (ok) community.refresh();
+  };
+
   const pick = async (key) => {
     if (key === status) {
       await setStatus(user, item.segment, item, null);
+      share(null, null);
       setStatusState(null);
       return;
     }
@@ -182,6 +196,7 @@ function DetailBody({ item, navigation }) {
     }
     await setStatus(user, item.segment, item, key);
     setStatusState(key);
+    if (myReview) share(myReview, key);
     markEarlier(key);
   };
 
@@ -196,6 +211,7 @@ function DetailBody({ item, navigation }) {
   const saveVerdict = async ({ verdict, vibes, moods, comment }) => {
     await setStatus(user, item.segment, item, "completed");
     await addReview(user, item.segment, item.id, { verdict, vibes, moods, comment });
+    share({ verdict, moods }, "completed");
     setModalOpen(false);
     refresh();
     markEarlier("completed");
@@ -360,7 +376,6 @@ function DetailBody({ item, navigation }) {
           {item.segment === "anime" && <FillerGuide item={item} progress={progress} />}
 
           {item.segment === "manga" ? <WhereToRead links={read} /> : <WhereToWatch links={watch} youtube={youtube} segment={item.segment} />}
-          <NoteBox item={item} />
           {item.segment === "anime" && <EpisodeList episodes={episodes} progress={progress} />}
           {item.segment === "anime" && <WatchOrder item={item} navigation={navigation} />}
           <CastCrew {...cast} segment={item.segment} navigation={navigation} familiar={familiar} />
@@ -371,6 +386,9 @@ function DetailBody({ item, navigation }) {
               <ReviewCard review={myReview} onEdit={() => setModalOpen(true)} onShare={() => setShareOpen(true)} />
             </View>
           )}
+
+          {hasCommunity() && <VerdictMeter counts={community.counts} myVerdict={myReview?.verdict} />}
+          <Comments segment={item.segment} id={String(item.id)} onSignIn={() => navigation.navigate("Account")} />
 
           {/* related seasons / entries (anime & manga) */}
           {related.length > 0 && (

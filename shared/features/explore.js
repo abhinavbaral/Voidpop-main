@@ -6,9 +6,10 @@
 // shuffles everything except Anime of the Year.
 
 import { fetchAniList, fetchAnimeOfTheYear, fetchRecommendations, fetchSequels } from "../api/anilist.js";
+import { fetchSimilarCinema, isCinema } from "../api/tmdb.js";
 import { readKey, writeKey } from "../backend/storage.js";
 import { seasonOf, shiftSeason, seasonTitle } from "./seasonChart.js";
-import { getReviews, getLibrary, getExcited, VERDICTS, leftToWatch } from "../backend/store.js";
+import { getReviews, getLibrary, getExcited, getCinemaShelf, VERDICTS, leftToWatch } from "../backend/store.js";
 
 const daySeed = () =>
   Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0)) / 864e5);
@@ -72,8 +73,8 @@ export async function loadAnimeOfTheYear() {
 }
 
 export async function knownKeys() {
-  const [lib, excited] = await Promise.all([getLibrary(), getExcited()]);
-  return new Set([...Object.keys(lib), ...Object.keys(excited)]);
+  const [lib, excited, shelf] = await Promise.all([getLibrary(), getExcited(), getCinemaShelf()]);
+  return new Set([...Object.keys(lib), ...Object.keys(excited), ...shelf.map((e) => `${e.item.segment}:${e.item.id}`)]);
 }
 
 // seed: the day (same picks all day), or a random number after a refresh.
@@ -161,19 +162,22 @@ export async function loadVerdictRows() {
 // first. A tile starts on the first one; Reroll (or pulling down) moves it to another, and the tile's
 // title and its picks change with it: "Peak like Death Note" → "Peak like One Piece".
 export async function loadVerdictSources() {
-  const [reviews, lib] = await Promise.all([getReviews(), getLibrary()]);
+  const [reviews, lib, shelf] = await Promise.all([getReviews(), getLibrary(), getCinemaShelf()]);
   const out = {};
   for (const verdict of ["peak", "divein", "onetime"]) {
-    out[verdict] = reviews
-      .filter((r) => r.verdict === verdict && r.segment === "anime" && lib[`${r.segment}:${r.titleId}`])
-      .sort((a, b) => (b.date || "").localeCompare(a.date || ""))
-      .map((r) => lib[`${r.segment}:${r.titleId}`].item);
+    // anime, manga and novels from your library, and movies and TV from your shelf: any of your titles can be the one
+    const mine = reviews
+      .filter((r) => r.verdict === verdict && lib[`${r.segment}:${r.titleId}`])
+      .map((r) => ({ date: r.date || "", item: lib[`${r.segment}:${r.titleId}`].item }));
+    const films = shelf.filter((e) => e.review?.verdict === verdict).map((e) => ({ date: e.review.date || "", item: e.item }));
+    out[verdict] = [...mine, ...films].sort((a, b) => b.date.localeCompare(a.date)).map((x) => x.item);
   }
   return out;
 }
 
 // Picks like one of those titles (from AniList's recommendations): raw, the tile leaves out what you already have.
 export async function loadRecsLike(source) {
+  if (isCinema(source.segment)) return fetchSimilarCinema(source.segment, source.id);
   return fetchRecommendations(source.segment, source.id, 25);
 }
 
@@ -256,7 +260,11 @@ export async function loadJumpBackIn(now = Date.now()) {
     .filter((e) => { const left = leftToWatch(e); return left === null ? e.item.segment === "manga" : left > 0; })
     .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
   const pick = (seg) => entries.filter((e) => e.item.segment === seg).slice(0, 12).map((e) => e.item);
-  return { anime: pick("anime"), manga: [] }; // Explore is anime only
+  // series on your shelf have no episode count: Watching or On Hold and left alone for 3+ days
+  const tv = (await getCinemaShelf())
+    .filter((e) => e.item.segment === "tv" && ["watching", "onhold"].includes(e.status) && new Date(e.updatedAt || 0).toISOString() < cutoff)
+    .map((e) => e.item).slice(0, 12);
+  return { anime: pick("anime"), manga: [], tv }; // Jump back in is for anime and TV
 }
 
 // "Jump back in" when nothing is left behind: your anime still in progress (Watching, Rewatching,
@@ -266,5 +274,6 @@ export async function loadInProgress() {
   const recent = (a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || "");
   const started = entries.filter((e) => ["watching", "rewatching", "onhold"].includes(e.status)).sort(recent);
   const planned = entries.filter((e) => e.status === "plan").sort(recent);
-  return [...started, ...planned].slice(0, 18).map((e) => e.item);
+  const tv = (await getCinemaShelf()).filter((e) => e.item.segment === "tv" && ["watching", "onhold", "plan"].includes(e.status)).map((e) => e.item);
+  return [...started, ...planned].slice(0, 18).map((e) => e.item).concat(tv).slice(0, 18);
 }

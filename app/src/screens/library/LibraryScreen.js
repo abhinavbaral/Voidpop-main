@@ -1,5 +1,5 @@
 // YOUR LIBRARY — laid out like Spotify's: the VoidPop logo, "Your Library" and a search
-// icon on top; Anime / Manga / Novels as chips; then your playlists.
+// icon on top; Anime / Manga / Novels / Movies / TV as chips; then your playlists.
 //   - Every status that has titles in it is a playlist made by VoidPop (Watching, Completed,
 //     Plan to Watch…), with one cover: the show you touched last. A status with no titles
 //     isn't shown. Tap one to open its titles (PlaylistScreen).
@@ -12,7 +12,7 @@ import { View, Text, TextInput, FlatList, StyleSheet, TouchableOpacity, useWindo
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import { useAuth } from "@voidpop/shared/backend/AuthContext";
-import { getLibrary, statusesFor, LIBRARY_KINDS as KINDS, kindOf, kindsMissing, fillKinds, noteAiring } from "@voidpop/shared/backend/store";
+import { getLibrary, getLibraryAll, statusesFor, LIBRARY_KINDS as KINDS, kindOf, kindsMissing, fillKinds, noteAiring } from "@voidpop/shared/backend/store";
 import { buildPlaylists, searchEntries, PLAYLIST_SORTS } from "@voidpop/shared/features/playlists";
 import { fetchNextEpisodes, fetchKinds } from "@voidpop/shared/api/anilist";
 import { useSettings } from "@voidpop/shared/backend/SettingsContext";
@@ -43,8 +43,8 @@ export default function LibraryScreen({ navigation }) {
   const [sheet, setSheet] = useState(null); // "sort"
 
   const reload = useCallback(async () => {
-    setEntries(Object.values(await getLibrary(user).catch(() => ({}))));
-  }, [user]);
+    setEntries(Object.values(await getLibraryAll().catch(() => ({}))));
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -127,7 +127,7 @@ export default function LibraryScreen({ navigation }) {
             contentContainerStyle={{ paddingBottom: 30, paddingTop: grid ? 4 : 0 }}
             renderItem={({ item: p }) => <PlaylistItem playlist={p} kind={kind} grid={grid} width={tile} onPress={() => open(p)} />}
             ListEmptyComponent={
-              <VoidmonEmpty pose="peeking" text={`Your ${current.label} library is empty. Add a title from Explore or Search and it shows up here.`} />
+              <VoidmonEmpty pose="peeking" text={`Your ${current.label} library is empty. Add a title from Explore${current.segment === "movie" || current.segment === "tv" ? "" : " or Search"} and it shows up here.`} />
             }
           />
         </>

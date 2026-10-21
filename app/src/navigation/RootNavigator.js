@@ -2,7 +2,8 @@
 // the first launch and "Main" after that (see hooks/useInitialRoute).
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import MainTabs from "./MainTabs";
-import DetailScreen from "../screens/title/DetailScreen";
+import TitleScreen from "../screens/title/TitleScreen";
+import AccountScreen from "../screens/account/AccountScreen";
 import PersonScreen from "../screens/title/PersonScreen";
 import SearchScreen from "../screens/explore/SearchScreen";
 import SeasonScreen from "../screens/explore/SeasonScreen";
@@ -25,10 +26,11 @@ export default function RootNavigator({ initialRouteName }) {
           reusing the existing Detail screen with stale state */}
       <Stack.Screen
         name="Detail"
-        component={DetailScreen}
+        component={TitleScreen}
         getId={({ params }) => (params ? `${params.segment}:${params.id}` : undefined)}
       />
       <Stack.Screen name="Search" component={SearchScreen} />
+      <Stack.Screen name="Account" component={AccountScreen} />
       <Stack.Screen name="MorePage" component={MorePageScreen} />
       <Stack.Screen name="Season" component={SeasonScreen} />
       <Stack.Screen name="Browse" component={BrowseScreen} />

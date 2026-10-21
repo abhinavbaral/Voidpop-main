@@ -6,9 +6,8 @@ import { useCallback, useMemo, useState } from "react";
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
-import { useAuth } from "@voidpop/shared/backend/AuthContext";
 import {
-  getLibrary, statusesFor, LIBRARY_KINDS as KINDS, kindOf, LIBRARY_SORTS, LIBRARY_LAYOUTS, sortEntries, getLibraryDates,
+  getLibraryAll, statusesFor, LIBRARY_KINDS as KINDS, kindOf, LIBRARY_SORTS, LIBRARY_LAYOUTS, sortEntries, getLibraryDates,
   bulkSetStatus, bulkRemove,
 } from "@voidpop/shared/backend/store";
 import { playlistEntries } from "@voidpop/shared/features/playlists";
@@ -30,7 +29,6 @@ export default function PlaylistScreen({ navigation, route }) {
   const layout = settings.libraryLayout || "compact";
   const gridCols = useGridColumns(layout === "cover" ? 120 : 190);
   const cols = layout === "list" ? 1 : gridCols;
-  const { user } = useAuth();
   const [entries, setEntries] = useState([]);
   const [dates, setDates] = useState({});
   const [sort, setSort] = useState("updated");
@@ -39,9 +37,9 @@ export default function PlaylistScreen({ navigation, route }) {
   const [sheet, setSheet] = useState(null); // "status" | "sort" | "layout"
 
   const reload = useCallback(async () => {
-    setEntries(Object.values(await getLibrary(user).catch(() => ({}))));
+    setEntries(Object.values(await getLibraryAll().catch(() => ({}))));
     setDates(await getLibraryDates().catch(() => ({})));
-  }, [user]);
+  }, []);
   useFocusEffect(useCallback(() => { reload(); }, [reload]));
 
   const keyOf = (e) => `${e.item.segment}:${e.item.id}`;

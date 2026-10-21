@@ -2,12 +2,14 @@
 // Netflix's; the look is VoidPop's). Wide banner picture fading into the
 // page, the title, genres, two lines of story, and two buttons:
 // "My list" (adds it to Plan to Watch, or says where it already is) and Info.
+// It can be an anime, a movie or a TV series (never manga or a novel).
 import { useCallback, useState } from "react";
 import { View, Text, Image, Pressable, StyleSheet, useWindowDimensions } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import Svg, { Defs, LinearGradient, Stop, Rect } from "react-native-svg";
 import { useAuth } from "@voidpop/shared/backend/AuthContext";
-import { getStatus, setStatus, statusesFor } from "@voidpop/shared/backend/store";
+import { getStatus, setStatus, statusesFor, getCinemaEntry, setCinemaStatus } from "@voidpop/shared/backend/store";
+import { isCinema } from "@voidpop/shared/api/tmdb";
 import { useTheme } from "../../context/ThemeContext.js";
 import Icon from "../ui/Icon.js";
 
@@ -17,7 +19,9 @@ export default function Billboard({ item, onOpen }) {
   const { width } = useWindowDimensions();
   const [status, setStat] = useState(null);
   const read = useCallback(() => {
-    if (item) getStatus(user, item.segment, item.id).then(setStat).catch(() => {});
+    if (!item) return;
+    // movies and TV live on their own shelf, anime in the library
+    (isCinema(item.segment) ? getCinemaEntry(item.segment, item.id).then((e) => e?.status || null) : getStatus(user, item.segment, item.id)).then(setStat).catch(() => {});
   }, [user, item]);
   useFocusEffect(read);
   if (!item) return null;
@@ -26,10 +30,12 @@ export default function Billboard({ item, onOpen }) {
   const label = status ? statusesFor(item.segment).find((s) => s.key === status)?.label : null;
   const add = async () => {
     if (status) return onOpen(item);
-    await setStatus(user, item.segment, item, "plan");
+    if (isCinema(item.segment)) await setCinemaStatus(item, "plan");
+    else await setStatus(user, item.segment, item, "plan");
     read();
   };
-  const meta = [...(item.genres || []).slice(0, 3), item.finished ? "Finished" : "Airing"].join("  ·  ");
+  const kind = item.segment === "movie" ? "Movie" : item.segment === "tv" ? "Series" : item.finished ? "Finished" : "Airing";
+  const meta = [...(item.genres || []).slice(0, 3), kind].join("  ·  ");
 
   return (
     <View style={{ marginTop: 12 }}>

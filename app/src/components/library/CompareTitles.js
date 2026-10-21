@@ -7,13 +7,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import { View, Text, Image, Modal, FlatList, TextInput, TouchableOpacity, StyleSheet } from "react-native";
 import { fetchAniList } from "@voidpop/shared/api/anilist";
-import { getLibrary, getReviews, getNote, statusesFor, totalFor, isDone, kindOf, VERDICTS } from "@voidpop/shared/backend/store";
+import { getLibrary, getReviews, statusesFor, totalFor, isDone, kindOf, VERDICTS } from "@voidpop/shared/backend/store";
 import { fillerFor, fillerSummary } from "@voidpop/shared/features/fillers";
 import { useTheme } from "../../context/ThemeContext.js";
 
 const MAX = 5; // titles per side
 const SIDE = ["A", "B"];
-const KIND = { anime: "Anime", manga: "Manga", novel: "Novel" };
+const KIND = { anime: "Anime", manga: "Manga", novel: "Novel", movie: "Movie", tv: "TV" };
 const keyOf = (item) => `${item.segment}:${item.id}`;
 
 // one value: plain text, or { text, color } for a Void Verdict
@@ -43,7 +43,6 @@ export default function CompareTitles() {
   const styles = makeStyles(C);
   const [byKey, setByKey] = useState({}); // library entries
   const [reviews, setReviews] = useState({});
-  const [notes, setNotes] = useState({});
   const [sides, setSides] = useState([[], []]); // title keys chosen for A and B
   const [pool, setPool] = useState({}); // key → item, for every title chosen (library or not)
   const [slot, setSlot] = useState(null); // 0 or 1 while the picker is open for that side
@@ -63,14 +62,6 @@ export default function CompareTitles() {
     const item = entry?.item || pool[k];
     return item ? { key: k, item, entry } : null;
   }).filter(Boolean));
-
-  useEffect(() => {
-    groups.flat().forEach(({ key, item }) => {
-      if (notes[key] === undefined) {
-        getNote(item.segment, item.id).then((t) => setNotes((n) => ({ ...n, [key]: t }))).catch(() => {});
-      }
-    });
-  }, [sides]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // search AniList for titles that aren't in the library
   useEffect(() => {
@@ -116,12 +107,11 @@ export default function CompareTitles() {
       Genres: (item.genres || []).slice(0, 3).join(", ") || "None listed",
       Aired: (item.date || "").slice(0, 4) || "Unknown",
       Vibes: r?.vibes?.length ? r.vibes.join(", ") : null, // old verdicts only; the row hides when nobody has any
-      "Your note": (notes[key] || "").slice(0, 140) || "No note",
     };
   };
   const ready = groups[0].length > 0 && groups[1].length > 0;
   const facts = groups.map((g) => g.map(factsOf));
-  const labels = ["Type", "Status", "Progress", "Void Verdict", "Length", ...(facts.flat().some((f) => f.Filler) ? ["Filler"] : []), "Genres", "Aired", ...(facts.flat().some((f) => f.Vibes) ? ["Vibes"] : []), "Your note"];
+  const labels = ["Type", "Status", "Progress", "Void Verdict", "Length", ...(facts.flat().some((f) => f.Filler) ? ["Filler"] : []), "Genres", "Aired", ...(facts.flat().some((f) => f.Vibes) ? ["Vibes"] : [])];
   const several = groups.some((g) => g.length > 1);
   const tally = (g) => VERDICTS.map((v) => [v.label, g.filter((t) => reviews[t.key]?.verdict === v.key).length]).filter(([, n]) => n).map(([l, n]) => `${l} ${n}`).join(" · ") || "None given";
   const totals = several ? [

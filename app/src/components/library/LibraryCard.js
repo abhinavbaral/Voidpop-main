@@ -14,6 +14,7 @@ import { useTheme } from "../../context/ThemeContext.js";
 
 const progressLine = (entry) => {
   const item = entry.item;
+  if (item.segment === "movie" || item.segment === "tv") return [item.segment === "tv" ? "Series" : "Movie", item.dateLabel].filter(Boolean).join(" · "); // nothing to count
   const unit = item.segment === "manga" ? "Ch" : "Ep";
   const total = totalFor(item);
   return `${unit} ${entry.progress || 0}${total ? ` / ${total}` : ""}`;

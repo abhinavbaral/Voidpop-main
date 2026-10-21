@@ -1,9 +1,13 @@
-// EXPLORE — the homepage. Your live trackers on top (new episodes, Coming up), then a
-// fixed grid of category tiles like Spotify's Search page. The tile titles never change
-// or disappear; tap one for its shows. Pull down (or press Reroll in a category) for new
-// shows in every tile that can be rerolled; fixed lists (Most loved, Trending, Coming soon,
-// Anime of the Year, Jump back in, New seasons) just reload.
-// Browse opens from the button at the top.
+// EXPLORE — the homepage, top to bottom:
+//   1. the Billboard: one anime, movie or TV series, different on every refresh
+//   2. your live trackers (new episodes, Coming up)
+//   3. search (everything: anime, manga, novels, movies, TV) and the Browse button
+//   4. a fixed grid of category tiles like Spotify's Search page. The tile titles never change
+//      or disappear; tap one for its shows
+//   5. poster rows that each mix anime, manga, novels, movies and TV (Popular in town, Peak like …,
+//      Dive in like …, One time like …, Most loved)
+// Pull down (or press Reroll in a category) for new shows in every tile that can be rerolled;
+// fixed lists (Most loved, Trending, Coming soon, the awards, Jump back in, New seasons) just reload.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
@@ -11,6 +15,8 @@ import { FlatList, View, Text, TouchableOpacity, StyleSheet, RefreshControl, Pla
 import { SafeAreaView } from "react-native-safe-area-context";
 import Brand from "../../components/brand/Brand.js";
 import { buildExplore } from "@voidpop/shared/features/explore";
+import { billboardPick } from "@voidpop/shared/features/exploreMix";
+import { GRID_KEYS, ROW_KEYS, viewTile } from "@voidpop/shared/features/exploreTiles";
 import { greetingFor } from "@voidpop/shared/lib/greeting";
 import { useSettings } from "@voidpop/shared/backend/SettingsContext";
 import NamePrompt from "../../components/welcome/NamePrompt.js";
@@ -22,6 +28,7 @@ import AnimatedBanner from "../../components/brand/AnimatedBanner.js";
 import { NewEpisodeCards, Countdowns } from "../../components/explore/ExploreCards.js";
 import Billboard from "../../components/explore/Billboard.js";
 import TileGrid from "../../components/explore/TileGrid.js";
+import PosterRow from "../../components/ui/PosterRow.js";
 import { useExplore, initExplore, refreshPersonal, rerollAll } from "../../state/explore";
 
 export default function ExploreScreen({ navigation }) {
@@ -45,15 +52,38 @@ export default function ExploreScreen({ navigation }) {
   };
 
   const open = (item) => openDetail(navigation, item);
-  // the Billboard is the one thing that still changes by itself: a new trending show each day
-  const featured = useMemo(() => (ex.pools ? buildExplore(ex.pools, ex.known).featured : null), [ex.pools, ex.known]);
+  // the Billboard changes on every refresh: a trending anime, movie or TV series (never manga or a novel)
+  const featured = useMemo(
+    () => (ex.pools ? billboardPick(ex.pools, ex.billboardSeed) || buildExplore(ex.pools, ex.known).featured : null),
+    [ex.pools, ex.known, ex.billboardSeed],
+  );
+  const openCategory = (key) => navigation.navigate("ExploreCategory", { key });
+  const searchRow = (
+    <View style={styles.header}>
+      {/* search (everything) and Browse in one row */}
+      <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+        <TouchableOpacity onPress={() => navigation.navigate("Search")} style={[styles.searchBtn, { flex: 1, marginTop: 0 }]} accessibilityRole="search">
+          <Text style={{ color: C.faint, fontSize: 13 }} numberOfLines={1}>Search anime, manga, novels, movies, TV...</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.navigate("Browse")} style={[styles.searchBtn, { marginTop: 0 }]} accessibilityRole="button">
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}><Icon name="browse" size={14} color={C.text} /><Text style={{ color: C.text, fontSize: 13, fontWeight: "700" }}>Browse</Text></View>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 
   const row = (key, render) => ({ key, render });
   const sections = [
     featured && row("billboard", () => <Billboard item={featured} onOpen={open} />),
     row("new-eps", () => <NewEpisodeCards onOpen={open} />),
     row("coming-up", () => <Countdowns onOpen={open} />),
-    row("tiles", () => <TileGrid state={ex} onOpen={(key) => navigation.navigate("ExploreCategory", { key })} />),
+    !wide && row("search", () => searchRow),
+    row("tiles", () => <TileGrid state={ex} keys={GRID_KEYS} onOpen={openCategory} />),
+    // poster rows below the tiles, each a mix of all five kinds
+    ...ROW_KEYS.map((key) => row(`row-${key}`, () => {
+      const v = viewTile(key, ex);
+      return <PosterRow title={v.title} items={v.items || undefined} loading={v.loading} onOpen={open} onMore={() => openCategory(key)} />;
+    })),
   ].filter(Boolean);
 
   const header = !wide && (
@@ -63,17 +93,6 @@ export default function ExploreScreen({ navigation }) {
       <View style={StyleSheet.absoluteFill}><AnimatedBanner accent={C.purple} dark={dark} height={170} /></View>
       <View style={styles.heroTop}><Brand size={20} /></View>
       <Text style={styles.hello} accessibilityRole="header">{greetingFor(new Date().getHours(), settings.name)}</Text>
-    </View>
-    <View style={styles.header}>
-      {/* search and Browse in one row */}
-      <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-        <TouchableOpacity onPress={() => navigation.navigate("Search")} style={[styles.searchBtn, { flex: 1, marginTop: 0 }]}>
-          <Text style={{ color: C.faint, fontSize: 13 }}>Search anime and manga...</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => navigation.navigate("Browse")} style={[styles.searchBtn, { marginTop: 0 }]}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}><Icon name="browse" size={14} color={C.text} /><Text style={{ color: C.text, fontSize: 13, fontWeight: "700" }}>Browse</Text></View>
-        </TouchableOpacity>
-      </View>
     </View>
     </>
     ) || null;

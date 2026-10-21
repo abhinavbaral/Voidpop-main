@@ -22,11 +22,12 @@ function Tile({ v, width, onPress }) {
   );
 }
 
-export default function TileGrid({ state, onOpen }) {
+// keys: which tiles to show, in order (default: all of them)
+export default function TileGrid({ state, onOpen, keys }) {
   const { width } = useWindowDimensions();
   const columns = width >= 900 ? 4 : width >= 600 ? 3 : 2;
   const w = (width - PAD * 2 - GAP * (columns - 1)) / columns;
-  const views = useMemo(() => TILES.map((t) => viewTile(t.key, state)), [state]);
+  const views = useMemo(() => (keys || TILES.map((t) => t.key)).map((k) => viewTile(k, state)), [state, keys]);
   return (
     <View style={styles.grid}>
       {views.map((v) => <Tile key={v.key} v={v} width={w} onPress={() => onOpen(v.key)} />)}

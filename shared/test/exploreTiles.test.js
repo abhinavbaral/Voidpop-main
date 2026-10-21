@@ -1,7 +1,7 @@
 // Explore's fixed tiles: titles never change, only the shows (and only on Reroll).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { TILES, EXTRA, viewTile, seededShuffle, dedupe, poolFor, chosenSource, nextSource, PICK_COUNT } from "../features/exploreTiles.js";
+import { TILES, GRID_KEYS, ROW_KEYS, EXTRA, viewTile, seededShuffle, dedupe, poolFor, chosenSource, nextSource, PICK_COUNT } from "../features/exploreTiles.js";
 
 const show = (id, extra = {}) => ({ id, segment: "anime", title: `Show ${id}`, ...extra });
 const many = (from, n) => Array.from({ length: n }, (_, i) => show(from + i));
@@ -13,11 +13,12 @@ const base = () => ({
   newSeasons: [], jump: { anime: [show(800), show(801)], manga: [] }, seeds: {}, saved: {}, extra: {}, busy: {},
 });
 
-test("14 tiles with unique keys; the fixed lists can't be rerolled", () => {
-  assert.equal(TILES.length, 14);
-  assert.equal(new Set(TILES.map((t) => t.key)).size, 14);
+test("18 tiles with unique keys, split into the grid and the poster rows; the fixed lists can't be rerolled", () => {
+  assert.equal(TILES.length, 18);
+  assert.equal(new Set(TILES.map((t) => t.key)).size, 18);
+  assert.deepEqual([...GRID_KEYS, ...ROW_KEYS].sort(), TILES.map((t) => t.key).sort()); // every tile is shown exactly once
   assert.ok(!TILES.some((t) => ["isekai", "shonen"].includes(t.key))); // Isekai Heaven and Shonen Feast are gone: those are genres in Browse now
-  assert.deepEqual(TILES.filter((t) => !t.reroll).map((t) => t.key), ["loved", "trending", "coming", "aoty", "jump", "seasons"]);
+  assert.deepEqual(TILES.filter((t) => !t.reroll).map((t) => t.key), ["loved", "trending", "coming", "aoty", "oscars", "emmys", "jump", "seasons"]);
   Object.keys(EXTRA).forEach((k) => assert.ok(TILES.find((t) => t.key === k), k)); // every Reroll source belongs to a tile
 });
 
@@ -134,4 +135,73 @@ test("Peak like / Dive in like / One time like move to another of your titles, a
   const onePiece = { ...st, verdicts: { ...st.verdicts, peak: { source: mine[1], items: many(740, 20) } } };
   assert.equal(viewTile("peak", st).title, "Peak like Death Note");
   assert.equal(viewTile("peak", onePiece).title, "Peak like One Piece");
+});
+
+
+/* ---------- Explore with movies and TV ---------- */
+
+const film = (id, extra = {}) => ({ id, segment: "movie", title: `Film ${id}`, genres: ["Drama"], ...extra });
+const serial = (id, extra = {}) => ({ id, segment: "tv", title: `Series ${id}`, genres: ["Drama"], ...extra });
+const withCinema = () => {
+  const st = base();
+  st.pools = {
+    ...st.pools, popN: many(250, 20).map((x) => ({ ...x, segment: "manga" })),
+    trMv: Array.from({ length: 20 }, (_, i) => film(1000 + i)), trTv: Array.from({ length: 20 }, (_, i) => serial(2000 + i)),
+    popMv: Array.from({ length: 30 }, (_, i) => film(3000 + i)), popTv: Array.from({ length: 30 }, (_, i) => serial(4000 + i)),
+    topMv: Array.from({ length: 10 }, (_, i) => film(5000 + i)), topTv: Array.from({ length: 10 }, (_, i) => serial(6000 + i)),
+    comingMv: [film(7001, { date: "2027-02-01" }), film(7002, { date: "2027-01-01" })], comingTv: [serial(7101, { date: "2026-12-01" })],
+    comingM: [{ id: 7201, segment: "manga", title: "Upcoming manga", date: "2026-11-15" }], comingN: [{ id: 7401, segment: "manga", title: "Upcoming novel", date: "2026-11-20" }], coming: [show(7301, { date: "2026-12-20" })],
+  };
+  st.oscars = [film(8001), film(8002)]; st.emmys = [serial(8101)];
+  return st;
+};
+const kinds = (items) => [...new Set(items.map((x) => x.segment))].sort();
+
+test("Coming soon is for everything, soonest first", () => {
+  const v = viewTile("coming", withCinema());
+  assert.deepEqual(ids(v.items), [7201, 7401, 7101, 7301, 7002, 7001]);
+  assert.deepEqual(kinds(v.items), ["anime", "manga", "movie", "tv"]);
+});
+
+test("Oscars and Emmys show their winners; if they can't load, the top rated of that kind", () => {
+  const st = withCinema();
+  assert.deepEqual([viewTile("oscars", st).items.map((x) => x.id), viewTile("emmys", st).items.map((x) => x.id)], [[8001, 8002], [8101]]);
+  assert.equal(viewTile("oscars", st).subtitle, "Best Picture winners");
+  st.oscars = []; st.emmys = [];
+  const o = viewTile("oscars", st), e = viewTile("emmys", st);
+  assert.deepEqual([kinds(o.items), kinds(e.items)], [["movie"], ["tv"]]);
+  assert.match(o.subtitle, /Top rated/);
+  assert.equal(viewTile("oscars", { ...st, oscars: null }).loading, true);
+});
+
+test("Popular in town and VoidPop Angles mix all five kinds; Don't Miss This has movies and TV", () => {
+  const st = withCinema();
+  assert.deepEqual(kinds(viewTile("talk", st).items), ["anime", "manga", "movie", "tv"]);
+  assert.deepEqual(kinds(viewTile("angles", st).items), ["anime", "manga", "movie", "tv"]);
+  assert.deepEqual(kinds(viewTile("dmMovies", st).items), ["movie"]);
+  assert.deepEqual(kinds(viewTile("dmTv", st).items), ["tv"]);
+  assert.equal(viewTile("dmMovies", st).items.length, PICK_COUNT);
+  assert.deepEqual(Object.keys(EXTRA).filter((k) => EXTRA[k].tmdb), ["dmMovies", "dmTv"]);   // their Reroll pages come from TMDB
+});
+
+test("Jump back in and New seasons are for anime and TV only", () => {
+  const st = withCinema();
+  st.jump = { anime: [show(800)], manga: [], tv: [serial(801)] };
+  st.newSeasons = [show(850)]; st.newSeasonsTv = [serial(851, { season: 2 })];
+  assert.deepEqual(ids(viewTile("jump", st).items), [800, 801]);
+  assert.deepEqual(ids(viewTile("seasons", st).items), [850, 851]);
+});
+
+test("Most loved says where it comes from", () => {
+  const st = withCinema();
+  assert.match(viewTile("loved", st).subtitle, /anime, manga, novels, movies and TV/);
+  assert.equal(viewTile("loved", { ...st, lovedFrom: "community" }).subtitle, "From the VoidPop community");
+});
+
+test("the anime tiles never fill up with movies, even when Most loved mixes every kind", () => {
+  const st = withCinema();
+  st.mostLoved = [film(1), serial(2), ...many(500, 10)];
+  st.aoty = [];
+  st.pools = { ...st.pools, popA: [], trA: [] };
+  for (const key of ["aoty", "jump", "dmAnime"]) assert.ok(viewTile(key, st).items.every((x) => x.segment === "anime"), key);
 });
