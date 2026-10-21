@@ -18,8 +18,3 @@ The full map is in [../ARCHITECTURE.md](../ARCHITECTURE.md).
 
 Everything else (the library, tiers, the AniList client, countdown formatting) is
 imported from `@voidpop/shared`.
-
-Optional settings in `app/.env` (all `EXPO_PUBLIC_…`): `TMDB_API_KEY` and `TMDB_REGION` for live movies and series,
-`VOIDPOP_API` for accounts, comments and community verdicts, `ANILIST_CLIENT_ID` for AniList sync.
-Explore is Home only (Billboard, trackers, search, the tile grid and mixed poster rows: see `src/screens/explore/ExploreScreen.js`, `src/state/explore.js`, `shared/features/exploreTiles.js`, `exploreMix.js`, `exploreCinema.js`). Browse has Anime, Manga, Novels, Movies and TV (Movies and TV filter by genre and country; `src/screens/explore/BrowseScreen.js`). The title page for movies and series is in `src/screens/cinema/`; the community screens live in `src/screens/account/` and `src/components/community/`.
-Note: these were written without a device or emulator to test on, so run `npm run check:app` and try them on your phone.
