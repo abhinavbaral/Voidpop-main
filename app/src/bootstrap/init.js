@@ -1,27 +1,38 @@
-// App startup wiring (imported first in App.js): VoidPop keeps your library
-// on this phone with AsyncStorage. No accounts, no keys.
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { setStorage } from "@voidpop/shared/backend/storage";
-import NetInfo from "@react-native-community/netinfo";
-import { setDeviceOnline } from "@voidpop/shared/api/anilist";
+/**
+ * VoidPop startup initialization.
+ *
+ * Connects React Native storage and network status to the shared logic,
+ * then configures optional AniList authentication.
+ */
 
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import NetInfo from "@react-native-community/netinfo";
+import * as Linking from "expo-linking";
+
+import { setStorage } from "@voidpop/shared/backend/storage";
+import { setDeviceOnline } from "@voidpop/shared/api/anilist";
+import { configureAniListSync } from "@voidpop/shared/sync/anilist";
+
+// Use AsyncStorage for persistent, device-local library data.
 setStorage({
   getItem: (key) => AsyncStorage.getItem(key),
   setItem: (key, value) => AsyncStorage.setItem(key, value),
   removeItem: (key) => AsyncStorage.removeItem(key),
 });
 
-// "Offline" = Android says there's no connection, or it's connected (e.g. to
-// Wi-Fi) but can't reach the internet. An AniList hiccup is not "offline".
-NetInfo.addEventListener((net) => {
-  setDeviceOnline(!(net.isConnected === false || net.isInternetReachable === false));
+// Track whether the device has an available internet connection.
+// A failed AniList request alone does not mean the device is offline.
+NetInfo.addEventListener((networkState) => {
+  const isOnline =
+    networkState.isConnected !== false &&
+    networkState.isInternetReachable !== false;
+
+  setDeviceOnline(isOnline);
 });
 
-// AniList sync (optional): a free AniList app's client id in
-// EXPO_PUBLIC_ANILIST_CLIENT_ID; its redirect URL must be voidation://auth
-// (in Expo Go the address is different; More → AniList shows the one to use).
-import * as Linking from "expo-linking";
-import { configureAniListSync } from "@voidpop/shared/sync/anilist";
+// Configure optional AniList synchronization.
+// Set EXPO_PUBLIC_ANILIST_CLIENT_ID to enable authentication.
+// The redirect URI may differ between a standalone build and Expo Go.
 configureAniListSync({
   clientId: process.env.EXPO_PUBLIC_ANILIST_CLIENT_ID,
   redirectUri: Linking.createURL("auth"),

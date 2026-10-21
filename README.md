@@ -1,159 +1,462 @@
 # VoidPop
 
-**Anime and manga tracker with live countdowns to the next episode.** A website and an
-Android app, built from one codebase. No sign-up and no API keys: open it and use it.
+**Anime, manga, and novel tracker with live episode countdowns, now with Movies & TV discovery.**
 
-- **Schedule:** a live countdown for every airing anime you follow, plus everything
-  airing this week, grouped by day in your own time zone
-- **Track** anime (Watching / Completed / Plan to Watch / On Hold / Dropped) and manga
-  (Reading / Finished / Plan to Read …), including manhwa, manhua and donghua
-- **Your verdict** instead of a number: Peak / Dive In / One Time / Void It, plus up to
-  three vibes, shareable as an image card
-- **Explore, Browse and Search** by origin (Japan, Korea, China), season, year and popularity
-- **Tiers** that grow with what you complete, from Newbie to Addicted (15 ranks)
-- **History:** episodes that aired in the last 14 days for everything you follow
-- **More:** statistics, appearance, settings (24-hour clock, countdown badges), data and storage, help, about
-- **Progress:** episodes watched / chapters read on every title, +1 from the Library, "Mark watched" in History,
-  "2 new" when you're behind; marking the last episode asks for your verdict
-- **Import from AniList** by username (public lists, no key); a title in both keeps whichever copy changed last
-- **Library search and sort** (recently updated, A–Z, airing soonest, most to catch up)
-- **Delayed label** when a followed show's next episode moves later, with the original date
-- **AniList sync (two-way):** sign in with AniList; status and progress stay the same on the app, the website and
-  AniList. Verdicts, Excited and the watch log stay on the device. See "Set up AniList sync" below.
-- **Select:** long-press titles in a playlist to bulk move or remove them
-- **Genre and studio filters** on the Season chart and Schedule; genre filter in Browse
-- **Background work (Android):** about hourly while closed: backup, episode alerts, widget, sync
-- **Explore only shows new things:** titles in your library or marked Excited are left out
-- **Watching this season + Pending:** aired-but-unwatched episodes of your Watching anime; new episodes add
-  to it automatically, +1 takes one off; a count badge on the Schedule tab
-- **Watch log:** every progress change is saved with its date (for stats and History); imports don't count
-- **Type your progress** (tap the number); you can't go past what's out: aired episodes, or a finished manga's chapter count
-- **Works offline:** the latest AniList answers are kept on the device (size-capped) and used when there's no internet
-- **Season chart:** a season's anime grouped by format, with countdowns and one-tap Plan to Watch
-- **Verdict recommendations:** "Peak like X", "Dive in like X", "One time like X" (Void It gets none)
-- **Add to calendar:** the phone's own event screen (app), Google Calendar or an .ics file (website), weekly for the remaining episodes
-- **Share a countdown** as an image
-- **Android widget** with the next episode of up to 30 shows you follow (needs the APK; not available in Expo Go)
-- **Where to watch / read:** official streaming and reading services for each title (from AniList)
-- **Episode alerts (app):** a notification when an episode airs for anything you follow or are Excited about
-- **Automatic backups (Android, Mihon-style):** pick a folder once; backups run on a schedule (12h / daily / weekly),
-  the newest 5 are kept, and they survive uninstalling. Manual share and restore-from-file too
-- Trailers open in YouTube (YouTube blocks in-app embeds with "Error 153")
+VoidPop is a cross-platform tracking application with an Android app and a website built around shared business logic. It combines personal progress tracking, airing schedules, title discovery, and community verdicts in one place.
 
-Data comes from the public [AniList](https://anilist.co) GraphQL API, which needs no key.
+VoidPop is designed to work without registration or API keys for basic anime and manga tracking. Accounts, AniList synchronization, and cloud features are optional.
 
-```
+## Features
+
+### Anime, Manga, and Novel Tracking
+
+- **Live countdowns:** Track the next episode of every airing anime in the library.
+- **Weekly schedule:** View upcoming episodes grouped by day in the local time zone.
+- **Progress tracking:** Record episodes watched and chapters read, with limits based on released episodes or available chapter counts where supported.
+- **Library statuses:** Track anime as Watching, Completed, Plan to Watch, On Hold, or Dropped. Manga and novels have corresponding reading statuses.
+- **Multiple origins and formats:** Explore Japanese, Korean, and Chinese anime, manga, manhwa, manhua, light novels, web novels, and related formats.
+- **Watching This Season:** Track aired but unwatched episodes for currently watched anime. New episodes are added automatically.
+- **History:** Review episodes that aired during the previous 14 days for followed titles.
+- **Delayed episodes:** Identify schedule changes and retain the original release date.
+- **AniList import:** Import public lists by username without an API key.
+- **Two-way AniList sync:** Optionally synchronize supported list statuses and progress with AniList.
+- **Library search and sorting:** Find titles by name and sort by recently updated, alphabetical order, airing time, or episodes to catch up on.
+
+### Movies & TV
+
+VoidPop includes a dedicated Movies & TV section inside Explore for discovering live-action movies and television series.
+
+- Browse and search movies and series independently of the anime, manga, and novel library.
+- Open dedicated title pages with Watchlist, Watched, and Void Verdict features.
+- Participate in community verdicts and public discussions.
+- Keep live-action tracking separate from the existing anime and manga progress system.
+
+Live movie and television metadata is provided through TMDB and requires a TMDB API key.
+
+### Void Verdicts
+
+VoidPop uses four verdicts instead of conventional star ratings:
+
+- **Peak:** An outstanding experience.
+- **Dive In:** Worth starting.
+- **One Time:** Worth experiencing once.
+- **Void It:** Not recommended.
+
+Each verdict can include up to three vibes. Verdicts can also be shared as image cards.
+
+Community verdict distributions remain hidden until a title has received at least 20 verdicts. Recommendations can suggest titles based on existing verdicts, such as "Peak like X," "Dive In like X," and "One Time like X." Titles marked Void It do not generate recommendations.
+
+### Explore and Browse
+
+Explore provides discovery tools for finding new titles by:
+
+- Origin and region.
+- Season and year.
+- Popularity.
+- Genre and studio, where supported.
+- Media type and format.
+
+Titles already in the library or marked Excited are excluded from Explore results where supported, keeping discovery focused on new titles.
+
+The Season chart groups anime by format and provides countdowns and one-tap Plan to Watch actions.
+
+### Progress, History, and Statistics
+
+- Update progress directly from the Library.
+- Mark episodes watched from History.
+- See when new episodes are waiting.
+- Receive a verdict prompt after marking the final available episode watched.
+- Maintain a dated watch log for progress changes and statistics.
+- Progress through 15 completion-based tiers, from Newbie to Addicted.
+- Search and sort the library by useful criteria.
+
+Imported progress does not count as watch-log activity.
+
+### Calendar and Sharing
+
+- Add remaining episodes to a calendar.
+- Open the phone's native event screen from the mobile app.
+- Export schedules to Google Calendar or an `.ics` file from the website.
+- Create shareable countdown images.
+- Open trailers directly in YouTube.
+
+Calendar exports include weekly events for the remaining episodes. YouTube trailers open externally because embedded playback may fail with Error 153.
+
+### Notifications and Android Features
+
+- Receive episode alerts for followed or Excited titles.
+- Use the Android home-screen widget to display upcoming episodes for up to 30 followed shows.
+- Run scheduled background tasks for backups, episode alerts, widget updates, and AniList synchronization where supported.
+
+The native widget and certain background features require a built APK and are not available in Expo Go.
+
+### Accounts and Community
+
+Accounts are optional. Core personal tracking remains available without signing in.
+
+The optional backend supports:
+
+- Account registration and authentication.
+- Public comments, replies, and likes.
+- Community verdicts.
+- Private cloud backups.
+- Account deletion.
+
+Comments and verdicts are associated with usernames rather than email addresses. The personal library remains local unless a backup is explicitly initiated.
+
+### Offline Support and Backups
+
+- Cache recent AniList responses on the device, subject to a storage limit.
+- Reuse cached data when the internet is unavailable.
+- Export and restore the library through More → Data and Storage.
+- Configure scheduled Android backups every 12 hours, daily, or weekly.
+- Keep the newest five automatic backups.
+- Restore from a backup file or share a backup manually.
+
+Folder-based automatic backups rely on native Android capabilities and should be tested in a built APK.
+
+### Additional Features
+
+- Appearance and display settings.
+- Optional 24-hour clock and countdown badges.
+- Genre and studio filters on supported screens.
+- Official streaming and reading service links from AniList.
+- Help, About, and data management pages.
+- Bulk selection to move or remove titles from supported playlists.
+
+## Tech Stack
+
+- **Mobile:** Expo and React Native.
+- **Website:** React and Vite.
+- **Backend:** Node.js using built-in capabilities.
+- **Shared logic:** JavaScript modules used by both platforms.
+- **Anime and manga data:** AniList GraphQL API.
+- **Movies and TV metadata:** TMDB.
+- **Website storage:** `localStorage`.
+- **Mobile storage:** AsyncStorage.
+
+AniList's public GraphQL API supports public-data queries without an API key. AniList authentication requires an application client ID. Live TMDB metadata requires a separate TMDB API key.
+
+## Project Structure
+
+```text
 voidpop/
-├── app/      Android + iOS app: Expo / React Native
-├── web/      Website: React + Vite
-├── server/   Backend: accounts, verdicts, comments, cloud backup (Node, no dependencies)
-└── shared/   Everything both products must agree on, written once:
-              api/ (AniList, TMDB, VoidPop server), backend/ (your data), features/ (rules),
-              lib/ (helpers), demo/ (sample data), test/
+├── app/          # Expo / React Native mobile application
+├── web/          # React + Vite website
+├── server/       # Accounts, comments, verdicts and cloud backup
+└── shared/       # Shared application logic
+    ├── api/      # AniList, TMDB and VoidPop server APIs
+    ├── backend/  # Storage and data access
+    ├── features/ # Shared feature rules
+    ├── lib/      # Utilities and helpers
+    ├── demo/     # Demo data
+    └── test/     # Shared tests
 ```
 
-Only the UI is written twice. What a screen shows, how the library is stored and how a
-countdown is formatted all live in `shared/`, so the app and the site cannot drift apart.
+Shared business rules live in `shared/` to keep the website and mobile app consistent. Storage access, progress calculations, countdown formatting, and other common logic are implemented once and reused wherever possible.
 
-## Run it
+The platform-specific interfaces remain in `app/` and `web/`.
+
+## Requirements
+
+- Node.js 22.5 or later.
+- npm with workspace support.
+- Expo Go for supported mobile development workflows.
+- An Android device or emulator for native testing.
+- Optional AniList and TMDB configuration for features that require them.
+
+## Installation and Development
+
+Run commands from the repository root unless otherwise specified.
+
+Install dependencies:
 
 ```sh
-npm install        # installs app, web and shared together (npm workspaces)
-npm run web        # website at http://localhost:5173
-npm run app        # mobile app — scan the QR code with Expo Go
-npm run web:demo   # website offline on a sample library (for presentations)
-npm run app:demo   # same for the app
-npm run server     # the backend at http://localhost:8787 (needs Node 22.5+)
+npm install
 ```
 
-To try accounts and comments locally: run `npm run server`, then put
-`VITE_VOIDPOP_API=http://localhost:8787` in `web/.env.local` (or `EXPO_PUBLIC_VOIDPOP_API` in `app/.env`;
-on a real phone use your computer's address, not localhost). Details in [server/README.md](server/README.md).
-For live movies and series add `VITE_TMDB_API_KEY` / `EXPO_PUBLIC_TMDB_API_KEY`.
-
-## Checks before you commit
-
-```
-npm run check        # lint + tests for shared and server (fast)
-npm run check:app    # full Android bundle (slower)
-```
-
-How the code is organised: see [ARCHITECTURE.md](ARCHITECTURE.md).
-
-## Where your data lives
-
-The library is one JSON document on your device: `localStorage` in the browser, `AsyncStorage`
-on the phone (`shared/backend/storage.js`). More → Data and storage exports it as a backup file
-and restores it. Every screen reads and writes through `shared/backend/store.js`.
-
-A VoidPop account is optional and adds only the social parts: your **comments** and the
-**verdicts you give** (with your username, never your email) are visible to others, and an optional
-**cloud backup** of your library is private to you. The library itself is never uploaded unless you
-press Back up. You can delete the account and everything on it from the Account page.
-
-## Deploy
-
-**Website → Vercel.** Import the repo with the Root Directory left at the repo root;
-`vercel.json` already sets the build command, the output folder and the rewrite that
-makes deep links like `/title/anime/16498` work.
-
-**Android APK → EAS Build** (free Expo account):
+Start the website:
 
 ```sh
-npm i -g eas-cli
+npm run web
+```
+
+The development website runs at `http://localhost:5173`.
+
+Start the mobile app:
+
+```sh
+npm run app
+```
+
+Scan the Expo QR code with Expo Go when supported by the configured Expo SDK.
+
+Run the website with demo data:
+
+```sh
+npm run web:demo
+```
+
+Run the mobile app with demo data:
+
+```sh
+npm run app:demo
+```
+
+Start the backend:
+
+```sh
+npm run server
+```
+
+The backend runs at `http://localhost:8787` by default.
+
+These commands assume the corresponding scripts are configured in the root `package.json`.
+
+## Backend Configuration
+
+To test accounts, comments, community verdicts, and cloud backups locally, start the backend:
+
+```sh
+npm run server
+```
+
+Create `web/.env.local` for website development:
+
+```dotenv
+VITE_VOIDPOP_API=http://localhost:8787
+```
+
+Configure `app/.env` for mobile development:
+
+```dotenv
+EXPO_PUBLIC_VOIDPOP_API=http://YOUR_COMPUTER_IP:8787
+```
+
+Replace `YOUR_COMPUTER_IP` with the computer's local network IP address when testing on a physical phone. On the phone, `localhost` refers to the phone itself.
+
+Environment files must remain outside version control. Production deployments should use the environment-variable settings provided by the hosting platform.
+
+## TMDB Configuration
+
+Live movie and television metadata requires a TMDB API key.
+
+Website configuration:
+
+```dotenv
+VITE_TMDB_API_KEY=your_tmdb_api_key
+```
+
+Mobile configuration:
+
+```dotenv
+EXPO_PUBLIC_TMDB_API_KEY=your_tmdb_api_key
+```
+
+Real credentials must not be committed to Git. If a credential needs to remain private, requests should be routed through a suitable backend rather than exposing the key in client-side code.
+
+## Checks Before Committing
+
+Run the shared and server checks:
+
+```sh
+npm run check
+```
+
+Run the mobile bundle check:
+
+```sh
+npm run check:app
+```
+
+The mobile check takes longer because it builds the app's JavaScript bundle.
+
+Both checks should be run before committing significant changes. Changes involving navigation, storage, authentication, or native features should also be tested manually on the website and in an Android build.
+
+For implementation details, see [ARCHITECTURE.md](ARCHITECTURE.md).
+
+## Where Data Is Stored
+
+The personal library is stored as a JSON document on the device.
+
+- **Website:** `localStorage`.
+- **Mobile app:** AsyncStorage.
+
+The shared storage implementation is in `shared/backend/storage.js`, and `shared/backend/store.js` provides the common library access layer.
+
+The More → Data and Storage section supports library export and restoration.
+
+### Local-First Storage
+
+Personal tracking data stays on the device by default. Creating an account does not automatically upload the entire library.
+
+Cloud backup is optional and begins only when explicitly initiated. Public comments and verdicts are visible to other users, while cloud backups remain private to the account owner.
+
+Account deletion removes associated server-side data according to the backend's deletion behavior. Local backups and previously exported files may need to be removed separately.
+
+### AniList Synchronization
+
+AniList synchronization is independent of the optional VoidPop account system.
+
+When authenticated with AniList, supported list statuses and progress can synchronize between VoidPop and AniList. Verdicts, Excited selections, and the local watch log remain on the device unless a separate feature explicitly handles them.
+
+Public-list imports do not count as watched activity.
+
+## Set Up AniList Sync
+
+AniList authentication uses OAuth. Each deployment needs an AniList application configured with the appropriate redirect URL.
+
+### 1. Create an AniList Client
+
+Sign in at [AniList](https://anilist.co) and open Settings → Developer → Create New Client.
+
+### 2. Configure the Mobile App
+
+Set the application name to `VoidPop` and use this redirect URL:
+
+```text
+voidation://auth
+```
+
+Add the client ID to `app/.env`:
+
+```dotenv
+EXPO_PUBLIC_ANILIST_CLIENT_ID=your_mobile_client_id
+```
+
+For EAS builds, configure the variable in the appropriate build profile or EAS environment variables.
+
+Build the APK after configuring the client ID if the installed binary requires it.
+
+### 3. Configure the Website
+
+Create a separate AniList client for the website.
+
+Production redirect URL:
+
+```text
+https://YOUR_DOMAIN/auth/anilist
+```
+
+Local development redirect URL:
+
+```text
+http://localhost:5173/auth/anilist
+```
+
+Add the website client ID to `web/.env`:
+
+```dotenv
+VITE_ANILIST_CLIENT_ID=your_web_client_id
+```
+
+Configure the same variable in the production hosting environment.
+
+### 4. Sign In
+
+Open More → AniList → Sign in with AniList.
+
+Expo Go may use a different redirect URL from a standalone APK. Use the redirect URL displayed by the app when configuring authentication for Expo Go.
+
+Client IDs are not passwords, but environment files should still be excluded from version control.
+
+## Deploy the Website
+
+The website can be deployed to Vercel.
+
+1. Import the repository into Vercel.
+2. Leave the Root Directory set to the repository root.
+3. Configure the required production environment variables.
+4. Deploy the project.
+
+The repository's `vercel.json` is intended to configure the build command, output directory, and rewrite rules for deep links, such as:
+
+```text
+/title/anime/16498
+```
+
+Verify the current Vercel configuration before deployment.
+
+## Build the Android APK
+
+Expo Application Services (EAS) can generate an installable Android APK.
+
+Install the EAS CLI:
+
+```sh
+npm install -g eas-cli
+```
+
+Navigate to the app directory:
+
+```sh
 cd app
-eas login
-eas build -p android --profile preview   # gives you a download link to an .apk
 ```
 
-## History
+Sign in:
 
-VoidPop began as a larger pop-culture tracker: anime, manga, movies, web series, a social
-feed and accounts. This codebase is the main VoidPop app now. It covers anime, manga and
-novels with the airing countdowns, plus movies and series, accounts, comments and community
-verdicts. The social feed (Mesh) is not coming back. The personal note on a title was replaced
-by comments (notes you saved earlier are kept and still appear in the Markdown export).
+```sh
+eas login
+```
 
-## Set up AniList sync (free, once)
+Build the preview APK:
 
-AniList lets any app sign users in for free; it just needs to know where to send
-them back. Each place VoidPop runs needs its own AniList app (one redirect URL each).
+```sh
+eas build -p android --profile preview
+```
 
-1. Sign in at anilist.co, open **Settings → Developer → Create new client**.
-2. **App (APK):** name `VoidPop`, redirect URL `voidation://auth`. Copy the client id into
-   `app/.env` as `EXPO_PUBLIC_ANILIST_CLIENT_ID=…`, then build the APK.
-   (For EAS, also add it under the build profile's `env`, or as an EAS environment variable.)
-3. **Website:** create a second client with redirect URL `https://<your site>/auth/anilist`
-   (and a third with `http://localhost:5173/auth/anilist` for local testing if you like).
-   Put its id in `web/.env` as `VITE_ANILIST_CLIENT_ID=…`, or in Vercel's environment variables.
-4. More → AniList → **Sign in with AniList**.
+Once the build completes, EAS provides a link to the generated artifact.
 
-Client ids aren't secret (the sign-in happens on AniList's own page), but keep
-`.env` files out of git anyway. Expo Go uses a different return address, shown
-on the More → AniList page, so test sign-in on the website or the APK.
+Native functionality, including the home-screen widget, scheduled background work, and folder-based backups, must be tested in a suitable development or production build. Expo Go does not support every native feature.
 
-## Updating the app without a new build (EAS Update)
+## Updating the App with EAS Update
 
-Build the APK once; after that, most changes reach phones as an update in a
-minute or two, with no build queue and no reinstall.
+EAS Update can deliver compatible JavaScript and asset changes without reinstalling the APK.
 
-One-time setup (from `app/`):
+From `app/`, configure updates:
 
-    npx eas-cli update:configure
-    npx eas-cli build -p android --profile preview
+```sh
+npx eas-cli update:configure
+```
 
-Install that APK. From then on, after changing code (from `app/`):
+Build and install an APK configured for the correct update channel:
 
-    npx eas-cli update --channel preview --message "what changed"
+```sh
+npx eas-cli build -p android --profile preview
+```
 
-Open VoidPop, close it completely, open it again: the update is in.
+After making compatible changes, publish an update:
 
-A new APK is only needed when a native library is added or changed (a new
-`expo-*` or `react-native-*` package, or app.json plugins/permissions).
+```sh
+npx eas-cli update --channel preview --message "Describe the changes"
+```
 
-The runtime version is the app version (`"version"` in app/app.json). An
-update only reaches APKs with the same version. **Whenever a native change
-needs a new APK, raise the version first** (1.0.0 → 1.0.1), then build; old
-APKs keep getting updates for their own version until people install the new
-one. (A native-code "fingerprint" was tried first, but it came out different
-on Windows and on EAS's servers, which broke builds.)
+Close and reopen VoidPop to check for the update.
+
+A new APK is generally required when native dependencies, native configuration, permissions, or other native components change.
+
+The runtime version and update channel must match the installed APK. Follow the current Expo EAS documentation when changing runtime-version policies or native dependencies.
+
+## Project History
+
+VoidPop began as a broader pop-culture tracking project that included anime, manga, movies, web series, social features, and accounts.
+
+The current codebase brings together personal tracking and discovery for anime, manga, and novels with Movies & TV discovery, public comments, community verdicts, and optional accounts.
+
+The Mesh social feed is no longer part of the project direction. Private title notes were replaced by comments. Existing notes are retained where supported and may still appear in Markdown exports.
+
+The project focuses on a consistent, local-first tracking experience while keeping social and cloud features optional.
+
+## Development Principles
+
+- Implement shared business rules in `shared/`.
+- Keep platform-specific interfaces in `app/` and `web/`.
+- Preserve offline operation for core tracking features.
+- Do not require an account for ordinary library use.
+- Keep Movies & TV separate from the anime, manga, and novel library.
+- Use Void Verdicts instead of star ratings.
+- Hide community verdict distributions until at least 20 verdicts are available.
+- Keep environment files and credentials out of version control.
+- Test both the website and Android app after changing shared logic.
+
+For additional technical documentation, see [ARCHITECTURE.md](ARCHITECTURE.md) and [server/README.md](server/README.md).
