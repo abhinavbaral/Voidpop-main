@@ -49,6 +49,8 @@ export const ICON_PATHS = {
   edit: "M4 20h4L19 9l-4-4L4 16zM13 7l4 4",
   sync: "M20 8a8 8 0 0 0-14-2M4 4v4h4M4 16a8 8 0 0 0 14 2M20 20v-4h-4",
   rewind: "M11 6l-7 6l7 6zM20 6l-7 6l7 6z",
+  film: "M4 5h16v14H4zM8 5v14M16 5v14M4 9h4M4 15h4M16 9h4M16 15h4",
+  check: "M5 12.5l4.5 4.5L19 7",
   plus: "M12 5v14M5 12h14",
   bell: "M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 20a2 2 0 0 0 4 0",
 };

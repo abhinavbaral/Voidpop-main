@@ -4,6 +4,9 @@
 // shows in every tile that can be rerolled; fixed lists (Most loved, Trending, Coming soon,
 // Anime of the Year, Jump back in, New seasons) just reload.
 // Browse opens from the button at the top.
+// A switch under the search row changes what Explore shows: Home (all of the above), Anime
+// (Japanese, Korean, Chinese), Manga (manga, manhwa, manhua), Novel (light and web novels),
+// or Movies & TV (live action).
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
@@ -22,7 +25,18 @@ import AnimatedBanner from "../../components/brand/AnimatedBanner.js";
 import { NewEpisodeCards, Countdowns } from "../../components/explore/ExploreCards.js";
 import Billboard from "../../components/explore/Billboard.js";
 import TileGrid from "../../components/explore/TileGrid.js";
+import Chips from "../../components/ui/Chips.js";
+import CinemaFeed from "../../components/explore/CinemaFeed.js";
+import CategoryFeed from "../../components/explore/CategoryFeed.js";
 import { useExplore, initExplore, refreshPersonal, rerollAll } from "../../state/explore";
+
+const MODES = [
+  { key: "home", label: "Home" },
+  { key: "anime", label: "Anime" },
+  { key: "manga", label: "Manga" },
+  { key: "novel", label: "Novel" },
+  { key: "cinema", label: "Movies & TV" },
+];
 
 export default function ExploreScreen({ navigation }) {
   const { C, dark } = useTheme();
@@ -31,6 +45,7 @@ export default function ExploreScreen({ navigation }) {
   const { settings } = useSettings();
   const ex = useExplore();
   const [refreshing, setRefreshing] = useState(false);
+  const [mode, setMode] = useState("home");
 
   useEffect(() => { initExplore(); }, []);
   // what's in your library and your verdicts change as you use the app, so these refresh on every visit
@@ -78,6 +93,26 @@ export default function ExploreScreen({ navigation }) {
     </>
     ) || null;
 
+  // the switch sits under the search row (or at the top on wide screens) and stays put as you scroll the list
+  const top = (
+    <>
+      {header}
+      <View style={{ paddingHorizontal: 14, paddingTop: wide ? 10 : 4 }}>
+        <Chips options={MODES} value={mode} onChange={setMode} />
+      </View>
+    </>
+  );
+
+  if (mode !== "home") {
+    return (
+      <SafeAreaView style={styles.safe} edges={["top"]}>
+        {mode === "cinema"
+          ? <CinemaFeed navigation={navigation} header={top} />
+          : <CategoryFeed key={mode} segment={mode} navigation={navigation} header={top} />}
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <NamePrompt />
@@ -88,7 +123,7 @@ export default function ExploreScreen({ navigation }) {
         data={sections}
         keyExtractor={(x) => x.key}
         renderItem={({ item: x }) => x.render()}
-        ListHeaderComponent={header}
+        ListHeaderComponent={top}
         contentContainerStyle={{ paddingBottom: 30 }}
         initialNumToRender={4}
         maxToRenderPerBatch={2}
