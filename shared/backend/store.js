@@ -8,10 +8,6 @@
 //                              and export unchanged (entries may carry a matching `cats` list too)
 //   reviews  {"segment:id" -> { verdict, vibes, moods, comment, date }}
 //   excited  {"segment:id" -> { item, at }}
-//   cinema   {"movie:id" | "tv:id" -> { item, status, review, addedAt, updatedAt }}
-//            your Movies and TV in the Library. Kept apart from `library` on purpose: movies and series
-//            have no episodes to count, so they stay out of AniList sync, ranks and anime stats.
-//            getLibraryAll() merges both for the Library screens
 //   settings { clock24, posterBadges, notifyEpisodes }
 //   log      [[time ms, "segment:id", change, source], …] every progress change
 //            (source: plus / typed / history / complete) and status change
@@ -28,13 +24,7 @@ const DB_KEY = "voidation:db:v1";
 // notifyEpisodes only matters in the app (the website can't schedule alerts)
 // logo: which logo the app shows (see Brand.js): "classic", "voidmon" or "peeking"
 export const DEFAULT_SETTINGS = { clock24: false, posterBadges: true, notifyEpisodes: true, seasonLayout: "grid", logo: "classic", libraryLayout: "compact", name: "", nameAsked: false };
-// the first Movies & TV version called a finished title "watched"; it is now "completed" like the rest of the Library
-function renameWatched(cinema) {
-  for (const e of Object.values(cinema)) if (e.status === "watched") e.status = "completed";
-  return cinema;
-}
-
-const EMPTY = () => ({ library: {}, reviews: {}, excited: {}, cinema: {}, notes: {}, log: [], categories: [], meta: {}, settings: { ...DEFAULT_SETTINGS } });
+const EMPTY = () => ({ library: {}, reviews: {}, excited: {}, notes: {}, log: [], categories: [], meta: {}, settings: { ...DEFAULT_SETTINGS } });
 
 let cache = null;
 let writing = Promise.resolve();
@@ -46,8 +36,6 @@ async function load() {
     const saved = raw ? JSON.parse(raw) : {};
     cache = { ...EMPTY(), ...saved, log: Array.isArray(saved.log) ? saved.log : [],
       categories: Array.isArray(saved.categories) ? saved.categories : [], settings: { ...DEFAULT_SETTINGS, ...(saved.settings || {}) } };
-    if (!cache.cinema || typeof cache.cinema !== "object") cache.cinema = {};
-    renameWatched(cache.cinema);
   } catch {
     cache = EMPTY(); // corrupt or unreadable storage: start clean rather than crash
   }
@@ -463,6 +451,56 @@ export async function bulkRemove(keys) {
     const e = db.library[k];
     if (e) await setStatus(null, e.item.segment, e.item, null);
   }
+}
+/* ---------- cinema tracking: movies and live-action TV ---------- */
+
+export async function setCinemaStatus(item, status) {
+  const db = await load();
+  db.cinema ||= {};
+
+  const key = keyOf(item.segment, item.id);
+
+  // Only movies and live-action TV belong in cinema storage.
+  if (item.segment !== "movie" && item.segment !== "tv") {
+    throw new Error(`Unsupported cinema segment: ${item.segment}`);
+  }
+
+  if (status === null) {
+    const previous = db.cinema[key];
+    if (!previous) return;
+
+    logStatus(db, key, previous.status, null);
+    delete db.cinema[key];
+    delete db.reviews[key];
+    delete db.notes[key];
+    delete db.excited[key];
+
+    await save();
+    return;
+  }
+
+  if (!statusesFor(item.segment).some((s) => s.key === status)) {
+    throw new Error(`Invalid ${item.segment} status: ${status}`);
+  }
+
+  if (item.unreleased && !["plan", "considering"].includes(status)) {
+    return;
+  }
+
+  const previous = db.cinema[key];
+  const now = new Date().toISOString();
+
+  logStatus(db, key, previous?.status, status);
+
+  db.cinema[key] = {
+    ...(previous || {}),
+    ...(previous ? {} : { addedAt: now }),
+    item: freshest(previous?.item, item),
+    status,
+    updatedAt: now,
+  };
+
+  await save();
 }
 
 /* ---------- your shows: next episode + pending, in one list ---------- */
@@ -902,76 +940,6 @@ export async function getMyReview(_user, segment, id) {
   return (await load()).reviews[keyOf(segment, id)] ?? null;
 }
 
-/* ---------- Movies & TV shelf ---------- */
-// Movies and series are not tracked episode by episode: you either want to see it
-// (Watchlist) or you have (Watched, with an optional verdict). Same Void Verdicts and
-// moods as anime, stored with the entry.
-
-// Statuses for a movie or series are statusesFor("movie" | "tv"): the same playlists as the rest of your Library.
-
-// keep the snapshot small: it only has to draw a card and open the title page
-const slimCinemaItem = (item) => ({
-  id: item.id, segment: item.segment, title: item.title, altTitle: item.altTitle || null,
-  image: item.image || null, imageSmall: item.imageSmall || null, banner: item.banner || null,
-  genres: item.genres || [], genre: item.genre || null,
-  date: item.date || null, dateLabel: item.dateLabel || null,
-  creator: item.creator || null, overview: (item.overview || "").slice(0, 400),
-  url: item.url || null, format: item.format || null, runtime: item.runtime || null,
-  demo: !!item.demo, unreleased: !!item.unreleased,
-});
-
-// every title on the shelf, newest change first
-export async function getCinemaShelf() {
-  return Object.values((await load()).cinema).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-}
-
-export async function getCinemaEntry(segment, id) {
-  return (await load()).cinema[keyOf(segment, id)] ?? null;
-}
-
-// status: a key from statusesFor(item.segment) (a series has the same ones as Anime),
-// or null to remove it from your Library (its verdict goes with it)
-export async function setCinemaStatus(item, status) {
-  const db = await load();
-  const key = keyOf(item.segment, item.id);
-  if (status === null) {
-    delete db.cinema[key];
-    return save();
-  }
-  if (!statusesFor(item.segment).some((s) => s.key === status)) throw new Error(`Unknown status: ${status}`);
-  const before = db.cinema[key];
-  const now = Date.now();
-  db.cinema[key] = {
-    item: slimCinemaItem(item), status, review: before?.review ?? null,
-    addedAt: before?.addedAt ?? now, updatedAt: now,
-  };
-  return save();
-}
-
-// Saving a verdict marks it Watched. A changed verdict keeps the earlier one in `history`.
-export async function saveCinemaReview(item, { verdict, moods, comment }) {
-  const db = await load();
-  const key = keyOf(item.segment, item.id);
-  const before = db.cinema[key];
-  const old = before?.review;
-  const history = [...(old?.history || [])];
-  if (old && old.verdict !== verdict) history.push({ verdict: old.verdict, date: old.date });
-  const now = Date.now();
-  db.cinema[key] = {
-    item: slimCinemaItem(item), status: "completed", addedAt: before?.addedAt ?? now, updatedAt: now,
-    review: {
-      verdict, moods: moods || [], comment: comment || "", date: new Date(now).toISOString(),
-      ...(history.length ? { history: history.slice(-10) } : {}),
-    },
-  };
-  return save();
-}
-
-// shelf entries that have a verdict (newest first)
-export async function getCinemaReviews() {
-  return (await getCinemaShelf()).filter((e) => e.review);
-}
-
 /* ---------- first-run welcome ---------- */
 // The welcome screens show once. More > Help can show them again.
 export async function isOnboarded() {
@@ -1056,7 +1024,6 @@ export async function importData(json) {
   if (!["voidpop", "voidation"].includes(data?.app) || typeof data.library !== "object") return "That file isn't a VoidPop backup.";
   cache = {
     library: data.library || {}, reviews: data.reviews || {}, excited: data.excited || {},
-    cinema: renameWatched(data.cinema && typeof data.cinema === "object" ? data.cinema : {}), // backups made before Movies & TV have none
     log: Array.isArray(data.log) ? data.log : [],
     categories: Array.isArray(data.categories) ? data.categories : [],
     meta: data.meta && typeof data.meta === "object" ? data.meta : {},
@@ -1083,13 +1050,7 @@ export async function exportLibraryCsv() {
       return [KIND_NAME[kindOf(e.item)], e.item.title, label, e.progress || 0, totalFor(e.item) ?? "",
         verdict, e.item.url || ""].map(cell).join(",");
     });
-  // Movies & TV: no progress or total
-  const cinemaRows = Object.values(db.cinema || {})
-    .sort((a, b) => a.item.title.localeCompare(b.item.title))
-    .map((e) => [e.item.segment === "tv" ? "Series" : "Movie", e.item.title,
-      statusesFor(e.item.segment).find((x) => x.key === e.status)?.label || e.status, "", "",
-      VERDICTS.find((v) => v.key === e.review?.verdict)?.label || "", e.item.url || ""].map(cell).join(","));
-  return ["Type,Title,Status,Progress,Total,Verdict,Link", ...rows, ...cinemaRows].join("\n") + "\n";
+  return ["Type,Title,Status,Progress,Total,Verdict,Link", ...rows].join("\n") + "\n";
 }
 
 // Export → Notes (Markdown): every title as a section with its status, verdict,

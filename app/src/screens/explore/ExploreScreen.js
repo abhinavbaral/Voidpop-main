@@ -1,14 +1,3 @@
-// EXPLORE — the homepage, top to bottom:
-//   1. the Billboard: one anime, movie or TV series, different on every refresh
-//   2. your live trackers (new episodes, Coming up)
-//   3. search (everything: anime, manga, novels, movies, TV) and the Browse button
-//   4. a fixed grid of category tiles like Spotify's Search page. The tile titles never change
-//      or disappear; tap one for its shows
-//   5. poster rows that each mix anime, manga, novels, movies and TV (Popular in town, Peak like …,
-//      Dive in like …, One time like …, Most loved)
-// Pull down (or press Reroll in a category) for new shows in every tile that can be rerolled;
-// fixed lists (Most loved, Trending, Coming soon, the awards, Jump back in, New seasons) just reload.
-
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import { FlatList, View, Text, TouchableOpacity, StyleSheet, RefreshControl, Platform } from "react-native";
@@ -28,8 +17,19 @@ import AnimatedBanner from "../../components/brand/AnimatedBanner.js";
 import { NewEpisodeCards, Countdowns } from "../../components/explore/ExploreCards.js";
 import Billboard from "../../components/explore/Billboard.js";
 import TileGrid from "../../components/explore/TileGrid.js";
-import PosterRow from "../../components/ui/PosterRow.js";
 import { useExplore, initExplore, refreshPersonal, rerollAll } from "../../state/explore";
+import PosterRow from "../../components/ui/PosterRow.js";
+import Chips from "../../components/ui/Chips.js";
+import CinemaFeed from "../../components/explore/CinemaFeed.js";
+import CategoryFeed from "../../components/explore/CategoryFeed.js";
+
+const MODES = [
+  { key: "home", label: "Home" },
+  { key: "anime", label: "Anime" },
+  { key: "manga", label: "Manga" },
+  { key: "novel", label: "Novel" },
+  { key: "cinema", label: "Movies & TV" },
+];
 
 export default function ExploreScreen({ navigation }) {
   const { C, dark } = useTheme();
@@ -38,6 +38,7 @@ export default function ExploreScreen({ navigation }) {
   const { settings } = useSettings();
   const ex = useExplore();
   const [refreshing, setRefreshing] = useState(false);
+  const [mode, setMode] = useState("home");
 
   useEffect(() => { initExplore(); }, []);
   // what's in your library and your verdicts change as you use the app, so these refresh on every visit
@@ -97,6 +98,26 @@ export default function ExploreScreen({ navigation }) {
     </>
     ) || null;
 
+  // the switch sits under the search row (or at the top on wide screens) and stays put as you scroll the list
+  const top = (
+    <>
+      {header}
+      <View style={{ paddingHorizontal: 14, paddingTop: wide ? 10 : 4 }}>
+        <Chips options={MODES} value={mode} onChange={setMode} />
+      </View>
+    </>
+  );
+
+  if (mode !== "home") {
+    return (
+      <SafeAreaView style={styles.safe} edges={["top"]}>
+        {mode === "cinema"
+          ? <CinemaFeed navigation={navigation} header={top} />
+          : <CategoryFeed key={mode} segment={mode} navigation={navigation} header={top} />}
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <NamePrompt />
@@ -107,7 +128,7 @@ export default function ExploreScreen({ navigation }) {
         data={sections}
         keyExtractor={(x) => x.key}
         renderItem={({ item: x }) => x.render()}
-        ListHeaderComponent={header}
+        ListHeaderComponent={top}
         contentContainerStyle={{ paddingBottom: 30 }}
         initialNumToRender={4}
         maxToRenderPerBatch={2}
