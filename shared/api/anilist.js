@@ -391,7 +391,7 @@ export async function fetchNewlyAnnounced(perPage = 50) {
 // Earlier seasons of an anime: follows AniList's PREQUEL links back
 // (S3 → S2 → S1). Only TV / TV short / ONA seasons are returned; movies and
 // specials in between are walked through but not returned.
-const SEASON_FORMATS = new Set(["TV", "TV_SHORT", "ONA"]);
+export const SEASON_FORMATS = new Set(["TV", "TV_SHORT", "ONA"]);
 export async function fetchEarlierSeasons(id) {
   const query = `query ($id: Int) {
     Media(id: $id, type: ANIME) {

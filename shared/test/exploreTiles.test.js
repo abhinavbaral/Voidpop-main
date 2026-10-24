@@ -245,3 +245,21 @@ test("Also watch this mixes the kinds and repeats nothing the Don't Miss tiles o
   assert.ok(v.items.every((x) => !shown.has(`${x.segment}:${x.id}`)));
   assert.equal(viewTile("watch", { ...st, pools: null }).loading, true);
 });
+
+test("Coming soon can be switched to one kind: only what is announced for it, soonest first, never topped up or brought back from the mix", () => {
+  const st = withCinema();
+  const all = viewTile("coming", st);
+  assert.deepEqual([...new Set(all.items.map((x) => x.segment))].sort(), ["anime", "manga", "movie", "tv"]);
+  const mv = viewTile("coming", { ...st, comingKind: "movie" });
+  assert.deepEqual(ids(mv.items), [7002, 7001]); // two films, soonest first
+  assert.equal(mv.reroll, false);
+  assert.deepEqual(ids(viewTile("coming", { ...st, comingKind: "tv" }).items), [7101]);
+  assert.deepEqual(ids(viewTile("coming", { ...st, comingKind: "manga" }).items), [7201]);
+  assert.deepEqual(ids(viewTile("coming", { ...st, comingKind: "novel" }).items), [7401]);
+  // nothing announced for a kind: say so, even though the mix has something to fall back on
+  const none = viewTile("coming", { ...st, comingKind: "novel", pools: { ...st.pools, comingN: [] }, last: { coming: { title: "Coming soon", subtitle: null, items: all.items } } });
+  assert.deepEqual([none.items.length, none.empty], [0, "Nothing announced for novels yet."]);
+  // "all", or a kind we don't know, is the whole mix
+  assert.deepEqual(ids(viewTile("coming", { ...st, comingKind: "all" }).items), ids(all.items));
+  assert.deepEqual(ids(viewTile("coming", { ...st, comingKind: "bogus" }).items), ids(all.items));
+});

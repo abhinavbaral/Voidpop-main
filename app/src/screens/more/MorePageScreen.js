@@ -10,15 +10,13 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import {
   getUserTier, TIERS, statusesFor, exportData, clearData, storageSize, importAniListEntries,
-  getExcited, toggleExcited, celebrate, exportLibraryCsv, exportLibraryMarkdown,
+  celebrate, exportLibraryCsv, exportLibraryMarkdown,
 } from "@voidpop/shared/backend/store";
 import { useSettings } from "@voidpop/shared/backend/SettingsContext";
 import { THEMES, PALETTES, applyPalette } from "@voidpop/shared/lib/theme";
 import { useTheme } from "../../context/ThemeContext.js";
-import { goBackOrHome, openDetail } from "../../utils/nav";
-import { loadAnnounced, daysLeft, ANNOUNCED_DAYS } from "@voidpop/shared/features/announced";
-import { useAuth } from "@voidpop/shared/backend/AuthContext";
-import { releaseLabel, durationLabel } from "@voidpop/shared/lib/format";
+import { goBackOrHome } from "../../utils/nav";
+import { durationLabel } from "@voidpop/shared/lib/format";
 import {
   FREQUENCIES, getBackupConfig, setFrequency, chooseFolder, backupNow, restoreFromFile, listBackups, restoreFromUri,
 } from "../../services/backup";
@@ -30,8 +28,7 @@ import * as Sharing from "expo-sharing";
 import { cacheDirectory, writeAsStringAsync, readAsStringAsync } from "expo-file-system/legacy";
 import * as DocumentPicker from "expo-document-picker";
 import { importMalFile, base64ToBytes } from "@voidpop/shared/features/malImport";
-import { timeAgo, getLibrary, youreWatching, setProgress, setStatus, addReview, totalFor } from "@voidpop/shared/backend/store";
-import VerdictModal from "../../components/title/VerdictModal.js";
+import { timeAgo } from "@voidpop/shared/backend/store";
 import Icon from "../../components/ui/Icon.js";
 import { SkeletonList } from "../../components/ui/Skeleton.js";
 import Voidmon, { VoidmonLoading } from "../../components/brand/Voidmon.js";
@@ -49,7 +46,7 @@ import { loadPeopleStats, PEOPLE_KINDS } from "@voidpop/shared/features/peopleSt
 const VERSION = appConfig.expo.version;
 const TITLES = {
   statistics: "Statistics", appearance: "Appearance and Settings", settings: "Appearance and Settings",
-  data: "Data and storage", youwatching: "You're watching", announced: "New announcements", badge: "Ranks and achievements", compare: "Compare", anilist: "Sync", help: "Help", about: "About",
+  data: "Data and storage", badge: "Ranks and achievements", compare: "Compare", anilist: "Sync", help: "Help", about: "About",
 };
 
 export default function MorePageScreen({ route, navigation }) {
@@ -57,7 +54,7 @@ export default function MorePageScreen({ route, navigation }) {
   const { C } = useTheme();
   const styles = makeStyles(C);
   const page = route.params?.page;
-  const Body = { statistics: Statistics, settings: Settings, appearance: Settings, data: DataStorage, compare: CompareTitles, anilist: AniListPage, announced: Announced, youwatching: YoureWatching, badge: BadgePage, help: Help, about: About }[page];
+  const Body = { statistics: Statistics, settings: Settings, appearance: Settings, data: DataStorage, compare: CompareTitles, anilist: AniListPage, badge: BadgePage, help: Help, about: About }[page];
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -643,108 +640,6 @@ function BadgePage({ styles, C }) {
       })}
     </>
       )}
-    </>
-  );
-}
-
-// Finished shows you're watching again or catching up on: Rewatching, or
-// Watching once its two weeks on Schedule are over. +1 for each episode; the
-// last one moves it to Completed (with the verdict popup, like everywhere else).
-function YoureWatching({ styles, C, navigation }) {
-  const { user } = useAuth();
-  const [list, setList] = useState(null);
-  const [finishing, setFinishing] = useState(null);
-  const refresh = useCallback(() => { getLibrary().then((lib) => setList(youreWatching(lib))).catch(() => setList([])); }, []);
-  useFocusEffect(refresh);
-
-  const plus = async (entry) => {
-    const r = await setProgress(user, entry.item, (entry.progress || 0) + 1, "plus");
-    if (r.reachedEnd) setFinishing(entry.item);
-    refresh();
-  };
-  const finish = async ({ verdict, vibes, moods, comment }) => {
-    await setStatus(user, finishing.segment, finishing, "completed");
-    await addReview(user, finishing.segment, finishing.id, { verdict, vibes, moods, comment });
-    setFinishing(null);
-    refresh();
-  };
-
-  if (!list) return <SkeletonList rows={4} style={{ paddingHorizontal: 0 }} />;
-  if (!list.length) {
-    return <Text style={styles.note}>Nothing here yet. Finished shows you mark as Watching or Rewatching show up here, so they don't crowd your Schedule.</Text>;
-  }
-  return (
-    <>
-      <Text style={styles.note}>Shows that have finished airing and that you're watching or rewatching. New episodes of airing shows stay on your Schedule.</Text>
-      <View style={[styles.card, { paddingVertical: 6 }]}>
-        {list.map((entry, i) => {
-          const { item } = entry;
-          const total = totalFor(item);
-          const done = total != null && (entry.progress || 0) >= total;
-          return (
-            <View key={item.id} style={[{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8 }, i > 0 && { borderTopWidth: 1, borderTopColor: C.border }]}>
-              <TouchableOpacity style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 10 }} onPress={() => openDetail(navigation, item)}>
-                {item.image ? <Image source={{ uri: item.image }} style={{ width: 38, height: 54, borderRadius: 6 }} /> : <View style={{ width: 38, height: 54, borderRadius: 6, backgroundColor: C.border }} />}
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
-                  <Text style={styles.note} numberOfLines={1}>
-                    {entry.status === "rewatching" ? "Rewatching" : "Watching"} · Ep {entry.progress || 0}{total ? ` of ${total}` : ""}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-              {!done && (
-                <TouchableOpacity onPress={() => plus(entry)} accessibilityLabel={`Watched episode ${(entry.progress || 0) + 1} of ${item.title}`}
-                  style={{ borderWidth: 1, borderColor: C.orange, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 }}>
-                  <Text style={{ fontSize: 12, fontWeight: "800", color: C.orange }}>+1</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          );
-        })}
-      </View>
-      {finishing && <VerdictModal visible initial={null} onSave={finish} onClose={() => setFinishing(null)} />}
-    </>
-  );
-}
-
-// Anime announced on AniList this week. Each stays 7 days, then drops off.
-function Announced({ styles, C, navigation }) {
-  const { user } = useAuth();
-  const [list, setList] = useState(null);
-  const [excited, setExcited] = useState({});
-  useFocusEffect(useCallback(() => {
-    loadAnnounced().then(setList).catch(() => setList([]));
-    getExcited().then(setExcited);
-  }, []));
-  if (!list) return <SkeletonList rows={5} style={{ paddingHorizontal: 0 }} />;
-  if (!list.length) return <Text style={styles.note}>No new announcements in the last {ANNOUNCED_DAYS} days.</Text>;
-  return (
-    <>
-      <Text style={styles.note}>Newly announced anime. Each one stays here for {ANNOUNCED_DAYS} days. Tap Excited to get it on your Schedule.</Text>
-      <View style={[styles.card, { paddingVertical: 6 }]}>
-        {list.map(({ item, seenAt }, i) => {
-          const on = !!excited[`anime:${item.id}`];
-          const left = daysLeft(seenAt);
-          return (
-            <View key={item.id} style={[{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8 }, i > 0 && { borderTopWidth: 1, borderTopColor: C.border }]}>
-              <TouchableOpacity style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 10 }} onPress={() => openDetail(navigation, item)}>
-                {item.image ? <Image source={{ uri: item.image }} style={{ width: 38, height: 54, borderRadius: 6 }} /> : <View style={{ width: 38, height: 54, borderRadius: 6, backgroundColor: C.border }} />}
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
-                  <Text style={styles.note} numberOfLines={1}>
-                    {item.date ? releaseLabel(item) : "Release date TBA"}{item.creator ? ` · ${item.creator}` : ""}
-                  </Text>
-                  <Text style={[styles.note, { fontSize: 10 }]}>{left} day{left === 1 ? "" : "s"} left here</Text>
-                </View>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={async () => { await toggleExcited(user, item); setExcited(await getExcited()); }}
-                style={{ borderWidth: 1, borderColor: C.orange, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: on ? C.orange : "transparent" }}>
-                <Text style={{ fontSize: 11, fontWeight: "800", color: on ? "#fff" : C.orange }}>{on ? "Excited ✓" : "Excited?"}</Text>
-              </TouchableOpacity>
-            </View>
-          );
-        })}
-      </View>
     </>
   );
 }

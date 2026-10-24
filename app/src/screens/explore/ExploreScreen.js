@@ -19,17 +19,6 @@ import Billboard from "../../components/explore/Billboard.js";
 import TileGrid from "../../components/explore/TileGrid.js";
 import { useExplore, initExplore, refreshPersonal, rerollAll } from "../../state/explore";
 import PosterRow from "../../components/ui/PosterRow.js";
-import Chips from "../../components/ui/Chips.js";
-import CinemaFeed from "../../components/explore/CinemaFeed.js";
-import CategoryFeed from "../../components/explore/CategoryFeed.js";
-
-const MODES = [
-  { key: "home", label: "Home" },
-  { key: "anime", label: "Anime" },
-  { key: "manga", label: "Manga" },
-  { key: "novel", label: "Novel" },
-  { key: "cinema", label: "Movies & TV" },
-];
 
 export default function ExploreScreen({ navigation }) {
   const { C, dark } = useTheme();
@@ -38,7 +27,6 @@ export default function ExploreScreen({ navigation }) {
   const { settings } = useSettings();
   const ex = useExplore();
   const [refreshing, setRefreshing] = useState(false);
-  const [mode, setMode] = useState("home");
 
   useEffect(() => { initExplore(); }, []);
   // what's in your library and your verdicts change as you use the app, so these refresh on every visit
@@ -98,26 +86,6 @@ export default function ExploreScreen({ navigation }) {
     </>
     ) || null;
 
-  // the switch sits under the search row (or at the top on wide screens) and stays put as you scroll the list
-  const top = (
-    <>
-      {header}
-      <View style={{ paddingHorizontal: 14, paddingTop: wide ? 10 : 4 }}>
-        <Chips options={MODES} value={mode} onChange={setMode} />
-      </View>
-    </>
-  );
-
-  if (mode !== "home") {
-    return (
-      <SafeAreaView style={styles.safe} edges={["top"]}>
-        {mode === "cinema"
-          ? <CinemaFeed navigation={navigation} header={top} />
-          : <CategoryFeed key={mode} segment={mode} navigation={navigation} header={top} />}
-      </SafeAreaView>
-    );
-  }
-
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <NamePrompt />
@@ -128,7 +96,7 @@ export default function ExploreScreen({ navigation }) {
         data={sections}
         keyExtractor={(x) => x.key}
         renderItem={({ item: x }) => x.render()}
-        ListHeaderComponent={top}
+        ListHeaderComponent={header}
         contentContainerStyle={{ paddingBottom: 30 }}
         initialNumToRender={4}
         maxToRenderPerBatch={2}

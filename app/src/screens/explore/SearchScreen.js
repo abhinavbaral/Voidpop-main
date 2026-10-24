@@ -14,6 +14,17 @@ import { openDetail, goBackOrHome } from "../../utils/nav";
 import { releaseLabel } from "@voidpop/shared/lib/format";
 import { VoidmonEmpty, VoidmonLoading, VoidmonTrouble } from "../../components/brand/Voidmon.js";
 
+// what the empty box says, by the pill that is selected
+const HINTS = {
+  all: "Type at least 2 characters to search.",
+  anime: "Type at least 2 characters to search anime.",
+  manga: "Type at least 2 characters to search manga.",
+  novel: "Type at least 2 characters to search novels.",
+  movie: "Type at least 2 characters to search movies.",
+  tv: "Type at least 2 characters to search TV shows.",
+  people: "Type at least 2 characters to search people (voice actors, directors, mangaka).",
+};
+
 function CreatorText({ item, style }) {
   const creator = item.creator;
   return creator ? <Text style={style} numberOfLines={1}>{creator}</Text> : null;
@@ -142,7 +153,7 @@ export default function SearchScreen({ navigation, route }) {
           status === "loading" ? <VoidmonLoading text="Searching…" style={{ marginTop: 28 }} />
           : status === "failed" ? <VoidmonTrouble what="Search" onRetry={retry} navigation={navigation} />
           : status === "done" ? <VoidmonEmpty pose="peeking" text="No matches found. Try the English or Japanese title." />
-          : <Text style={styles.hint}>Type at least 2 characters to search anime, manga and people (voice actors, directors, mangaka).</Text>
+          : <Text style={styles.hint}>{HINTS[kind] || HINTS.all}</Text>
         }
         contentContainerStyle={{ paddingBottom: 30 }}
       />

@@ -6,7 +6,7 @@ import { useMemo, useState } from "react";
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useExplore, reroll, loadTrend, initExplore } from "../../state/explore";
-import { viewTile } from "@voidpop/shared/features/exploreTiles";
+import { viewTile, COMING_KINDS } from "@voidpop/shared/features/exploreTiles";
 import { useTheme } from "../../context/ThemeContext.js";
 import { openDetail, goBackOrHome } from "../../utils/nav";
 import Card from "../../components/ui/Card.js";
@@ -20,7 +20,8 @@ export default function ExploreCategoryScreen({ navigation, route }) {
   const styles = makeStyles(C);
   const key = route.params.key;
   const ex = useExplore();
-  const v = useMemo(() => viewTile(key, ex), [key, ex]);
+  const [comingKind, setComingKind] = useState("all"); // Coming soon: All / Anime / Manga / Novels / Movies / TV
+  const v = useMemo(() => viewTile(key, key === "coming" ? { ...ex, comingKind } : ex), [key, ex, comingKind]);
   const busy = !!ex.busy[key];
   const [refreshing, setRefreshing] = useState(false);
   // pull down: new shows if this list can be rerolled, otherwise just reload it
@@ -46,6 +47,12 @@ export default function ExploreCategoryScreen({ navigation, route }) {
           </TouchableOpacity>
         )}
       </View>
+
+      {key === "coming" && (
+        <View style={{ paddingHorizontal: 14, paddingTop: 10 }}>
+          <Chips value={comingKind} onChange={setComingKind} options={COMING_KINDS} />
+        </View>
+      )}
 
       {key === "trending" && (
         <View style={{ paddingHorizontal: 14, paddingTop: 10 }}>

@@ -14,10 +14,11 @@ import { useTheme } from "../../context/ThemeContext.js";
 import Voidmon from "../../components/brand/Voidmon.js";
 import AnimatedBanner from "../../components/brand/AnimatedBanner.js";
 import Icon from "../../components/ui/Icon.js";
+import OtherPopup from "../../components/more/OtherPopup.js";
 
 const GROUPS = [
   [["statistics", "stats", "Statistics"], ["compare", "list", "Compare"], ["data", "storage", "Data and storage"]],
-  [["youwatching", "play", "You're watching"], ["announced", "bell", "New announcements"]],
+  [["other", "menu", "Other"]], // opens a popup with You're watching and New announcements
   [["anilist", "sync", "Sync"], ["account", "profile", "Account"]],
   [["settings", "palette", "Appearance and Settings"], ["help", "help", "Help"], ["about", "info", "About"]],
 ];
@@ -26,6 +27,7 @@ export default function MoreScreen({ navigation }) {
   const { C, dark } = useTheme();
   const styles = makeStyles(C);
   const [rank, setRank] = useState(null);
+  const [otherOpen, setOtherOpen] = useState(false);
   useFocusEffect(useCallback(() => {
     getUserTier().then(setRank).catch(() => {});
   }, []));
@@ -56,7 +58,7 @@ export default function MoreScreen({ navigation }) {
               <Pressable
                 key={page}
                 style={({ pressed }) => [styles.row, pressed && { backgroundColor: C.card }]}
-                onPress={() => (page === "account" ? navigation.navigate("Account") : navigation.navigate("MorePage", { page }))}
+                onPress={() => (page === "other" ? setOtherOpen(true) : page === "account" ? navigation.navigate("Account") : navigation.navigate("MorePage", { page }))}
               >
                 <View style={styles.icon}><Icon name={icon} size={21} color={C.purple} /></View>
                 <Text style={[styles.label, { flex: 1 }]}>{label}</Text>
@@ -65,6 +67,7 @@ export default function MoreScreen({ navigation }) {
           </View>
         ))}
       </ScrollView>
+      <OtherPopup visible={otherOpen} onClose={() => setOtherOpen(false)} navigation={navigation} />
     </SafeAreaView>
   );
 }

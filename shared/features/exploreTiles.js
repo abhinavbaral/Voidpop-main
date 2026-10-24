@@ -44,6 +44,13 @@ export const TILES = [
 // What Explore shows, in order. The grid is the colourful tiles; the rows are posters in lines, each mixing
 // anime, manga, novels, movies and TV.
 export const GRID_KEYS = ["coming", "aoty", "oscars", "emmys", "jump", "seasons", "dmAnime", "dmManga", "dmMovies", "dmNovels", "dmTv", "angles", "trending"];
+// The kinds you can switch Coming soon between (the chips on its page); "all" is every kind together
+export const COMING_KINDS = [
+  { key: "all", label: "All" }, { key: "anime", label: "Anime" }, { key: "manga", label: "Manga" },
+  { key: "novel", label: "Novels" }, { key: "movie", label: "Movies" }, { key: "tv", label: "TV" },
+];
+const COMING_NAME = { anime: "anime", manga: "manga", novel: "novels", movie: "movies", tv: "TV shows" };
+
 export const ROW_KEYS = ["talk", "best", "watch", "peak", "divein", "onetime", "loved"];
 
 // Where Reroll can fetch more shows from AniList (a random page; the picks then draw
@@ -117,6 +124,7 @@ export function nextSource(sources, current, random = Math.random) {
 // What one tile shows. st = the Explore state:
 //   community ({ best, popular, loved } from communityRank.js, or null with no server / too few verdicts)
 //   pools, aoty, mostLoved, trend, country, verdicts ({ source, items } per verdict), newSeasons, jump, jumpFallback   (null/undefined while loading)
+//   comingKind ("all" or unset, or one of anime / manga / novel / movie / tv: what Coming soon is switched to)
 //   known (library + Excited keys), seeds, extra (more shows fetched by Reroll), saved (picks kept from the last Reroll),
 //   last (what each tile showed last time: { title, subtitle, items })
 // → { key, title, subtitle, color, reroll, items, loading, empty, hidden }
@@ -130,11 +138,11 @@ export function viewTile(key, st) {
   if (v.items === null && last?.items?.length) { // still loading: what it showed last time, right away
     return { ...v, title: last.title || v.title, subtitle: last.subtitle ?? v.subtitle, items: keepLast(), loading: false };
   }
-  if (v.items && !v.items.length && last?.items?.length) { // nothing to show now: what it showed last time
+  if (v.items && !v.items.length && !v.noLast && last?.items?.length) { // nothing to show now: what it showed last time
     const items = keepLast();
     if (items.length) return { ...v, title: last.title || v.title, subtitle: last.subtitle ?? v.subtitle, items, empty: null };
   }
-  if (v.items && !v.items.length) return { ...v, empty: "Can't load shows right now. Check your connection and pull down to try again." };
+  if (v.items && !v.items.length && !v.empty) return { ...v, empty: "Can't load shows right now. Check your connection and pull down to try again." };
   return v;
 }
 
@@ -198,11 +206,17 @@ function compute(key, st) {
     case "coming": {
       if (!st.pools) return wait();
       const yours = new Set((st.newSeasons || []).map((it) => it.id)); // sequels of shows you watched live in "New seasons"
-      // for everything: anime, manga, novels, movies and TV that haven't come out yet
+      // everything that hasn't come out yet (anime, manga, novels, movies, TV), or just the kind it's switched to
       const p = st.pools;
-      const list = dedupe(fresh([...(p.coming || []), ...(p.comingMv || []), ...(p.comingTv || []), ...(p.comingM || []), ...(p.comingN || [])])).filter((it) => !yours.has(it.id));
+      const byKind = { anime: p.coming, manga: p.comingM, novel: p.comingN, movie: p.comingMv, tv: p.comingTv };
+      const kind = byKind[st.comingKind] ? st.comingKind : null;
+      const pool = kind ? byKind[kind] : [...(p.coming || []), ...(p.comingMv || []), ...(p.comingTv || []), ...(p.comingM || []), ...(p.comingN || [])];
+      const list = dedupe(fresh(pool)).filter((it) => !(it.segment === "anime" && yours.has(it.id)));
       const items = [...list].sort(byDate).slice(0, 24); // soonest first
       const label = st.pools.comingChip?.label || null;
+      if (kind) { // one kind: only what is announced for it, never topped up with other kinds or what's popular
+        return out(items, { title: st.pools.comingTitle || def.title, subtitle: label, noLast: true, empty: items.length ? null : `Nothing announced for ${COMING_NAME[kind]} yet.` });
+      }
       if (items.length < MIN_SHOWN) { // nothing announced: what everyone's watching
         const t = topUp(items, interleave([st.pools.trA, st.pools.trMv, st.pools.trTv], 24));
         return out(t.items, { title: st.pools.comingTitle || def.title, subtitle: t.topped ? "Nothing more announced yet. What everyone's watching" : label });

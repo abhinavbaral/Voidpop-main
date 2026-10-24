@@ -5,7 +5,7 @@
 // shows you've watched. Picks are the same all day; pulling to refresh
 // shuffles everything except Anime of the Year.
 
-import { fetchAniList, fetchAnimeOfTheYear, fetchRecommendations, fetchSequels } from "../api/anilist.js";
+import { fetchAniList, fetchAnimeOfTheYear, fetchRecommendations, fetchSequels, SEASON_FORMATS } from "../api/anilist.js";
 import { fetchSimilarCinema, isCinema } from "../api/tmdb.js";
 import { readKey, writeKey } from "../backend/storage.js";
 import { seasonOf, shiftSeason, seasonTitle } from "./seasonChart.js";
@@ -182,8 +182,10 @@ export async function loadRecsLike(source) {
 }
 
 // "New seasons of shows you watched": sequels of anime you've completed or are
-// watching that are airing now, announced, or came out in the last 12 months,
-// and aren't in your library yet. Airing first, then announced, then recent.
+// watching that aren't in your library yet: airing now, announced, or out in the
+// last 12 months (any kind), and older ones too when they are a real season (TV
+// or ONA), so the Season 2 you forgot about years ago shows up. A recap film or
+// OVA from years back doesn't. Airing first, then announced, then the rest, newest first.
 //
 // Each show's sequels are checked at most once a day and remembered on the
 // device, so a big library doesn't flood AniList with requests.
@@ -213,13 +215,14 @@ export async function loadNewSeasons() {
 
   const now = Date.now();
   const rank = (it) => (!it.unreleased && !it.finished ? 0 : it.unreleased ? 1 : 2);
-  const isNew = (it) => it.unreleased || !it.finished || (it.date && now - new Date(it.date).getTime() < YEAR_MS);
+  const isNew = (it) => it.unreleased || !it.finished || (it.date && now - new Date(it.date).getTime() < YEAR_MS)
+    || !it.format || SEASON_FORMATS.has(it.format); // an older one counts only if it is a season, not a film or special
   const candidates = [];
   const seen = new Set();
   sources.forEach((src) => {
     (saved[src.id]?.items || []).forEach((it) => {
       const key = `anime:${it.id}`;
-      if (known.has(key) || seen.has(key) || !isNew(it)) return; // an old sequel isn't "new"
+      if (known.has(key) || seen.has(key) || !isNew(it)) return; // an old film or special isn't a "new season"
       seen.add(key);
       candidates.push({ ...it, sequelOf: src.title });
     });
