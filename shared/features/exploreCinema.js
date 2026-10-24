@@ -131,7 +131,7 @@ export async function loadNewSeasonsTv() {
   if (!hasTmdb()) return [];
   const mine = (await getCinemaShelf())
     .filter((e) => e.item?.segment === "tv" && ["completed", "watching", "rewatching"].includes(e.status))
-    .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""))
+    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
     .slice(0, 25); // each is one request (TMDB answers are kept for 10 minutes)
   const now = Date.now();
   const checked = await Promise.all(mine.map(async (e) => {

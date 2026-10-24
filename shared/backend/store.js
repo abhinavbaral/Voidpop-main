@@ -24,7 +24,13 @@ const DB_KEY = "voidation:db:v1";
 // notifyEpisodes only matters in the app (the website can't schedule alerts)
 // logo: which logo the app shows (see Brand.js): "classic", "voidmon" or "peeking"
 export const DEFAULT_SETTINGS = { clock24: false, posterBadges: true, notifyEpisodes: true, seasonLayout: "grid", logo: "classic", libraryLayout: "compact", name: "", nameAsked: false };
-const EMPTY = () => ({ library: {}, reviews: {}, excited: {}, notes: {}, log: [], categories: [], meta: {}, settings: { ...DEFAULT_SETTINGS } });
+// the first Movies & TV version called a finished title "watched"; it is now "completed" like the rest of the Library
+function renameWatched(cinema) {
+  for (const e of Object.values(cinema)) if (e.status === "watched") e.status = "completed";
+  return cinema;
+}
+
+const EMPTY = () => ({ library: {}, reviews: {}, excited: {}, cinema: {}, notes: {}, log: [], categories: [], meta: {}, settings: { ...DEFAULT_SETTINGS } });
 
 let cache = null;
 let writing = Promise.resolve();
@@ -36,6 +42,8 @@ async function load() {
     const saved = raw ? JSON.parse(raw) : {};
     cache = { ...EMPTY(), ...saved, log: Array.isArray(saved.log) ? saved.log : [],
       categories: Array.isArray(saved.categories) ? saved.categories : [], settings: { ...DEFAULT_SETTINGS, ...(saved.settings || {}) } };
+    if (!cache.cinema || typeof cache.cinema !== "object") cache.cinema = {}; // data saved before Movies & TV has none
+    renameWatched(cache.cinema);
   } catch {
     cache = EMPTY(); // corrupt or unreadable storage: start clean rather than crash
   }
@@ -454,10 +462,32 @@ export async function bulkRemove(keys) {
 }
 /* ---------- cinema tracking: movies and live-action TV ---------- */
 
+// Only what the shelf needs of a movie or series, so a backup stays small
+const slimCinemaItem = (item) => ({
+  id: item.id, segment: item.segment, title: item.title, altTitle: item.altTitle || null,
+  image: item.image || null, imageSmall: item.imageSmall || null, banner: item.banner || null,
+  genres: item.genres || [], genre: item.genre || null,
+  date: item.date || null, dateLabel: item.dateLabel || null, endDate: item.endDate || null,
+  creator: item.creator || null, overview: (item.overview || "").slice(0, 400),
+  url: item.url || null, format: item.format || null, runtime: item.runtime || null,
+  seasons: item.seasons ?? null, finished: item.finished ?? null,
+  demo: !!item.demo, unreleased: !!item.unreleased,
+});
+
+// every title on the shelf, newest change first
+export async function getCinemaShelf() {
+  return Object.values((await load()).cinema || {}).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+}
+
+export async function getCinemaEntry(segment, id) {
+  return ((await load()).cinema || {})[keyOf(segment, id)] ?? null;
+}
+
+// status: a key from statusesFor(item.segment) (a series has the same ones as Anime),
+// or null to remove it from your Library (its verdict goes with it)
 export async function setCinemaStatus(item, status) {
   const db = await load();
   db.cinema ||= {};
-
   const key = keyOf(item.segment, item.id);
 
   // Only movies and live-action TV belong in cinema storage.
@@ -468,39 +498,53 @@ export async function setCinemaStatus(item, status) {
   if (status === null) {
     const previous = db.cinema[key];
     if (!previous) return;
-
     logStatus(db, key, previous.status, null);
-    delete db.cinema[key];
+    delete db.cinema[key]; // its verdict is part of the entry, so it goes too
     delete db.reviews[key];
     delete db.notes[key];
     delete db.excited[key];
-
-    await save();
-    return;
+    return save();
   }
 
   if (!statusesFor(item.segment).some((s) => s.key === status)) {
-    throw new Error(`Invalid ${item.segment} status: ${status}`);
+    throw new Error(`Unknown status: ${status}`);
   }
+  if (item.unreleased && !["plan", "considering"].includes(status)) return; // not out yet: only planned or considered
 
-  if (item.unreleased && !["plan", "considering"].includes(status)) {
-    return;
-  }
-
-  const previous = db.cinema[key];
-  const now = new Date().toISOString();
-
-  logStatus(db, key, previous?.status, status);
-
+  const before = db.cinema[key];
+  const now = Date.now();
+  logStatus(db, key, before?.status, status);
   db.cinema[key] = {
-    ...(previous || {}),
-    ...(previous ? {} : { addedAt: now }),
-    item: freshest(previous?.item, item),
-    status,
-    updatedAt: now,
+    item: slimCinemaItem(freshest(before?.item, item)), status, review: before?.review ?? null,
+    addedAt: before?.addedAt ?? now, updatedAt: now,
   };
+  return save();
+}
 
-  await save();
+// Saving a verdict marks it Completed (Watched for a movie). A changed verdict keeps the earlier one in `history`.
+export async function saveCinemaReview(item, { verdict, moods, comment }) {
+  const db = await load();
+  db.cinema ||= {};
+  const key = keyOf(item.segment, item.id);
+  const before = db.cinema[key];
+  const old = before?.review;
+  const history = [...(old?.history || [])];
+  if (old && old.verdict !== verdict) history.push({ verdict: old.verdict, date: old.date });
+  const now = Date.now();
+  logStatus(db, key, before?.status, "completed");
+  db.cinema[key] = {
+    item: slimCinemaItem(item), status: "completed", addedAt: before?.addedAt ?? now, updatedAt: now,
+    review: {
+      verdict, moods: moods || [], comment: comment || "", date: new Date(now).toISOString(),
+      ...(history.length ? { history: history.slice(-10) } : {}),
+    },
+  };
+  return save();
+}
+
+// shelf entries that have a verdict (newest first)
+export async function getCinemaReviews() {
+  return (await getCinemaShelf()).filter((e) => e.review);
 }
 
 /* ---------- your shows: next episode + pending, in one list ---------- */
@@ -1024,6 +1068,8 @@ export async function importData(json) {
   if (!["voidpop", "voidation"].includes(data?.app) || typeof data.library !== "object") return "That file isn't a VoidPop backup.";
   cache = {
     library: data.library || {}, reviews: data.reviews || {}, excited: data.excited || {},
+    cinema: renameWatched(data.cinema && typeof data.cinema === "object" ? data.cinema : {}), // backups made before Movies & TV have none
+    notes: data.notes && typeof data.notes === "object" ? data.notes : {}, // an old backup has none; removing a title deletes its note, so it must exist
     log: Array.isArray(data.log) ? data.log : [],
     categories: Array.isArray(data.categories) ? data.categories : [],
     meta: data.meta && typeof data.meta === "object" ? data.meta : {},
@@ -1050,7 +1096,13 @@ export async function exportLibraryCsv() {
       return [KIND_NAME[kindOf(e.item)], e.item.title, label, e.progress || 0, totalFor(e.item) ?? "",
         verdict, e.item.url || ""].map(cell).join(",");
     });
-  return ["Type,Title,Status,Progress,Total,Verdict,Link", ...rows].join("\n") + "\n";
+  // Movies & TV: no progress or total
+  const cinemaRows = Object.values(db.cinema || {})
+    .sort((a, b) => a.item.title.localeCompare(b.item.title))
+    .map((e) => [e.item.segment === "tv" ? "Series" : "Movie", e.item.title,
+      statusesFor(e.item.segment).find((x) => x.key === e.status)?.label || e.status, "", "",
+      VERDICTS.find((v) => v.key === e.review?.verdict)?.label || "", e.item.url || ""].map(cell).join(","));
+  return ["Type,Title,Status,Progress,Total,Verdict,Link", ...rows, ...cinemaRows].join("\n") + "\n";
 }
 
 // Export → Notes (Markdown): every title as a section with its status, verdict,

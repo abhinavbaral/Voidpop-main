@@ -8,6 +8,7 @@
 //   PUT    /api/verdicts/:segment/:id    { verdict, status, moods?, title?, image? }
 //   DELETE /api/verdicts/:segment/:id
 //   GET    /api/titles/:segment/:id/verdicts                           → { total, counts, mine? }
+//   GET    /api/rankings?min=20                                        → { titles: [{ segment, id, title, image, total, counts }] }  (Explore: Best out there, Popular in town, Most loved)
 //   GET    /api/titles/:segment/:id/comments?before=<id>               → { comments, nextBefore }
 //   POST   /api/titles/:segment/:id/comments { body, parentId? }       → { comment }
 //   PATCH  /api/comments/:id             { body }
@@ -19,7 +20,7 @@
 
 import { hashPassword, checkPassword, makeTokens } from "./auth.js";
 
-export const SEGMENTS = ["anime", "manga", "movie", "tv"];
+export const SEGMENTS = ["anime", "manga", "novel", "movie", "tv"];
 export const VERDICT_KEYS = ["peak", "divein", "onetime", "voidit"];
 // a verdict counts in the community split only when the person finished or dropped it
 export const COUNTED = ["completed", "dropped", "watched"];
@@ -165,6 +166,23 @@ export function createApp({ db, secret, origins = "*", trustProxy = false, now =
       if (mine) out.mine = mine;
     }
     return out;
+  });
+
+  // Every title with at least `min` counted verdicts and how they split. Explore turns this into its community rows
+  // (shared/features/communityRank.js); the server only counts, the rules for each row live there.
+  route("GET", "/api/rankings", (req, { query }) => {
+    const min = Math.min(Math.max(Number(query.get("min")) || 20, 1), 1000);
+    const rows = db.prepare(`SELECT segment, item_id, MAX(title) AS title, MAX(image) AS image, verdict, COUNT(*) AS n FROM verdicts
+      WHERE status IN (${COUNTED.map(() => "?").join(",")}) GROUP BY segment, item_id, verdict`).all(...COUNTED);
+    const byTitle = new Map();
+    for (const r of rows) {
+      const key = `${r.segment}:${r.item_id}`;
+      if (!byTitle.has(key)) byTitle.set(key, { segment: r.segment, id: r.item_id, title: r.title || null, image: r.image || null, total: 0, counts: Object.fromEntries(VERDICT_KEYS.map((k) => [k, 0])) });
+      const t = byTitle.get(key);
+      t.title = t.title || r.title || null; t.image = t.image || r.image || null;
+      if (r.verdict in t.counts) { t.counts[r.verdict] = r.n; t.total += r.n; }
+    }
+    return { titles: [...byTitle.values()].filter((t) => t.total >= min).sort((a, b) => b.total - a.total).slice(0, 500) };
   });
 
   route("GET", "/api/titles/([^/]+)/([^/]+)/comments", (req, { m, query }) => {

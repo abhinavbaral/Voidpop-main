@@ -103,6 +103,23 @@ test("community counts: only finished or dropped people count; one verdict per p
   assert.equal((await call("PUT", "/api/verdicts/tv/1", { body: { verdict: "peak", status: "completed" } })).status, 401);
 });
 
+test("rankings: titles with enough counted verdicts and their split; novels accepted; watching/plan not counted", async () => {
+  const people = [];
+  for (let i = 0; i < 4; i++) people.push(await signUp(`rank_${i}`));
+  const put = (u, seg, id, verdict, status, title) => call("PUT", `/api/verdicts/${seg}/${id}`, { token: u.token, body: { verdict, status, title, image: "http://img/" + id } });
+  for (const [i, u] of people.entries()) await put(u, "novel", "n1", i === 3 ? "divein" : "peak", "completed", "Novel One");
+  await put(people[0], "movie", "m1", "peak", "completed", "Film One");
+  await put(people[1], "movie", "m1", "peak", "watching", "Film One"); // still watching: not counted
+  const all = (await call("GET", "/api/rankings?min=1")).json.titles;
+  const novel = all.find((t) => t.segment === "novel" && t.id === "n1");
+  assert.deepEqual(novel.counts, { peak: 3, divein: 1, onetime: 0, voidit: 0 });
+  assert.equal(novel.total, 4); assert.equal(novel.title, "Novel One");
+  assert.equal(all.find((t) => t.id === "m1").total, 1);
+  const strict = (await call("GET", "/api/rankings?min=3")).json.titles;
+  assert.ok(strict.some((t) => t.id === "n1") && !strict.some((t) => t.id === "m1"));
+  assert.ok((await call("GET", "/api/rankings")).json.titles.every((t) => t.total >= 20)); // default minimum
+});
+
 /* ---------- comments ---------- */
 
 test("comments: post, reply, like, edit, delete, rules", async () => {

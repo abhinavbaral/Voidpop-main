@@ -13,12 +13,13 @@ const base = () => ({
   newSeasons: [], jump: { anime: [show(800), show(801)], manga: [] }, seeds: {}, saved: {}, extra: {}, busy: {},
 });
 
-test("18 tiles with unique keys, split into the grid and the poster rows; the fixed lists can't be rerolled", () => {
-  assert.equal(TILES.length, 18);
-  assert.equal(new Set(TILES.map((t) => t.key)).size, 18);
+test("20 tiles with unique keys, split into the grid and the poster rows; the fixed lists can't be rerolled", () => {
+  assert.equal(TILES.length, 20);
+  assert.equal(new Set(TILES.map((t) => t.key)).size, 20);
+  assert.deepEqual(ROW_KEYS, ["talk", "best", "watch", "peak", "divein", "onetime", "loved"]);
   assert.deepEqual([...GRID_KEYS, ...ROW_KEYS].sort(), TILES.map((t) => t.key).sort()); // every tile is shown exactly once
   assert.ok(!TILES.some((t) => ["isekai", "shonen"].includes(t.key))); // Isekai Heaven and Shonen Feast are gone: those are genres in Browse now
-  assert.deepEqual(TILES.filter((t) => !t.reroll).map((t) => t.key), ["loved", "trending", "coming", "aoty", "oscars", "emmys", "jump", "seasons"]);
+  assert.deepEqual(TILES.filter((t) => !t.reroll).map((t) => t.key), ["best", "loved", "trending", "coming", "aoty", "oscars", "emmys", "jump", "seasons"]);
   Object.keys(EXTRA).forEach((k) => assert.ok(TILES.find((t) => t.key === k), k)); // every Reroll source belongs to a tile
 });
 
@@ -204,4 +205,43 @@ test("the anime tiles never fill up with movies, even when Most loved mixes ever
   st.aoty = [];
   st.pools = { ...st.pools, popA: [], trA: [] };
   for (const key of ["aoty", "jump", "dmAnime"]) assert.ok(viewTile(key, st).items.every((x) => x.segment === "anime"), key);
+});
+
+// ---- the community rows (communityRank.js decides who is in; these check what the tiles do with it) ----
+const comm = (from, n, segment = "anime") => Array.from({ length: n }, (_, i) => show(from + i, { segment }));
+
+test("Best out there: hidden until the community has enough, then a fixed ranking without your marked titles", () => {
+  const st = base();
+  assert.equal(viewTile("best", st).hidden, true); // no community at all
+  assert.equal(viewTile("best", { ...st, community: { best: comm(1, 5), popular: [], loved: [] } }).hidden, true); // too few
+  // a title you marked is never suggested; it is not brought back from "last time" either
+  const known = new Set(["anime:1", "anime:2"]);
+  const v = viewTile("best", { ...st, known, last: { best: { title: "Best out there", items: comm(1, 8) } }, community: { best: comm(1, 7), popular: [], loved: [] } });
+  assert.equal(v.hidden, true); // 7 minus 2 marked = 5 left
+  const ok = viewTile("best", { ...st, community: { best: comm(1, 9), popular: [], loved: [] }, seeds: { best: 42 } });
+  assert.deepEqual([ok.title, ok.reroll, ok.hidden], ["Best out there", false, undefined]);
+  assert.deepEqual(ids(ok.items), ids(comm(1, 9))); // ranking order, whatever the seed
+  assert.equal(ok.subtitle, "Loved by the VoidPop community");
+});
+
+test("Most loved and Popular in town use the community once it has 6+ titles, else their usual picks", () => {
+  const st = base();
+  const community = { best: [], popular: comm(1000, 8), loved: comm(2000, 7) };
+  assert.equal(viewTile("loved", { ...st, community }).subtitle, "From the VoidPop community");
+  assert.deepEqual(ids(viewTile("loved", { ...st, community }).items), ids(community.loved));
+  assert.deepEqual(ids(viewTile("loved", { ...st, community: { best: [], popular: [], loved: comm(2000, 5) } }).items), ids(st.mostLoved.slice(0, 30)));
+  assert.deepEqual(ids(viewTile("talk", { ...st, community }).items).sort(), ids(community.popular).sort());
+  assert.ok(viewTile("talk", { ...st, community: null }).items.length >= 6); // trending mix as before
+});
+
+test("Also watch this mixes the kinds and repeats nothing the Don't Miss tiles or Angles show", () => {
+  const st = base();
+  st.pools = { ...st.pools, popMv: comm(3000, 60, "movie"), popTv: comm(4000, 60, "tv"), popN: comm(5000, 60, "novel") }; // about as deep as the real pools (3 TMDB pages each)
+  const v = viewTile("watch", st);
+  assert.equal(v.title, "Also watch this");
+  assert.equal(v.reroll, true);
+  assert.ok(new Set(v.items.map((x) => x.segment)).size >= 4);
+  const shown = new Set(["dmAnime", "dmManga", "dmNovels", "dmMovies", "dmTv", "angles"].flatMap((k) => viewTile(k, { ...st, last: null }).items.map((x) => `${x.segment}:${x.id}`)));
+  assert.ok(v.items.every((x) => !shown.has(`${x.segment}:${x.id}`)));
+  assert.equal(viewTile("watch", { ...st, pools: null }).loading, true);
 });

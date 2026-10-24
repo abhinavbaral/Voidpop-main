@@ -2,7 +2,7 @@
 // change or disappear; only the shows inside them do, and only on Reroll (or when you
 // pull down to refresh, which rerolls every tile that can be rerolled).
 //
-// Fixed lists have no Reroll: Most loved and Trending (rankings), Coming soon (soonest
+// Fixed lists have no Reroll: Most loved, Best out there and Trending (rankings), Coming soon (soonest
 // first), the award winners (Anime of the Year, Oscars, Emmys), Jump back in and New seasons (your own
 // anime and TV). Everything else mixes anime, manga, novels, movies and TV.
 //
@@ -23,6 +23,8 @@ export const TILES = [
   { key: "divein", title: "Dive in like", verdict: "Dive In", color: "#8d67ab", reroll: true },
   { key: "onetime", title: "One time like", verdict: "One Time", color: "#477d95", reroll: true },
   { key: "talk", title: "Popular in town", color: "#dc148c", reroll: true },
+  { key: "best", title: "Best out there", color: "#2d46b9", reroll: false }, // community only: hidden until people have given verdicts
+  { key: "watch", title: "Also watch this", color: "#7d4b32", reroll: true },
   { key: "loved", title: "Most loved", color: "#e13300", reroll: false },
   { key: "trending", title: "Trending in", color: "#1e3264", reroll: false },
   { key: "coming", title: "Coming soon", color: "#006450", reroll: false },
@@ -42,7 +44,7 @@ export const TILES = [
 // What Explore shows, in order. The grid is the colourful tiles; the rows are posters in lines, each mixing
 // anime, manga, novels, movies and TV.
 export const GRID_KEYS = ["coming", "aoty", "oscars", "emmys", "jump", "seasons", "dmAnime", "dmManga", "dmMovies", "dmNovels", "dmTv", "angles", "trending"];
-export const ROW_KEYS = ["talk", "peak", "divein", "onetime", "loved"];
+export const ROW_KEYS = ["talk", "best", "watch", "peak", "divein", "onetime", "loved"];
 
 // Where Reroll can fetch more shows from AniList (a random page; the picks then draw
 // from the bigger pool). Categories not listed here reshuffle what they already have.
@@ -85,9 +87,10 @@ const MIN_SHOWN = 6; // a tile with fewer shows than this gets topped up
 
 // the unmarked shows a Reroll tile draws from (its AniList pages plus anything Reroll fetched)
 const POOL_OF = { dmAnime: "popA", dmManga: "popM", dmNovels: "popN", dmMovies: "popMv", dmTv: "popTv" };
-// Popular in town and VoidPop Angles mix all five kinds, taken in turns
+// Popular in town, Also watch this and VoidPop Angles mix all five kinds, taken in turns
 const MIXED = {
   talk: (p) => [p.trA, p.trMv, p.trTv, p.popM, p.popN],
+  watch: (p) => [p.popMv, p.popTv, p.popA, p.popM, p.popN],
   angles: (p) => [p.popA, p.popM, p.popN, p.popMv, p.popTv],
 };
 export function poolFor(key, st) {
@@ -112,12 +115,16 @@ export function nextSource(sources, current, random = Math.random) {
 }
 
 // What one tile shows. st = the Explore state:
+//   community ({ best, popular, loved } from communityRank.js, or null with no server / too few verdicts)
 //   pools, aoty, mostLoved, trend, country, verdicts ({ source, items } per verdict), newSeasons, jump, jumpFallback   (null/undefined while loading)
 //   known (library + Excited keys), seeds, extra (more shows fetched by Reroll), saved (picks kept from the last Reroll),
 //   last (what each tile showed last time: { title, subtitle, items })
-// → { key, title, subtitle, color, reroll, items, loading, empty }
+// → { key, title, subtitle, color, reroll, items, loading, empty, hidden }
+// hidden = leave the row out altogether (Best out there until the community has enough verdicts); never
+// brought back from what it showed last time.
 export function viewTile(key, st) {
   const v = compute(key, st);
+  if (v.hidden) return v;
   const last = st.last?.[key];
   const keepLast = () => (key === "jump" || key === "aoty" ? last.items : (last.items || []).filter((it) => !(st.known || new Set()).has(keyOf(it))));
   if (v.items === null && last?.items?.length) { // still loading: what it showed last time, right away
@@ -168,7 +175,15 @@ function compute(key, st) {
   }
 
   switch (key) {
+    case "best": {
+      // Peak for 70%+ of the people who finished it (communityRank.js). Nothing to fall back on: it needs people.
+      const c = fresh(st.community?.best);
+      if (c.length < MIN_SHOWN) return out([], { hidden: true });
+      return out(c.slice(0, RANKING_COUNT), { subtitle: "Loved by the VoidPop community" });
+    }
     case "loved": {
+      const c = fresh(st.community?.loved);
+      if (c.length >= MIN_SHOWN) return out(c.slice(0, RANKING_COUNT), { subtitle: "From the VoidPop community" });
       if (st.mostLoved == null) return wait();
       // what the VoidPop community loves once enough people have given verdicts, until then a mix of everything's most loved
       return out(fresh(st.mostLoved).slice(0, RANKING_COUNT), {
@@ -221,7 +236,20 @@ function compute(key, st) {
       const t = topUp([], [...dedupe(st.pools?.coming || []).sort(byDate), ...(st.pools?.trA || [])]);
       return out(t.items, { subtitle: "No new seasons of your shows yet. Coming soon instead" });
     }
+    case "watch": {
+      if (!st.pools) return wait();
+      // a mix of all five kinds that none of the Don't Miss This tiles or VoidPop Angles is showing right now
+      const shown = new Set(["dmAnime", "dmManga", "dmNovels", "dmMovies", "dmTv", "angles"].flatMap((k) => (viewTile(k, { ...st, last: null }).items || []).map(keyOf)));
+      const lists = MIXED.watch(st.pools).map((l) => (l || []).filter((it) => !known.has(keyOf(it)) && !shown.has(keyOf(it))));
+      const rest = interleave(lists, 200);
+      const t = topUp(draw(rest), interleave(MIXED.angles(st.pools), 30));
+      return out(t.items);
+    }
     case "talk": case "dmAnime": case "dmManga": case "dmNovels": case "dmMovies": case "dmTv": {
+      if (key === "talk") { // what the community is finishing, once there is one
+        const c = fresh(st.community?.popular);
+        if (c.length >= MIN_SHOWN) return out(mix(c, seed).slice(0, PICK_COUNT), { subtitle: "Most talked about in VoidPop" });
+      }
       if (!st.pools) return wait();
       if ((key === "dmMovies" && !st.pools.popMv) || (key === "dmTv" && !st.pools.popTv)) return wait(); // movies and TV load a moment after anime
       const backups = { dmManga: st.pools.popM, dmNovels: st.pools.popN, dmMovies: st.pools.popMv, dmTv: st.pools.popTv }[key] || popular();

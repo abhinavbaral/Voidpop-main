@@ -251,7 +251,7 @@ function Shelf({ navigation, onFind }) {
     );
   }
   const plan = shelf.filter((e) => e.status === "plan");
-  const watched = shelf.filter((e) => e.status === "watched");
+  const watched = shelf.filter((e) => e.status === "completed");
   const verdicts = shelf.filter((e) => e.review).length;
   const grid = (entries, empty) => (entries.length ? (
     <View style={{ flexDirection: "row", flexWrap: "wrap", marginHorizontal: -6 }}>

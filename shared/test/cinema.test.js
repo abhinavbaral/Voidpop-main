@@ -19,7 +19,7 @@ test("shelf: watchlist → watched with a verdict; changing it keeps the earlier
 
   await s.saveCinemaReview(film(1), { verdict: "peak", moods: ["Made me feel alive."], comment: "wow" });
   let e = await s.getCinemaEntry("movie", 1);
-  assert.equal(e.status, "watched");
+  assert.equal(e.status, "completed"); // Watched
   assert.equal(e.review.verdict, "peak");
   assert.equal(e.review.history, undefined);
 
@@ -38,7 +38,7 @@ test("shelf: moving back to the watchlist keeps the verdict; removing deletes it
 
 test("shelf: snapshots stay small, and movies never enter the anime/manga library or stats", async () => {
   const before = (await s.getStats()).totalCompleted;
-  await s.setCinemaStatus(film(2, { cast: ["a"], sampleVotes: { peak: 1 } }), "watched");
+  await s.setCinemaStatus(film(2, { cast: ["a"], sampleVotes: { peak: 1 } }), "completed");
   const e = await s.getCinemaEntry("movie", 2);
   assert.equal(e.item.overview.length, 400);
   assert.equal(e.item.cast, undefined);
@@ -50,7 +50,7 @@ test("shelf: backup round-trips it, old backups without it still restore, CSV li
   await s.setCinemaStatus(film(3, { title: "Past, Lives" }), "plan");
   const backup = await s.exportData();
   assert.ok(JSON.parse(backup).cinema["movie:3"]);
-  assert.match(await s.exportLibraryCsv(), /Movie,"Past, Lives",Watchlist/);
+  assert.match(await s.exportLibraryCsv(), /Movie,"Past, Lives",Plan to Watch/);
 
   await s.clearData();
   assert.deepEqual(await s.getCinemaShelf(), []);

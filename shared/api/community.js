@@ -110,6 +110,10 @@ export async function dropVerdict(segment, id) {
   try { await request("DELETE", `/api/verdicts/${segment}/${encodeURIComponent(id)}`); return true; } catch { return false; }
 }
 
+// Every title with enough counted verdicts and how they split: [{ segment, id, title, image, total, counts }].
+// Explore ranks these itself (features/communityRank.js); the server only counts.
+export const fetchRankings = (min) => request("GET", `/api/rankings${min ? `?min=${min}` : ""}`).then((r) => r.titles || []);
+
 /* ---------- comments ---------- */
 
 export const fetchComments = (segment, id, { before } = {}) =>

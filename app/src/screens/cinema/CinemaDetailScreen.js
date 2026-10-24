@@ -112,9 +112,9 @@ export default function CinemaDetailScreen({ route, navigation }) {
               <Text style={[styles.statusText, status === "plan" && { color: "#fff" }]}>{status === "plan" ? "On your watchlist ✓" : "Add to watchlist"}</Text>
             </TouchableOpacity>
             {!unreleased && (
-              <TouchableOpacity onPress={() => toggle("watched")} accessibilityRole="button" accessibilityState={{ selected: status === "watched" }}
-                style={[styles.status, status === "watched" && styles.statusOn]}>
-                <Text style={[styles.statusText, status === "watched" && { color: "#fff" }]}>{status === "watched" ? "Watched ✓" : "Mark as watched"}</Text>
+              <TouchableOpacity onPress={() => toggle("completed")} accessibilityRole="button" accessibilityState={{ selected: status === "completed" }}
+                style={[styles.status, status === "completed" && styles.statusOn]}>
+                <Text style={[styles.statusText, status === "completed" && { color: "#fff" }]}>{status === "completed" ? "Watched ✓" : "Mark as watched"}</Text>
               </TouchableOpacity>
             )}
             {!unreleased && (

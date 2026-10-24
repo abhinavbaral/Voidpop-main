@@ -7,6 +7,7 @@ import { fetchAniList } from "@voidpop/shared/api/anilist";
 import { fetchCinema } from "@voidpop/shared/api/tmdb";
 import { loadExplorePools, knownKeys, loadVerdictSources, loadRecsLike, loadNewSeasons, loadAnimeOfTheYear, loadJumpBackIn, loadInProgress } from "@voidpop/shared/features/explore";
 import { loadCinemaPools, loadComingBooks, loadAwards, loadNewSeasonsTv, loadMostLoved } from "@voidpop/shared/features/exploreCinema";
+import { loadCommunityRows } from "@voidpop/shared/features/exploreCommunity";
 import { likeMix } from "@voidpop/shared/features/exploreMix";
 import { TILES, EXTRA, PICK_COUNT, viewTile, dedupe, poolFor, chosenSource, nextSource } from "@voidpop/shared/features/exploreTiles";
 
@@ -16,7 +17,7 @@ const VERDICT_KEY = "voidation:explore:verdict:v1"; // { peak: "anime:123", … 
 const LAST_KEY = "voidation:explore:last:v1"; // { tileKey: { title, subtitle, items } }: what every tile showed last time, so none is ever empty or blank
 
 let state = {
-  pools: null, known: new Set(), aoty: null, mostLoved: null, trend: null, country: "JP",
+  pools: null, known: new Set(), community: null, aoty: null, mostLoved: null, trend: null, country: "JP",
   verdicts: null, verdictSources: null, verdictChoice: {}, newSeasons: null, newSeasonsTv: null, jump: null, jumpFallback: [],
   oscars: null, emmys: null, lovedFrom: "mixed", billboardSeed: Math.floor(Math.random() * 1e9), // a new Billboard title on every refresh
   seeds: {}, saved: {}, extra: {}, busy: {}, last: {},
@@ -132,6 +133,8 @@ export async function initExplore() {
     loadComingBooks().then(mergePools).catch(() => {}),
     loadAwards().then((a) => set({ oscars: a.oscars, emmys: a.emmys })).catch(() => set({ oscars: state.oscars || [], emmys: state.emmys || [] })),
     loadAnimeOfTheYear().then((aoty) => set({ aoty })).catch(() => set({ aoty: state.aoty || [] })),
+    // Best out there, Popular in town and Most loved from the community's verdicts (null with no server: they fall back or hide)
+    loadCommunityRows().then((community) => set({ community })).catch(() => {}),
     // Most loved: the VoidPop community once it has enough verdicts, until then a mix of everything's most loved
     Promise.all([lovedAnime, cinema]).then(([la, c]) => loadMostLoved(la, c.topMv || [], c.topTv || []))
       .then((r) => set({ mostLoved: r.items, lovedFrom: r.from }))

@@ -81,7 +81,7 @@ export default function ExploreScreen({ navigation }) {
     !wide && row("search", () => searchRow),
     row("tiles", () => <TileGrid state={ex} keys={GRID_KEYS} onOpen={openCategory} />),
     // poster rows below the tiles, each a mix of all five kinds
-    ...ROW_KEYS.map((key) => row(`row-${key}`, () => {
+    ...ROW_KEYS.filter((key) => !viewTile(key, ex).hidden).map((key) => row(`row-${key}`, () => {
       const v = viewTile(key, ex);
       return <PosterRow title={v.title} items={v.items || undefined} loading={v.loading} onOpen={open} onMore={() => openCategory(key)} />;
     })),
