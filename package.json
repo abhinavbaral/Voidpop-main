@@ -29,6 +29,8 @@
     "sharp": "^0.34.5"
   },
   "dependencies": {
-    "expo-updates": "~29.0.20"
+    "expo-updates": "~29.0.20",
+    "react-native": "0.81.5",
+    "react-native-web": "^0.21.0"
   }
 }

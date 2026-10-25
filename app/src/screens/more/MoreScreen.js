@@ -1,7 +1,8 @@
 // MORE — laid out like the "More" tab in reader apps: Voidmon on top with your rank
 // badge right beside him (just the badge: tap it for Ranks and badges), then menu rows
 // that open Statistics, Data and storage,
-// Appearance and Settings (24-hour clock, countdown badges, welcome tour…),
+// Appearance (theme, colour, name) and Settings (24-hour clock, countdown badges,
+// episode alerts, welcome tour),
 // Help and About (MorePageScreen).
 
 import { ScrollView, View, Text, Pressable, StyleSheet } from "react-native";
@@ -20,7 +21,7 @@ const GROUPS = [
   [["statistics", "stats", "Statistics"], ["compare", "list", "Compare"], ["data", "storage", "Data and storage"]],
   [["other", "menu", "Other"]], // opens a popup with You're watching and New announcements
   [["anilist", "sync", "Sync"], ["account", "profile", "Account"]],
-  [["settings", "palette", "Appearance and Settings"], ["help", "help", "Help"], ["about", "info", "About"]],
+  [["appearance", "palette", "Appearance"], ["settings", "settings", "Settings"], ["help", "help", "Help"], ["about", "info", "About"]],
 ];
 
 export default function MoreScreen({ navigation }) {

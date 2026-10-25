@@ -3,7 +3,6 @@
 //   Anime : Origin (All/JP/KR Animation/CN Donghua), Season, Year, Sort
 //   Manga : Origin (All/JP/Manhwa/Manhua/Comics), Sort
 //   Novel : Origin (light novels / Korean and Chinese web novels), Sort
-//   Movies, TV : Genre, Country, Sort (live action, from TMDB)
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import {
@@ -15,7 +14,6 @@ import Card from "../../components/ui/Card.js";
 import {
   fetchAniList, fetchFilterNames, SORTS, SEASONS, ANIME_ORIGINS, MANGA_ORIGINS, NOVEL_ORIGINS,
 } from "@voidpop/shared/api/anilist";
-import { fetchCinema, CINEMA_GENRES, CINEMA_COUNTRIES, CINEMA_SORTS, isCinema } from "@voidpop/shared/api/tmdb";
 import { resolveGenreFilters } from "@voidpop/shared/features/genres";
 import { useTheme } from "../../context/ThemeContext.js";
 import { useGridColumns } from "../../utils/layout";
@@ -29,8 +27,6 @@ const SEGMENTS = [
   { key: "anime", label: "Anime" },
   { key: "manga", label: "Manga" },
   { key: "novel", label: "Novels" },
-  { key: "movie", label: "Movies" },
-  { key: "tv", label: "TV" },
 ];
 
 const ORIGIN_MAP = {
@@ -38,10 +34,6 @@ const ORIGIN_MAP = {
   manga: MANGA_ORIGINS,
   novel: NOVEL_ORIGINS,
 };
-
-// Movies and TV are live action (TMDB); everything else is AniList
-const CINEMA_GENRE_OPTIONS = [{ key: "", label: "All" }, ...CINEMA_GENRES.map((g) => ({ key: g.name, label: g.name }))];
-const CINEMA_SORT_OPTIONS = CINEMA_SORTS.map((s) => ({ key: s.key, label: s.label }));
 
 const THIS_YEAR = new Date().getFullYear();
 const YEAR_OPTIONS = Array.from({ length: 10 }, (_, i) => ({
@@ -72,8 +64,7 @@ export default function BrowseScreen({ navigation, route }) {
     fetchFilterNames().then((n) => { if (alive) setGenres(resolveGenreFilters(n.genres, n.tags)); }).catch(() => {});
     return () => { alive = false; };
   }, []);
-  const cinema = isCinema(segment);
-  const pickedGenre = cinema ? null : genres.find((x) => x.key === genre) || null;
+  const pickedGenre = genres.find((x) => x.key === genre) || null;
 
   const [items, setItems] = useState([]);
   const [page, setPage] = useState(1);
@@ -89,13 +80,11 @@ export default function BrowseScreen({ navigation, route }) {
       setLoading(true);
       setError(null);
       try {
-        const result = isCinema(segment)
-          ? await fetchCinema(segment, { page: pageToLoad, sort, genre, country: origin })
-          : await fetchAniList(segment, {
-            page: pageToLoad, sort, origin, ...(pickedGenre ? { [pickedGenre.kind]: pickedGenre.value } : {}),
-            season: segment === "anime" ? season : "",
-            year: Number(year),
-          });
+        const result = await fetchAniList(segment, {
+          page: pageToLoad, sort, origin, ...(pickedGenre ? { [pickedGenre.kind]: pickedGenre.value } : {}),
+          season: segment === "anime" ? season : "",
+          year: Number(year),
+        });
         setItems((prev) => {
           const base = reset ? [] : prev;
           const ids = new Set(base.map((i) => i.id));
@@ -131,14 +120,8 @@ export default function BrowseScreen({ navigation, route }) {
     }
   };
 
-  // filter sections for the ACTIVE segment (Genres, Season + Year, Origin / Country, Sort)
-  const sections = cinema
-    ? [
-      { label: "Genres", value: genre, options: CINEMA_GENRE_OPTIONS, onSelect: setGenre },
-      { label: "Country", value: origin, options: CINEMA_COUNTRIES, onSelect: setOrigin },
-      { label: "Sort by", value: sort, options: CINEMA_SORT_OPTIONS, onSelect: setSort },
-    ]
-    : [
+  // filter sections for the ACTIVE segment (Genres, Season + Year, Origin, Sort)
+  const sections = [
       {
         label: "Genres",
         value: genre,
@@ -161,20 +144,13 @@ export default function BrowseScreen({ navigation, route }) {
     ];
 
   // summary line under the header, e.g. "Anime · Japanese Anime · Summer 2026"
-  const summary = (cinema
-    ? [
-      SEGMENTS.find((x) => x.key === segment)?.label,
-      CINEMA_COUNTRIES.find((o) => o.key === origin && o.key !== "")?.label,
-      genre || null,
-      CINEMA_SORTS.find((x) => x.key === sort && x.key !== "popular")?.label,
-    ]
-    : [
+  const summary = [
       SEGMENTS.find((x) => x.key === segment)?.label,
       ORIGIN_MAP[segment].find((o) => o.key === origin && o.key !== "")?.label,
       pickedGenre?.label || null,
       segment === "anime" && season ? `${season[0].toUpperCase() + season.slice(1)} ${year}` : null,
       !(segment === "anime" && season) ? SORTS.find((x) => x.key === sort && x.key !== "popular")?.label : null,
-    ])
+    ]
     .filter(Boolean)
     .join("  ·  ");
 
@@ -192,7 +168,6 @@ export default function BrowseScreen({ navigation, route }) {
           </TouchableOpacity>
         )}
         <Text style={styles.summary} numberOfLines={1}>{orderMode ? "Any anime's full watch order" : summary}</Text>
-        {!cinema && (
         <TouchableOpacity onPress={() => setOrderMode(!orderMode)} accessibilityRole="switch" accessibilityState={{ checked: orderMode }}
           style={[styles.filterBtn, orderMode && { backgroundColor: C.purple, borderColor: C.purple }]}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
@@ -200,7 +175,6 @@ export default function BrowseScreen({ navigation, route }) {
             <Text style={[styles.filterBtnText, orderMode && { color: "#fff" }]}>Watch order</Text>
           </View>
         </TouchableOpacity>
-        )}
       </View>
 
       {orderMode ? (

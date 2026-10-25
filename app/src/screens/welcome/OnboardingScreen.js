@@ -1,6 +1,7 @@
 // First-run welcome, shown once (More > Help can show it again):
-//   1. Welcome   2. Look (theme)   3. Bring your list (MAL file / AniList
-//   username / start fresh)   4. Alerts   → Explore
+//   1. Welcome   2. Rating (the four Void Verdicts)   3. Look (light / dark and a
+//   colour)   4. Bring your list (MAL file / AniList username / start fresh)
+//   5. Never miss an episode (alerts)   → Explore
 // Every step can be skipped; nothing here is required to use the app.
 // Voidmon (the mascot) guides each step.
 import { useState } from "react";
@@ -8,7 +9,8 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, Image, StyleSheet 
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as DocumentPicker from "expo-document-picker";
 import { readAsStringAsync } from "expo-file-system/legacy";
-import { setOnboarded, importAniListEntries } from "@voidpop/shared/backend/store";
+import { setOnboarded, importAniListEntries, VERDICTS } from "@voidpop/shared/backend/store";
+import { THEMES, PALETTES } from "@voidpop/shared/lib/theme";
 import { fetchAniListUserList } from "@voidpop/shared/api/anilist";
 import { importMalFile, base64ToBytes } from "@voidpop/shared/features/malImport";
 import { useTheme } from "../../context/ThemeContext.js";
@@ -18,10 +20,18 @@ import Icon from "../../components/ui/Icon.js";
 import { useLogo } from "../../components/brand/Brand.js";
 import Voidmon, { VoidmonLoading } from "../../components/brand/Voidmon.js";
 
-const STEPS = 4;
+const STEPS = 5;
+
+// what each verdict means, in words that fit a film, a show, a manga or a novel
+const VERDICT_INFO = {
+  peak: { icon: "heart", sub: "An all-time favorite" }, // not a star: Void Verdicts replace star ratings
+  divein: { icon: "check", sub: "Worth your time" },
+  onetime: { icon: "clock", sub: "Good once, no need to return" },
+  voidit: { icon: "close", sub: "Not for me" },
+};
 
 export default function OnboardingScreen({ navigation }) {
-  const { C, dark, pref, setPref, pureBlack, setPureBlack } = useTheme();
+  const { C, dark, pref, setPref, pureBlack, setPureBlack, palette, setPalette } = useTheme();
   const styles = makeStyles(C);
   const logo = useLogo();
   const [step, setStep] = useState(0);
@@ -29,6 +39,7 @@ export default function OnboardingScreen({ navigation }) {
   const [message, setMessage] = useState("");
   const [user, setUser] = useState("");
   const [alerts, setAlerts] = useState(null);
+  const [demoVerdict, setDemoVerdict] = useState("peak"); // only highlights a row here; nothing is saved
 
   const finish = async () => {
     await setOnboarded(true);
@@ -81,26 +92,63 @@ export default function OnboardingScreen({ navigation }) {
         </View>
       </View>
       <Guide pose="welcome" says="Hi, I'm Voidmon. I'll show you around." />
-      <Text style={styles.h1}>Find your next anime.{"\n"}Never miss an episode.</Text>
-      <Text style={styles.p}>Live countdowns, your own Void Verdicts and picks made from them. Everything stays on your phone.</Text>
+      <Text style={styles.h1}>Every story you love.{"\n"}All in one place.</Text>
+      <Text style={styles.p}>Track anime, manga, novels, movies and TV shows. Your own Void Verdicts, picks made from them and live countdowns. Everything stays on your phone.</Text>
     </View>,
-    // 2. look
+    // 2. rating
+    <View key="r">
+      <Guide pose="asking" says="Forget the stars. How did it feel?" />
+      <Text style={styles.eyebrow}>VOID VERDICTS</Text>
+      <Text style={styles.h1}>A better kind of rating</Text>
+      <Text style={styles.p}>When you finish something, pick the verdict that sounds like you. Some stories are all-time favorites, some are just right for one evening. Four verdicts say it better than a number.</Text>
+      <View style={styles.verdictCard}>
+        {VERDICTS.map((v, i) => {
+          const on = demoVerdict === v.key;
+          return (
+            <TouchableOpacity key={v.key} onPress={() => setDemoVerdict(v.key)} accessibilityRole="radio" accessibilityState={{ selected: on }}
+              style={[styles.verdictRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.border }, { borderLeftColor: on ? v.color : "transparent" }, on && { backgroundColor: v.color + "33" }]}>
+              <Icon name={VERDICT_INFO[v.key].icon} size={22} color={v.color} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.bigTitle}>{v.label}</Text>
+                <Text style={styles.small}>{VERDICT_INFO[v.key].sub}</Text>
+              </View>
+              <View style={[styles.radio, { borderColor: on ? v.color : C.border }]}>{on && <View style={[styles.radioDot, { backgroundColor: v.color }]} />}</View>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+      <Text style={[styles.small, { textAlign: "center", marginTop: 10 }]}>Tap one to try it. Nothing is saved here.</Text>
+    </View>,
+    // 3. look
     <View key="t">
       <Guide pose="theme" says="Light or dark? I look good in both." />
       <Text style={styles.h1}>Pick your look</Text>
-      <Text style={styles.p}>You can change this any time in More › Appearance and Others.</Text>
+      <Text style={styles.p}>Light or dark, and a colour. You can change this any time in More › Appearance.</Text>
       <View style={styles.row}>
         {[["system", "System"], ["light", "Light"], ["dark", "Dark"]].map(([k, l]) => <Choice key={k} on={pref === k} label={l} onPress={() => setPref(k)} />)}
+      </View>
+      <View style={styles.swatches}>
+        {PALETTES.map((p) => {
+          const on = palette === p.key;
+          const color = p.accent ? p.accent[dark ? 0 : 1] : THEMES[dark ? "void" : "pop"].purple;
+          return (
+            <TouchableOpacity key={p.key} onPress={() => setPalette(p.key)} accessibilityRole="radio" accessibilityState={{ selected: on }} accessibilityLabel={`${p.label} colour`}
+              style={[styles.swatch, on && { borderColor: color }]}>
+              <View style={[styles.swatchDot, { backgroundColor: color }]} />
+              <Text style={[styles.choiceText, { fontSize: 13 }]}>{p.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
       <TouchableOpacity style={[styles.toggle, pureBlack && styles.choiceOn]} onPress={() => setPureBlack(!pureBlack)} accessibilityRole="switch" accessibilityState={{ checked: pureBlack }}>
         <Text style={[styles.choiceText, pureBlack && { color: "#fff" }]}>Pure black (dark theme, saves battery on OLED)</Text>
       </TouchableOpacity>
     </View>,
-    // 3. bring your list
+    // 4. bring your list
     <View key="l">
-      {busy ? <VoidmonLoading text="Bringing your list over…" delay={0} size={96} /> : <Guide pose="import" says="Tracked anime somewhere else? I'll carry it over." />}
+      {busy ? <VoidmonLoading text="Bringing your list over…" delay={0} size={96} /> : <Guide pose="import" says="Tracked something somewhere else? I'll carry it over." />}
       <Text style={styles.h1}>Bring your list</Text>
-      <Text style={styles.p}>Already track anime somewhere? Bring it over, or start fresh.</Text>
+      <Text style={styles.p}>Already track anime or manga somewhere? Bring it over, or start fresh.</Text>
       <TouchableOpacity style={styles.bigBtn} onPress={importMal} disabled={busy}>
         <Icon name="storage" size={20} color={C.purple} />
         <View style={{ flex: 1 }}>
@@ -124,7 +172,7 @@ export default function OnboardingScreen({ navigation }) {
       </View>
       {!!message && <Text style={[styles.p, { color: C.text, marginTop: 10 }]}>{message}</Text>}
     </View>,
-    // 4. alerts
+    // 5. alerts
     <View key="a">
       <Guide pose="alerts" says="I'll ring when a new episode is out." />
       <Text style={styles.h1}>Never miss an episode</Text>
@@ -147,7 +195,7 @@ export default function OnboardingScreen({ navigation }) {
       <View style={styles.bottom}>
         {step > 0 ? <TouchableOpacity onPress={() => { setMessage(""); setStep(step - 1); }} hitSlop={10}><Text style={{ color: C.sub, fontWeight: "700" }}>Back</Text></TouchableOpacity> : <View />}
         <TouchableOpacity style={styles.next} onPress={next}>
-          <Text style={{ color: "#fff", fontWeight: "800" }}>{step === 0 ? "Get started" : step === STEPS - 1 ? "Start exploring" : step === 2 && !message ? "Start fresh" : "Next"}</Text>
+          <Text style={{ color: "#fff", fontWeight: "800" }}>{step === 0 ? "Get started" : step === STEPS - 1 ? "Start exploring" : step === 3 && !message ? "Start fresh" : "Next"}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -165,6 +213,14 @@ const makeStyles = (C) => StyleSheet.create({
   bubble: { flex: 1, backgroundColor: C.card, borderColor: C.border, borderWidth: 1, borderRadius: 14, borderBottomLeftRadius: 4, paddingHorizontal: 14, paddingVertical: 10 },
   bubbleText: { color: C.text, fontSize: 14, fontWeight: "700", lineHeight: 20 },
   logoDisc: { position: "absolute", borderRadius: 999, padding: 10 },
+  eyebrow: { color: C.purple, fontSize: 12, fontWeight: "800", letterSpacing: 1.6, marginBottom: 6 },
+  verdictCard: { marginTop: 18, borderWidth: 1, borderColor: C.border, borderRadius: 16, backgroundColor: C.card, overflow: "hidden" },
+  verdictRow: { flexDirection: "row", alignItems: "center", gap: 14, paddingHorizontal: 16, paddingVertical: 14, borderLeftWidth: 4 },
+  radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, alignItems: "center", justifyContent: "center" },
+  radioDot: { width: 10, height: 10, borderRadius: 5 },
+  swatches: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 14 },
+  swatch: { width: "31%", flexGrow: 1, borderWidth: 2, borderColor: C.border, borderRadius: 12, paddingVertical: 12, alignItems: "center", gap: 8, backgroundColor: C.card },
+  swatchDot: { width: 26, height: 26, borderRadius: 13 },
   h1: { color: C.text, fontSize: 26, fontWeight: "900", lineHeight: 32 },
   p: { color: C.sub, fontSize: 14, lineHeight: 21, marginTop: 10 },
   row: { flexDirection: "row", gap: 10, marginTop: 20 },

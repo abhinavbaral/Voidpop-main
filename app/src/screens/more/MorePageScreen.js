@@ -45,7 +45,7 @@ import { loadPeopleStats, PEOPLE_KINDS } from "@voidpop/shared/features/peopleSt
 
 const VERSION = appConfig.expo.version;
 const TITLES = {
-  statistics: "Statistics", appearance: "Appearance and Settings", settings: "Appearance and Settings",
+  statistics: "Statistics", appearance: "Appearance", settings: "Settings",
   data: "Data and storage", badge: "Ranks and achievements", compare: "Compare", anilist: "Sync", help: "Help", about: "About",
 };
 
@@ -54,7 +54,7 @@ export default function MorePageScreen({ route, navigation }) {
   const { C } = useTheme();
   const styles = makeStyles(C);
   const page = route.params?.page;
-  const Body = { statistics: Statistics, settings: Settings, appearance: Settings, data: DataStorage, compare: CompareTitles, anilist: AniListPage, badge: BadgePage, help: Help, about: About }[page];
+  const Body = { statistics: Statistics, settings: Settings, appearance: Appearance, data: DataStorage, compare: CompareTitles, anilist: AniListPage, badge: BadgePage, help: Help, about: About }[page];
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -239,19 +239,11 @@ function ThemeSettings({ styles, C }) {
   );
 }
 
-function Settings({ styles, C, navigation }) {
+// Appearance: your name, theme (light / dark and colour) and the app logo
+function Appearance({ styles, C }) {
   const { settings, update } = useSettings();
   const [nameDraft, setNameDraft] = useState(settings.name || "");
   useEffect(() => { setNameDraft(settings.name || ""); }, [settings.name]);
-  const row = (key, label, hint) => (
-    <Pressable key={key} style={styles.toggleRow} onPress={() => update(key, !settings[key])}>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.cardTitle}>{label}</Text>
-        <Text style={styles.note}>{hint}</Text>
-      </View>
-      <Switch value={settings[key]} onValueChange={(v) => update(key, v)} trackColor={{ false: C.border, true: C.purple }} thumbColor="#fff" />
-    </Pressable>
-  );
   return (
     <>
     <View style={styles.card}>
@@ -263,6 +255,24 @@ function Settings({ styles, C, navigation }) {
     </View>
     <ThemeSettings styles={styles} C={C} />
     <LogoSettings styles={styles} C={C} />
+    </>
+  );
+}
+
+// Settings: 24-hour clock, countdown badges, new episode alerts and the welcome tour
+function Settings({ styles, C, navigation }) {
+  const { settings, update } = useSettings();
+  const row = (key, label, hint) => (
+    <Pressable key={key} style={styles.toggleRow} onPress={() => update(key, !settings[key])}>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.cardTitle}>{label}</Text>
+        <Text style={styles.note}>{hint}</Text>
+      </View>
+      <Switch value={settings[key]} onValueChange={(v) => update(key, v)} trackColor={{ false: C.border, true: C.purple }} thumbColor="#fff" />
+    </Pressable>
+  );
+  return (
+    <>
     <View style={styles.card}>
       {row("clock24", "24-hour clock", "Airing times as 16:30 instead of 4:30 PM")}
       {row("posterBadges", "Countdown badges", '"Ep 7 · 3h 30m" on posters')}
