@@ -8,6 +8,7 @@ import { View, Text, FlatList, Pressable, StyleSheet, Platform } from "react-nat
 import Card from "./Card.js";
 import Icon from "./Icon.js";
 import Skeleton from "./Skeleton.js";
+import Chips from "./Chips.js";
 import { useTheme } from "../../context/ThemeContext.js";
 import { useIsWide } from "../../utils/layout";
 
@@ -17,7 +18,9 @@ export const MIN_ROW = 4;
 // chip: an optional pill after the title, e.g. { label: "Fall 2026", icon: "fall" };
 //   with onPress it's a button (Trending in [Japan ▾])
 // onMore: shows "See all ›" on the right
-export default function PosterRow({ title, items, loading, onOpen, dot, chip, onMore }) {
+// kinds: { options, value, onChange } puts switch chips under the title (Popular in town: Anime / Manga / ...). A row
+//   with chips stays on screen even when the chosen kind has few or no titles, so you can always switch back.
+export default function PosterRow({ title, items, loading, onOpen, dot, chip, onMore, kinds }) {
   const { C } = useTheme();
   const styles = makeStyles(C);
   const wide = useIsWide();
@@ -33,7 +36,7 @@ export default function PosterRow({ title, items, loading, onOpen, dot, chip, on
   };
   const canLeft = x > 4;
   const canRight = x + viewW < contentW - 4;
-  if (!loading && (items?.length || 0) < MIN_ROW) return null;
+  if (!kinds && !loading && (items?.length || 0) < MIN_ROW) return null;
 
   return (
     <View style={{ marginTop: wide ? 26 : 18 }}>
@@ -70,12 +73,19 @@ export default function PosterRow({ title, items, loading, onOpen, dot, chip, on
           </View>
         )}
       </View>
+      {kinds && (
+        <View style={{ paddingHorizontal: 14 }}>
+          <Chips options={kinds.options} value={kinds.value} onChange={kinds.onChange} />
+        </View>
+      )}
       {loading ? (
         <View style={{ flexDirection: "row", paddingHorizontal: 8 }}>
           {Array.from({ length: wide ? 6 : 3 }, (_, i) => (
             <Skeleton key={i} width={cardW - 10} height={cardW * 1.5 + 64} style={{ margin: 6 }} />
           ))}
         </View>
+      ) : !items?.length ? (
+        <Text style={styles.empty}>Nothing to show here right now.</Text>
       ) : (
         <FlatList
           ref={listRef}
@@ -117,4 +127,5 @@ const makeStyles = (C) => StyleSheet.create({
   },
   arrowHover: { borderColor: C.purple },
   arrowText: { color: C.text, fontSize: 20, lineHeight: 22, fontWeight: "700" },
+  empty: { color: C.faint, fontSize: 13, paddingHorizontal: 14, paddingVertical: 24 },
 });

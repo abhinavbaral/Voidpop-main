@@ -1,9 +1,10 @@
 // Explore's fixed tiles: titles never change, only the shows (and only on Reroll).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { TILES, GRID_KEYS, ROW_KEYS, EXTRA, viewTile, seededShuffle, dedupe, poolFor, chosenSource, nextSource, PICK_COUNT } from "../features/exploreTiles.js";
+import { TILES, GRID_KEYS, ROW_KEYS, EXTRA, TALK_KINDS, TALK_DEFAULT, viewTile, seededShuffle, dedupe, poolFor, chosenSource, nextSource, PICK_COUNT } from "../features/exploreTiles.js";
 
 const show = (id, extra = {}) => ({ id, segment: "anime", title: `Show ${id}`, ...extra });
+const WATCHABLE = ["anime", "movie", "tv"];
 const many = (from, n) => Array.from({ length: n }, (_, i) => show(from + i));
 const ids = (items) => items.map((x) => x.id);
 const base = () => ({
@@ -175,9 +176,8 @@ test("Oscars and Emmys show their winners; if they can't load, the top rated of 
   assert.equal(viewTile("oscars", { ...st, oscars: null }).loading, true);
 });
 
-test("Popular in town and VoidPop Angles mix all five kinds; Don't Miss This has movies and TV", () => {
+test("VoidPop Angles mixes all five kinds; Don't Miss This has movies and TV", () => {
   const st = withCinema();
-  assert.deepEqual(kinds(viewTile("talk", st).items), ["anime", "manga", "movie", "tv"]);
   assert.deepEqual(kinds(viewTile("angles", st).items), ["anime", "manga", "movie", "tv"]);
   assert.deepEqual(kinds(viewTile("dmMovies", st).items), ["movie"]);
   assert.deepEqual(kinds(viewTile("dmTv", st).items), ["tv"]);
@@ -240,10 +240,99 @@ test("Also watch this mixes the kinds and repeats nothing the Don't Miss tiles o
   const v = viewTile("watch", st);
   assert.equal(v.title, "Also watch this");
   assert.equal(v.reroll, true);
-  assert.ok(new Set(v.items.map((x) => x.segment)).size >= 4);
+  assert.deepEqual([...new Set(v.items.map((x) => x.segment))].sort(), ["anime", "movie", "tv"]); // things you watch: never manga or novels
   const shown = new Set(["dmAnime", "dmManga", "dmNovels", "dmMovies", "dmTv", "angles"].flatMap((k) => viewTile(k, { ...st, last: null }).items.map((x) => `${x.segment}:${x.id}`)));
   assert.ok(v.items.every((x) => !shown.has(`${x.segment}:${x.id}`)));
   assert.equal(viewTile("watch", { ...st, pools: null }).loading, true);
+});
+
+test("Also watch this stays watchable when it runs short or falls back on what it showed last time", () => {
+  const st = withCinema();
+  st.pools = { ...st.pools, popA: [], popMv: [film(3000), film(3001)], popTv: [], popM: comm(200, 30, "manga"), popN: comm(5000, 30, "novel") };
+  const short = viewTile("watch", st);
+  assert.ok(short.items.length && short.items.every((x) => WATCHABLE.includes(x.segment))); // topped up, but not with manga or novels
+  // a list saved before this change mixed all five kinds: only the watchable ones come back from it
+  const old = { title: "Also watch this", items: [show(1), ...comm(2, 3, "manga"), film(4), ...comm(5, 3, "novel"), serial(6)] };
+  const loading = viewTile("watch", { ...st, pools: null, last: { watch: old } });
+  assert.deepEqual(loading.items.map((x) => x.segment), ["anime", "movie", "tv"]);
+  assert.equal(loading.loading, false);
+});
+
+// ---- Popular in town: one kind at a time, switchable, starting on anime ----
+const novel = (id) => show(id, { segment: "novel" });
+const kindStub = () => {
+  const st = withCinema();
+  st.pools = { ...st.pools, popN: Array.from({ length: 20 }, (_, i) => novel(250 + i)), popM: comm(200, 20, "manga") };
+  return st;
+};
+
+test("Popular in town has five chips and starts on anime", () => {
+  assert.deepEqual(TALK_KINDS.map((k) => k.key), ["anime", "manga", "novel", "movie", "tv"]);
+  assert.equal(TALK_DEFAULT, "anime");
+  const st = kindStub();
+  const dflt = viewTile("talk", st);
+  assert.equal(dflt.title, "Popular in town"); // the title never changes with the chip
+  assert.ok(dflt.items.length >= 6 && dflt.items.every((x) => x.segment === "anime"));
+  assert.deepEqual(ids(dflt.items), ids(viewTile("talk", { ...st, talkKind: "anime" }).items)); // unset = anime
+  assert.deepEqual(ids(dflt.items), ids(viewTile("talk", { ...st, talkKind: "nonsense" }).items)); // unknown = anime
+});
+
+test("Popular in town: each chip shows only its own kind, never topped up from another", () => {
+  const st = kindStub();
+  for (const k of TALK_KINDS) {
+    const v = viewTile("talk", { ...st, talkKind: k.key });
+    assert.ok(v.items.length >= 6, k.key);
+    assert.ok(v.items.every((x) => x.segment === k.key), k.key);
+    assert.equal(v.title, "Popular in town");
+  }
+  // a kind with only two titles stays at two: it is not padded with anime
+  const thin = viewTile("talk", { ...st, talkKind: "novel", pools: { ...st.pools, popN: [novel(1), novel(2)] } });
+  assert.deepEqual(thin.items.map((x) => x.segment), ["novel", "novel"]);
+  assert.equal(thin.loading, false);
+});
+
+test("Popular in town: titles you marked are left out of every chip", () => {
+  const st = kindStub();
+  const first = viewTile("talk", { ...st, talkKind: "movie" }).items[0];
+  const v = viewTile("talk", { ...st, talkKind: "movie", known: new Set([`movie:${first.id}`]) });
+  assert.ok(!v.items.some((x) => x.id === first.id));
+});
+
+test("Popular in town: the community counts per kind, with that kind's own picks when it has too few", () => {
+  const st = kindStub();
+  const popular = [...comm(8000, 7, "manga"), ...comm(8100, 3, "anime"), ...comm(8200, 9, "movie")]; // a mixed ranking, as communityRank gives it
+  const community = { best: [], popular, loved: [] };
+  const manga = viewTile("talk", { ...st, community, talkKind: "manga" });
+  assert.deepEqual(ids(manga.items).sort(), ids(popular.filter((x) => x.segment === "manga")).sort());
+  assert.equal(manga.subtitle, "Most talked about in VoidPop");
+  const movie = viewTile("talk", { ...st, community, talkKind: "movie" });
+  assert.ok(movie.items.every((x) => x.segment === "movie") && movie.items.length === 9);
+  // anime has only 3 community titles: not enough, so the usual anime picks and no community subtitle
+  const anime = viewTile("talk", { ...st, community });
+  assert.ok(anime.items.length >= 6 && anime.items.every((x) => x.segment === "anime"));
+  assert.ok(!ids(anime.items).includes(8100) && anime.subtitle == null);
+});
+
+test("Popular in town: waiting for movies or TV shows loading, and never another kind's list from last time", () => {
+  const st = kindStub();
+  const lastAnime = { talk: { title: "Popular in town", subtitle: null, items: comm(1, 8) } };
+  const noCinema = { ...st, pools: { ...st.pools, trMv: undefined, popMv: undefined, trTv: undefined, popTv: undefined }, last: lastAnime };
+  const mv = viewTile("talk", { ...noCinema, talkKind: "movie" });
+  assert.deepEqual([mv.loading, mv.items], [true, null]); // skeleton, not the saved anime
+  // anime itself may still show what it showed last time while it loads
+  assert.deepEqual(ids(viewTile("talk", { ...st, pools: null, last: lastAnime }).items), ids(comm(1, 8)));
+  // a list saved when this row mixed every kind: only its anime come back on the anime chip
+  const mixedLast = { talk: { title: "Popular in town", items: [show(1), ...comm(2, 3, "manga"), film(4)] } };
+  assert.deepEqual(ids(viewTile("talk", { ...st, pools: null, last: mixedLast }).items), [1]);
+  assert.equal(viewTile("talk", { ...st, pools: null, talkKind: "tv", last: lastAnime }).loading, true);
+});
+
+test("Popular in town still rerolls: a new seed gives another order of the same kind", () => {
+  const st = { ...kindStub(), talkKind: "tv" };
+  const a = viewTile("talk", st), b = viewTile("talk", { ...st, seeds: { talk: 4242 } });
+  assert.equal(a.reroll, true);
+  assert.notDeepEqual(ids(a.items), ids(b.items));
+  assert.ok(b.items.every((x) => x.segment === "tv"));
 });
 
 test("Coming soon can be switched to one kind: only what is announced for it, soonest first, never topped up or brought back from the mix", () => {

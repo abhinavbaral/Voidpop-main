@@ -5,7 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Brand from "../../components/brand/Brand.js";
 import { buildExplore } from "@voidpop/shared/features/explore";
 import { billboardPick } from "@voidpop/shared/features/exploreMix";
-import { GRID_KEYS, ROW_KEYS, viewTile } from "@voidpop/shared/features/exploreTiles";
+import { GRID_KEYS, ROW_KEYS, TALK_KINDS, TALK_DEFAULT, viewTile } from "@voidpop/shared/features/exploreTiles";
 import { greetingFor } from "@voidpop/shared/lib/greeting";
 import { useSettings } from "@voidpop/shared/backend/SettingsContext";
 import NamePrompt from "../../components/welcome/NamePrompt.js";
@@ -27,6 +27,7 @@ export default function ExploreScreen({ navigation }) {
   const { settings } = useSettings();
   const ex = useExplore();
   const [refreshing, setRefreshing] = useState(false);
+  const [talkKind, setTalkKind] = useState(TALK_DEFAULT); // Popular in town: one kind at a time, anime to start
 
   useEffect(() => { initExplore(); }, []);
   // what's in your library and your verdicts change as you use the app, so these refresh on every visit
@@ -46,7 +47,7 @@ export default function ExploreScreen({ navigation }) {
     () => (ex.pools ? billboardPick(ex.pools, ex.billboardSeed) || buildExplore(ex.pools, ex.known).featured : null),
     [ex.pools, ex.known, ex.billboardSeed],
   );
-  const openCategory = (key) => navigation.navigate("ExploreCategory", { key });
+  const openCategory = (key, kind) => navigation.navigate("ExploreCategory", { key, kind });
   const searchRow = (
     <View style={styles.header}>
       {/* search (everything) and Browse in one row */}
@@ -68,10 +69,16 @@ export default function ExploreScreen({ navigation }) {
     row("coming-up", () => <Countdowns onOpen={open} />),
     !wide && row("search", () => searchRow),
     row("tiles", () => <TileGrid state={ex} keys={GRID_KEYS} onOpen={openCategory} />),
-    // poster rows below the tiles, each a mix of all five kinds
+    // poster rows below the tiles: most mix all five kinds; Popular in town shows one kind at a time (chips),
+    // and Also watch this has only what you can watch
     ...ROW_KEYS.filter((key) => !viewTile(key, ex).hidden).map((key) => row(`row-${key}`, () => {
-      const v = viewTile(key, ex);
-      return <PosterRow title={v.title} items={v.items || undefined} loading={v.loading} onOpen={open} onMore={() => openCategory(key)} />;
+      const talk = key === "talk";
+      const v = viewTile(key, talk ? { ...ex, talkKind } : ex);
+      return (
+        <PosterRow title={v.title} items={v.items || undefined} loading={v.loading} onOpen={open}
+          kinds={talk ? { options: TALK_KINDS, value: talkKind, onChange: setTalkKind } : undefined}
+          onMore={() => openCategory(key, talk ? talkKind : undefined)} />
+      );
     })),
   ].filter(Boolean);
 

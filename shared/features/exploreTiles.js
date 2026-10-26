@@ -4,7 +4,8 @@
 //
 // Fixed lists have no Reroll: Most loved, Best out there and Trending (rankings), Coming soon (soonest
 // first), the award winners (Anime of the Year, Oscars, Emmys), Jump back in and New seasons (your own
-// anime and TV). Everything else mixes anime, manga, novels, movies and TV.
+// anime and TV). Popular in town shows one kind at a time (anime to start; you switch it with chips) and
+// Also watch this mixes only what you can watch: anime, movies and TV. Everything else mixes all five kinds.
 //
 // A tile is never empty: when its own list runs dry it tops up from related shows,
 // or shows what it showed last time (see viewTile).
@@ -51,6 +52,17 @@ export const COMING_KINDS = [
 ];
 const COMING_NAME = { anime: "anime", manga: "manga", novel: "novels", movie: "movies", tv: "TV shows" };
 
+// The kinds you can switch Popular in town between (the chips on its row and its page). One kind at a time, no "all";
+// it always starts on anime.
+export const TALK_KINDS = [
+  { key: "anime", label: "Anime" }, { key: "manga", label: "Manga" }, { key: "novel", label: "Novels" },
+  { key: "movie", label: "Movies" }, { key: "tv", label: "TV" },
+];
+export const TALK_DEFAULT = "anime";
+const talkKindOf = (st) => (TALK_KINDS.some((k) => k.key === st?.talkKind) ? st.talkKind : TALK_DEFAULT);
+// Also watch this is for things you watch: no manga, no novels
+export const WATCH_KINDS = ["anime", "movie", "tv"];
+
 export const ROW_KEYS = ["talk", "best", "watch", "peak", "divein", "onetime", "loved"];
 
 // Where Reroll can fetch more shows from AniList (a random page; the picks then draw
@@ -94,11 +106,15 @@ const MIN_SHOWN = 6; // a tile with fewer shows than this gets topped up
 
 // the unmarked shows a Reroll tile draws from (its AniList pages plus anything Reroll fetched)
 const POOL_OF = { dmAnime: "popA", dmManga: "popM", dmNovels: "popN", dmMovies: "popMv", dmTv: "popTv" };
-// Popular in town, Also watch this and VoidPop Angles mix all five kinds, taken in turns
+// Also watch this mixes anime, movies and TV; VoidPop Angles mixes all five kinds, taken in turns
 const MIXED = {
-  talk: (p) => [p.trA, p.trMv, p.trTv, p.popM, p.popN],
-  watch: (p) => [p.popMv, p.popTv, p.popA, p.popM, p.popN],
+  watch: (p) => [p.popMv, p.popTv, p.popA],
   angles: (p) => [p.popA, p.popM, p.popN, p.popMv, p.popTv],
+};
+// Popular in town, one kind at a time: what is trending now first, then what is popular
+const TALK_POOLS = {
+  anime: (p) => [p.trA, p.popA], manga: (p) => [p.popM], novel: (p) => [p.popN],
+  movie: (p) => [p.trMv, p.popMv], tv: (p) => [p.trTv, p.popTv],
 };
 export function poolFor(key, st) {
   const base = MIXED[key] && st.pools ? interleave(MIXED[key](st.pools), 200) : st.pools?.[POOL_OF[key]];
@@ -134,9 +150,13 @@ export function viewTile(key, st) {
   const v = compute(key, st);
   if (v.hidden) return v;
   const last = st.last?.[key];
-  const keepLast = () => (key === "jump" || key === "aoty" ? last.items : (last.items || []).filter((it) => !(st.known || new Set()).has(keyOf(it))));
-  if (v.items === null && last?.items?.length) { // still loading: what it showed last time, right away
-    return { ...v, title: last.title || v.title, subtitle: last.subtitle ?? v.subtitle, items: keepLast(), loading: false };
+  // what it showed last time may hold kinds the tile no longer shows (it used to mix all five): leave those out
+  const only = key === "watch" ? WATCH_KINDS : key === "talk" ? [talkKindOf(st)] : null;
+  const keepLast = () => (key === "jump" || key === "aoty" ? last.items
+    : (last.items || []).filter((it) => !(st.known || new Set()).has(keyOf(it)) && (!only || only.includes(it.segment))));
+  if (v.items === null && !v.noLast && last?.items?.length) { // still loading: what it showed last time, right away
+    const items = keepLast();
+    if (items.length) return { ...v, title: last.title || v.title, subtitle: last.subtitle ?? v.subtitle, items, loading: false };
   }
   if (v.items && !v.items.length && !v.noLast && last?.items?.length) { // nothing to show now: what it showed last time
     const items = keepLast();
@@ -252,18 +272,28 @@ function compute(key, st) {
     }
     case "watch": {
       if (!st.pools) return wait();
-      // a mix of all five kinds that none of the Don't Miss This tiles or VoidPop Angles is showing right now
+      // a mix of anime, movies and TV (never manga or novels) that none of the Don't Miss This tiles or VoidPop Angles is showing right now
       const shown = new Set(["dmAnime", "dmManga", "dmNovels", "dmMovies", "dmTv", "angles"].flatMap((k) => (viewTile(k, { ...st, last: null }).items || []).map(keyOf)));
       const lists = MIXED.watch(st.pools).map((l) => (l || []).filter((it) => !known.has(keyOf(it)) && !shown.has(keyOf(it))));
       const rest = interleave(lists, 200);
-      const t = topUp(draw(rest), interleave(MIXED.angles(st.pools), 30));
+      const t = topUp(draw(rest), interleave(MIXED.watch(st.pools), 30)); // topped up with watchable kinds only
       return out(t.items);
     }
-    case "talk": case "dmAnime": case "dmManga": case "dmNovels": case "dmMovies": case "dmTv": {
-      if (key === "talk") { // what the community is finishing, once there is one
-        const c = fresh(st.community?.popular);
-        if (c.length >= MIN_SHOWN) return out(mix(c, seed).slice(0, PICK_COUNT), { subtitle: "Most talked about in VoidPop" });
-      }
+    case "talk": {
+      // one kind at a time (anime unless switched). Only the community's titles of that kind, once there are enough of them
+      // (the split is by kind, so a kind can have too few while another has plenty), else that kind's trending and popular.
+      // Never topped up from another kind: the chip says what is inside. noLast: what it showed last time is another kind.
+      const kind = talkKindOf(st);
+      const noLast = kind !== TALK_DEFAULT;
+      const c = fresh(st.community?.popular).filter((it) => it.segment === kind);
+      if (c.length >= MIN_SHOWN) return out(mix(c, seed).slice(0, PICK_COUNT), { subtitle: "Most talked about in VoidPop", noLast });
+      if (!st.pools) return wait({ noLast });
+      const p = st.pools;
+      if ((kind === "movie" && !p.trMv && !p.popMv) || (kind === "tv" && !p.trTv && !p.popTv)) return wait({ noLast }); // movies and TV load a moment after anime
+      const list = dedupe(fresh(TALK_POOLS[kind](p).flatMap((l) => l || [])));
+      return out(draw(list), { noLast });
+    }
+    case "dmAnime": case "dmManga": case "dmNovels": case "dmMovies": case "dmTv": {
       if (!st.pools) return wait();
       if ((key === "dmMovies" && !st.pools.popMv) || (key === "dmTv" && !st.pools.popTv)) return wait(); // movies and TV load a moment after anime
       const backups = { dmManga: st.pools.popM, dmNovels: st.pools.popN, dmMovies: st.pools.popMv, dmTv: st.pools.popTv }[key] || popular();
