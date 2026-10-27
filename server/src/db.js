@@ -11,13 +11,26 @@ export function openDb(file = ":memory:") {
     PRAGMA journal_mode = WAL;
     PRAGMA foreign_keys = ON;
 
+    -- AUTOINCREMENT: an id is never handed out twice, so a deleted account's login token can't open the next one
     CREATE TABLE IF NOT EXISTS users (
-      id         INTEGER PRIMARY KEY,
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
       email      TEXT NOT NULL UNIQUE COLLATE NOCASE,
       username   TEXT NOT NULL UNIQUE COLLATE NOCASE,
       pass_hash  TEXT NOT NULL,
       created_at TEXT NOT NULL
     );
+
+    -- "Sign in with Google / Apple": which provider account belongs to which user. subject = the provider's
+    -- stable id for the person (never their email, which can change). A user can have several, or none (password only).
+    CREATE TABLE IF NOT EXISTS identities (
+      provider   TEXT NOT NULL,
+      subject    TEXT NOT NULL,
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      email      TEXT,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (provider, subject)
+    );
+    CREATE INDEX IF NOT EXISTS identities_by_user ON identities (user_id);
 
     -- one verdict per person per title. 'status' is what decides if it counts in the community split
     CREATE TABLE IF NOT EXISTS verdicts (

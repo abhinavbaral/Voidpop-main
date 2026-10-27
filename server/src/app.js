@@ -3,9 +3,14 @@
 //
 //   POST   /api/auth/register            { email, username, password } → { token, user }
 //   POST   /api/auth/login               { identifier, password }      → { token, user }
+//   GET    /api/auth/providers                                         → { google, apple }  (which sign-ins this server has set up)
+//   POST   /api/auth/google              { idToken }                   → { token, user, isNew }  (signed in: connects Google to your account)
+//   POST   /api/auth/apple               { identityToken, name? }      → { token, user, isNew }  (same)
 //   GET    /api/me                                                     → { user }
+//   PATCH  /api/me                       { username }                  → { user }
 //   DELETE /api/me                                                     delete the account and everything on it
 //   PUT    /api/verdicts/:segment/:id    { verdict, status, moods?, title?, image? }
+//   POST   /api/verdicts/bulk            { items: [{ segment, id, verdict, status, moods?, title?, image? }] } → { saved, skipped }   (up to 100; a new account's existing library)
 //   DELETE /api/verdicts/:segment/:id
 //   GET    /api/titles/:segment/:id/verdicts                           → { total, counts, mine? }
 //   GET    /api/rankings?min=20                                        → { titles: [{ segment, id, title, image, total, counts }] }  (Explore: Best out there, Popular in town, Most loved)
@@ -18,16 +23,22 @@
 //   PUT    /api/sync                     { data, baseVersion }         → { version }   (409 if someone else saved first)
 //   GET    /api/health
 
+import { createHash, randomInt } from "node:crypto";
 import { hashPassword, checkPassword, makeTokens } from "./auth.js";
+import { makeVerifier, OidcError, GOOGLE, APPLE } from "./oidc.js";
 
 export const SEGMENTS = ["anime", "manga", "novel", "movie", "tv"];
 export const VERDICT_KEYS = ["peak", "divein", "onetime", "voidit"];
 // a verdict counts in the community split only when the person finished or dropped it
-export const COUNTED = ["completed", "dropped", "watched"];
-const STATUSES = ["completed", "dropped", "watched", "watching", "plan", "paused"];
+// ("rewatching" is a finished title being watched again, so it still counts)
+export const COUNTED = ["completed", "dropped", "watched", "rewatching"];
+// every status the app has (its "On Hold" is "onhold"; "paused" is kept for older clients): a verdict is never refused over its status
+const STATUSES = ["completed", "dropped", "watched", "rewatching", "watching", "plan", "considering", "onhold", "paused"];
 
 const MAX_BODY = 16 * 1024;
 const MAX_SYNC = 5 * 1024 * 1024;
+const MAX_BULK_ITEMS = 100;
+const MAX_BULK_BODY = 256 * 1024;
 const PAGE = 20;
 
 class HttpError extends Error {
@@ -35,7 +46,9 @@ class HttpError extends Error {
 }
 const bad = (m) => new HttpError(400, m);
 
-export function createApp({ db, secret, origins = "*", trustProxy = false, now = () => Date.now() }) {
+// google / apple: the client ids a sign-in token must have been issued for (empty = that sign-in is off).
+// fetchJson: how the provider's public keys are fetched (tests pass a fake; the default is fetch).
+export function createApp({ db, secret, origins = "*", trustProxy = false, now = () => Date.now(), google = [], apple = [], fetchJson }) {
   const tokens = makeTokens(secret);
   const iso = () => new Date(now()).toISOString();
 
@@ -53,7 +66,13 @@ export function createApp({ db, secret, origins = "*", trustProxy = false, now =
 
   /* ---------- helpers ---------- */
   const userRow = (id) => db.prepare("SELECT id, email, username, created_at FROM users WHERE id = ?").get(id);
-  const publicUser = (u) => ({ id: u.id, username: u.username, email: u.email, createdAt: u.created_at });
+  // an account made with Google or Apple that shared no email has a made-up one (a reserved ".invalid" address): never shown
+  const PLACEHOLDER = "@sign-in.invalid";
+  const providersOf = (id) => db.prepare("SELECT provider FROM identities WHERE user_id = ? ORDER BY provider").all(id).map((r) => r.provider);
+  const publicUser = (u) => ({
+    id: u.id, username: u.username, email: u.email.endsWith(PLACEHOLDER) ? null : u.email, createdAt: u.created_at,
+    providers: providersOf(u.id), // ["google", "apple"]: what is connected to this account
+  });
 
   function authed(req, required = true) {
     const m = /^Bearer (.+)$/.exec(req.headers.authorization || "");
@@ -120,7 +139,93 @@ export function createApp({ db, secret, origins = "*", trustProxy = false, now =
     return { token: tokens.issue(row.id, now()), user: publicUser(row) };
   });
 
+  /* ---------- sign in with Google / Apple ---------- */
+  // The phone gets an ID token from Google or Apple and sends it here; oidc.js checks its signature and who it is for.
+  //   signed out + already connected → sign in to that account
+  //   signed out + new               → make an account (no password: nothing can match NO_PASSWORD)
+  //   signed in                      → connect that Google/Apple account to the signed-in account
+  // An email that already belongs to a password account is NEVER linked automatically. Sign-up here doesn't verify
+  // email, so whoever registered an address first would otherwise get into the real owner's Google account.
+  // The owner signs in with the password first, then connects Google from Account.
+  const verifyToken = makeVerifier({ fetchJson, now });
+  const SOCIAL = {
+    google: { ...GOOGLE, label: "Google", audiences: google, field: "idToken" },
+    apple: { ...APPLE, label: "Apple", audiences: apple, field: "identityToken" },
+  };
+  const NO_PASSWORD = "!"; // checkPassword() never matches this
+  const placeholderEmail = (provider, sub) => `${provider}-${createHash("sha256").update(sub).digest("hex").slice(0, 20)}${PLACEHOLDER}`;
+
+  // a username nobody has, from the first hint that has 3+ usable characters (names in other scripts have none: the email's start is the fallback)
+  function freeUsername(...hints) {
+    let base = "";
+    for (const hint of hints) {
+      const s = String(hint || "").replace(/[^A-Za-z0-9_]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 18);
+      if (s.length >= 3) { base = s; break; }
+    }
+    if (!base) base = "voidpop";
+    let name = base;
+    for (let i = 0; i < 20 && db.prepare("SELECT 1 FROM users WHERE username = ?").get(name); i++) name = `${base}${randomInt(1000, 10000)}`;
+    return name;
+  }
+
+  async function socialSignIn(req, provider, body) {
+    limit(req, "auth", 10);
+    const p = SOCIAL[provider];
+    if (!p.audiences.length) throw new HttpError(503, `Sign in with ${p.label} isn't set up on this server.`);
+    const raw = body[p.field];
+    if (typeof raw !== "string" || !raw || raw.length > 8192) throw bad(`Missing ${p.label} sign-in.`);
+    let claims;
+    try { claims = await verifyToken(raw, p); }
+    catch (e) {
+      if (e instanceof OidcError) throw new HttpError(e.kind === "unavailable" ? 503 : 401, e.message);
+      throw e;
+    }
+    // from here on nothing waits, so the checks and the inserts below can't interleave with another request
+    const me = authed(req, false);
+    const linked = db.prepare("SELECT user_id FROM identities WHERE provider = ? AND subject = ?").get(provider, claims.sub);
+    if (linked) {
+      if (me && me.id !== linked.user_id) throw new HttpError(409, `That ${p.label} account is already connected to a different VoidPop account.`);
+      const user = userRow(linked.user_id);
+      return { token: tokens.issue(user.id, now()), user: publicUser(user), isNew: false };
+    }
+    const email = claims.email && claims.emailVerified ? claims.email : null;
+    if (me) {
+      db.prepare("INSERT INTO identities (provider, subject, user_id, email, created_at) VALUES (?, ?, ?, ?, ?)").run(provider, claims.sub, me.id, email, iso());
+      return { token: tokens.issue(me.id, now()), user: publicUser(me), isNew: false, linked: true };
+    }
+    if (email && db.prepare("SELECT 1 FROM users WHERE email = ?").get(email)) {
+      throw new HttpError(409, `That email already has a VoidPop account. Sign in with your password, then connect ${p.label} from Account.`);
+    }
+    const username = freeUsername(body.name, claims.name, email ? email.split("@")[0] : "");
+    let uid;
+    db.exec("BEGIN");
+    try {
+      const r = db.prepare("INSERT INTO users (email, username, pass_hash, created_at) VALUES (?, ?, ?, ?)").run(email || placeholderEmail(provider, claims.sub), username, NO_PASSWORD, iso());
+      uid = Number(r.lastInsertRowid);
+      db.prepare("INSERT INTO identities (provider, subject, user_id, email, created_at) VALUES (?, ?, ?, ?, ?)").run(provider, claims.sub, uid, email, iso());
+      db.exec("COMMIT");
+    } catch (e) { db.exec("ROLLBACK"); throw e; }
+    const user = userRow(uid);
+    return [201, { token: tokens.issue(user.id, now()), user: publicUser(user), isNew: true }];
+  }
+
+  route("GET", "/api/auth/providers", () => ({ google: google.length > 0, apple: apple.length > 0 }));
+  route("POST", "/api/auth/google", (req, { body }) => socialSignIn(req, "google", body));
+  route("POST", "/api/auth/apple", (req, { body }) => socialSignIn(req, "apple", body));
+
   route("GET", "/api/me", (req) => ({ user: publicUser(authed(req)) }));
+
+  // people who came in with Google or Apple get a made-up username: this is how they pick their own
+  route("PATCH", "/api/me", (req, { body }) => {
+    limit(req, "write", 60);
+    const me = authed(req);
+    const username = text(body.username, 3, 24, "Username");
+    if (!/^[A-Za-z0-9_]+$/.test(username)) throw bad("Usernames can use letters, numbers and _ only.");
+    const taken = db.prepare("SELECT id FROM users WHERE username = ?").get(username);
+    if (taken && taken.id !== me.id) throw new HttpError(409, "That username is taken.");
+    db.prepare("UPDATE users SET username = ? WHERE id = ?").run(username, me.id);
+    return { user: publicUser(userRow(me.id)) };
+  });
 
   route("DELETE", "/api/me", (req) => {
     const me = authed(req);
@@ -128,10 +233,8 @@ export function createApp({ db, secret, origins = "*", trustProxy = false, now =
     return { ok: true };
   });
 
-  route("PUT", "/api/verdicts/([^/]+)/([^/]+)", (req, { m, body }) => {
-    limit(req, "write", 60);
-    const me = authed(req);
-    const segment = seg(m[1]); const id = itemId(m[2]);
+  // One verdict, checked and saved. Throws a 400 for anything wrong, so callers decide whether that stops them (PUT) or just skips it (bulk).
+  function saveVerdict(me, segment, id, body) {
     if (!VERDICT_KEYS.includes(body.verdict)) throw bad("Unknown verdict.");
     if (!STATUSES.includes(body.status)) throw bad("Unknown status.");
     const moods = Array.isArray(body.moods) ? body.moods.filter((x) => typeof x === "string").slice(0, 6).map((x) => x.slice(0, 80)) : [];
@@ -143,7 +246,30 @@ export function createApp({ db, secret, origins = "*", trustProxy = false, now =
       .run(me.id, segment, id, body.verdict, body.status, JSON.stringify(moods),
         typeof body.title === "string" ? body.title.slice(0, 200) : null,
         typeof body.image === "string" && /^https:\/\//.test(body.image) ? body.image.slice(0, 500) : null, iso());
+  }
+
+  route("PUT", "/api/verdicts/([^/]+)/([^/]+)", (req, { m, body }) => {
+    limit(req, "write", 60);
+    const me = authed(req);
+    saveVerdict(me, seg(m[1]), itemId(m[2]), body);
     return { ok: true };
+  });
+
+  // Everything someone already had on their phone as a guest, shared in one go when they sign in. One bad item
+  // is skipped, not fatal; the app sends 100 at a time.
+  route("POST", "/api/verdicts/bulk", (req, { body }) => {
+    limit(req, "bulk", 20);
+    const me = authed(req);
+    if (!Array.isArray(body.items) || body.items.length > MAX_BULK_ITEMS) throw bad(`Send between 0 and ${MAX_BULK_ITEMS} verdicts at a time.`);
+    let saved = 0;
+    db.exec("BEGIN");
+    try {
+      for (const it of body.items) {
+        try { saveVerdict(me, seg(it?.segment), itemId(String(it?.id)), it); saved += 1; } catch (e) { if (!(e instanceof HttpError)) throw e; }
+      }
+      db.exec("COMMIT");
+    } catch (e) { db.exec("ROLLBACK"); throw e; }
+    return { saved, skipped: body.items.length - saved };
   });
 
   route("DELETE", "/api/verdicts/([^/]+)/([^/]+)", (req, { m }) => {
@@ -329,8 +455,8 @@ export function createApp({ db, secret, origins = "*", trustProxy = false, now =
       const r = routes.find((x) => x.method === req.method && x.re.test(url.pathname));
       if (!r) throw new HttpError(404, "Not found.");
       const m = r.re.exec(url.pathname).map((x) => (x === undefined ? x : decodeURIComponent(x))); // m[1] is the first capture
-      const body = req.method === "GET" || req.method === "DELETE" ? {} : await readBody(req, url.pathname === "/api/sync" ? MAX_SYNC + 1024 : MAX_BODY);
-      const out = r.fn(req, { m, body, query: url.searchParams });
+      const body = req.method === "GET" || req.method === "DELETE" ? {} : await readBody(req, url.pathname === "/api/sync" ? MAX_SYNC + 1024 : url.pathname === "/api/verdicts/bulk" ? MAX_BULK_BODY : MAX_BODY);
+      const out = await r.fn(req, { m, body, query: url.searchParams }); // await: sign-in with Google/Apple fetches keys
       return Array.isArray(out) ? send(out[0], out[1]) : send(200, out);
     } catch (e) {
       if (e instanceof HttpError) return send(e.status, { error: e.message, ...(e.extra || {}) });

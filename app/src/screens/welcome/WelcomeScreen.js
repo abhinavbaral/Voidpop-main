@@ -9,6 +9,7 @@ import CoverWall from "../../components/welcome/CoverWall";
 import ArrowButton from "../../components/welcome/ArrowButton";
 import { useLogo } from "../../components/brand/Brand";
 import { isOnboarded } from "@voidpop/shared/backend/store";
+import { shouldAskSignIn } from "@voidpop/shared/api/community";
 import { getCoversForWelcome } from "../../services/swipeCovers";
 
 const COPY = {
@@ -32,6 +33,8 @@ export default function WelcomeScreen({ navigation, route }) {
   // to Main; a first run (or the tour from More) goes through Onboarding, which
   // lands on Main (first run) or goes back to More (the tour) when it finishes.
   const start = async () => {
+    // a build with a VoidPop server: offer sign-in (or guest) first, once. Not for the tour from More.
+    if (!route?.params?.tour && await shouldAskSignIn().catch(() => false)) { navigation.replace("SignIn"); return; }
     const done = await isOnboarded().catch(() => true); // can't read it: don't trap the user in Onboarding
     if (done && !route?.params?.tour) navigation.replace("Main");
     else navigation.replace("Onboarding");

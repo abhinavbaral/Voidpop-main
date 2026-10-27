@@ -3,11 +3,12 @@
 import { useState } from "react";
 import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { register, login, logout, deleteAccount, pushBackup, pullBackup } from "@voidpop/shared/api/community";
+import { logout, deleteAccount, pushBackup, pullBackup, combineWithAccount, updateUsername } from "@voidpop/shared/api/community";
 import { useAccount } from "@voidpop/shared/backend/useCommunity";
 import { useTheme } from "../../context/ThemeContext.js";
 import { goBackOrHome } from "../../utils/nav";
 import Icon from "../../components/ui/Icon.js";
+import AuthForm, { SocialButtons } from "../../components/account/AuthForm.js";
 
 function Field({ label, C, ...rest }) {
   return (
@@ -23,27 +24,21 @@ export default function AccountScreen({ navigation }) {
   const { C } = useTheme();
   const styles = makeStyles(C);
   const { user, ready, enabled } = useAccount();
-  const [mode, setMode] = useState("login");
-  const [f, setF] = useState({ identifier: "", email: "", username: "", password: "" });
-  const [err, setErr] = useState("");
   const [msg, setMsg] = useState("");
+  const [name, setName] = useState(null);       // the username being typed (null = not changed)
+  const [accountErr, setAccountErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState(null); // "restore" | "delete": the second tap does it
-  const set = (k) => (v) => setF((x) => ({ ...x, [k]: v }));
-
-  const submit = async () => {
-    setBusy(true); setErr("");
-    try {
-      if (mode === "login") await login({ identifier: f.identifier.trim(), password: f.password });
-      else await register({ email: f.email.trim(), username: f.username.trim(), password: f.password });
-      setF((x) => ({ ...x, password: "" }));
-    } catch (e) { setErr(e.message); }
+  // people who came in with Google or Apple start with a made-up username: this is where they pick their own
+  const saveName = async () => {
+    setBusy(true); setAccountErr("");
+    try { await updateUsername(name.trim()); setName(null); } catch (e) { setAccountErr(e.message); }
     setBusy(false);
   };
   const run = async (fn, ok) => {
     setBusy(true); setMsg(""); setConfirm(null);
     try { const r = await fn(); setMsg(typeof ok === "function" ? ok(r) : ok); }
-    catch (e) { setMsg(e.status === 409 ? "Another device saved a newer backup. Restore it first, or you'd overwrite it." : e.message); }
+    catch (e) { setMsg(e.status === 409 ? "Another device saved a newer backup. Tap Combine to keep both, or Restore to use the account's version (it replaces this phone's)." : e.message); }
     setBusy(false);
   };
 
@@ -70,14 +65,19 @@ export default function AccountScreen({ navigation }) {
           <>
             <View style={styles.card}>
               <Text style={styles.h2}>{user.username}</Text>
-              <Text style={styles.sub}>{user.email}</Text>
+              {!!user.email && <Text style={styles.sub}>{user.email}</Text>}
+              <Field C={C} label="Change username" value={name ?? user.username} onChangeText={setName} maxLength={24} />
+              <Btn label="Save username" disabled={name === null || name.trim() === user.username} onPress={saveName} />
+              <SocialButtons connect skip={user.providers || []} heading="Connect another way to sign in" onDone={() => setAccountErr("")} onError={setAccountErr} />
+              {!!accountErr && <Text style={{ color: C.rose }} accessibilityRole="alert">{accountErr}</Text>}
               <Btn label="Sign out" onPress={logout} />
             </View>
             <View style={styles.card}>
               <Text style={styles.h2}>Cloud backup</Text>
-              <Text style={styles.sub}>Your library stays on this phone. Back it up to your account to move to another phone or browser, then restore it there. Restoring replaces what is on the device you restore to.</Text>
+              <Text style={styles.sub}>Your library stays on this phone. Back it up to your account to move to another phone or browser, then restore it there. Restoring replaces what is on the device you restore to. Combine keeps everything from both the phone and the account, and shares the verdicts you already gave.</Text>
               <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
                 <Btn primary label="Back up now" onPress={() => run(pushBackup, "Backed up to your account.")} />
+                <Btn label="Combine with this phone" onPress={() => run(combineWithAccount, (r) => `Combined: ${r.fromAccount} titles added from your account, ${r.verdicts} verdicts shared.`)} />
                 <Btn label={confirm === "restore" ? "Tap again to replace this library" : "Restore from account"}
                   onPress={() => (confirm === "restore" ? run(pullBackup, (ok) => (ok ? "Restored. Restart the app to see everything." : "There's no backup in your account yet.")) : setConfirm("restore"))} />
               </View>
@@ -92,26 +92,7 @@ export default function AccountScreen({ navigation }) {
           </>
         ) : (
           <View style={styles.card}>
-            <View style={{ flexDirection: "row", gap: 8 }}>
-              {[["login", "Sign in"], ["register", "Create account"]].map(([k, l]) => (
-                <TouchableOpacity key={k} onPress={() => { setMode(k); setErr(""); }} accessibilityRole="tab" accessibilityState={{ selected: mode === k }}
-                  style={[styles.tab, mode === k && { borderColor: C.purple, backgroundColor: C.inputBg }]}>
-                  <Text style={{ color: mode === k ? C.purple : C.sub, fontWeight: "800" }}>{l}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            {mode === "login" ? (
-              <Field C={C} label="Email or username" value={f.identifier} onChangeText={set("identifier")} textContentType="username" />
-            ) : (
-              <>
-                <Field C={C} label="Email" value={f.email} onChangeText={set("email")} keyboardType="email-address" textContentType="emailAddress" />
-                <Field C={C} label="Username (letters, numbers, _)" value={f.username} onChangeText={set("username")} maxLength={24} />
-              </>
-            )}
-            <Field C={C} label="Password" value={f.password} onChangeText={set("password")} secureTextEntry textContentType={mode === "login" ? "password" : "newPassword"} />
-            {mode === "register" && <Text style={styles.sub}>At least 8 characters. Your email is only used to sign in; it is never shown to others.</Text>}
-            {!!err && <Text style={{ color: C.rose }} accessibilityRole="alert">{err}</Text>}
-            <Btn primary label={mode === "login" ? "Sign in" : "Create account"} onPress={submit} />
+            <AuthForm />
           </View>
         )}
       </ScrollView>

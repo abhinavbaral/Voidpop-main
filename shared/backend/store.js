@@ -1135,6 +1135,42 @@ export async function storageSize() {
 }
 
 // Wipe the library, verdicts and Excited list. Settings stay.
+// Bring a backup INTO this phone's library without losing anything on either side (importData replaces instead).
+// Every title, verdict, note and so on from both is kept; when both have the same one, the more recently changed wins.
+// Settings and flags stay as they are on this phone. A title you removed here that still sits in the backup comes
+// back (nothing records removals), which is the safe direction for "combine".
+// → { added: titles that were only in the backup } or { error }
+const stampOf = (v) => { const t = typeof v === "number" ? v : Date.parse(v || ""); return Number.isFinite(t) ? t : 0; };
+export async function mergeData(json) {
+  let data;
+  try { data = JSON.parse(json); } catch { return { error: "That isn't a VoidPop backup." }; }
+  if (!["voidpop", "voidation"].includes(data?.app) || !data.library || typeof data.library !== "object") return { error: "That isn't a VoidPop backup." };
+  const db = await load();
+  db.cinema ||= {};
+  const take = (mine, theirs, when) => {
+    let n = 0;
+    for (const [k, v] of Object.entries(theirs && typeof theirs === "object" ? theirs : {})) {
+      if (!v || typeof v !== "object") continue;
+      if (!(k in mine)) { mine[k] = v; n += 1; } else if (when(v) > when(mine[k])) mine[k] = v;
+    }
+    return n;
+  };
+  const cinema = renameWatched(data.cinema && typeof data.cinema === "object" ? data.cinema : {});
+  const added = take(db.library, data.library, (e) => stampOf(e.updatedAt)) + take(db.cinema, cinema, (e) => stampOf(e.updatedAt));
+  take(db.reviews, data.reviews, (r) => stampOf(r.date));
+  take(db.excited, data.excited, (x) => stampOf(x.at));
+  take(db.notes, data.notes, (x) => stampOf(x.at));
+  if (Array.isArray(data.log)) { // both histories, each entry once, oldest first
+    const seen = new Set(db.log.map((e) => JSON.stringify(e)));
+    for (const e of data.log) if (Array.isArray(e) && !seen.has(JSON.stringify(e))) db.log.push(e);
+    db.log.sort((a, b) => (a[0] || 0) - (b[0] || 0));
+  }
+  if (!db.categories.length && Array.isArray(data.categories)) db.categories = data.categories;
+  db.meta = { ...(data.meta && typeof data.meta === "object" ? data.meta : {}), ...db.meta }; // this phone's flags win (e.g. already onboarded)
+  await save();
+  return { added };
+}
+
 export async function clearData() {
   const db = await load();
   cache = { ...EMPTY(), settings: db.settings };

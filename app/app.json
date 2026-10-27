@@ -42,9 +42,11 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.voidation.app"
+      "bundleIdentifier": "com.voidation.app",
+      "usesAppleSignIn": true
     },
     "plugins": [
+      "expo-apple-authentication",
       [
         "expo-notifications",
         {

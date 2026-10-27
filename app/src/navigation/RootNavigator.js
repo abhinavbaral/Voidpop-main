@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import MainTabs from "./MainTabs";
 import TitleScreen from "../screens/title/TitleScreen";
 import AccountScreen from "../screens/account/AccountScreen";
+import SignInScreen from "../screens/account/SignInScreen";
 import PersonScreen from "../screens/title/PersonScreen";
 import SearchScreen from "../screens/explore/SearchScreen";
 import SeasonScreen from "../screens/explore/SeasonScreen";
@@ -31,6 +32,7 @@ export default function RootNavigator({ initialRouteName }) {
       />
       <Stack.Screen name="Search" component={SearchScreen} />
       <Stack.Screen name="Account" component={AccountScreen} />
+      <Stack.Screen name="SignIn" component={SignInScreen} options={fade} />
       <Stack.Screen name="MorePage" component={MorePageScreen} />
       <Stack.Screen name="Season" component={SeasonScreen} />
       <Stack.Screen name="Browse" component={BrowseScreen} />

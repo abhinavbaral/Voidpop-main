@@ -7,10 +7,11 @@
 // The login token is kept in the same on-device storage as your library (backend/storage.js).
 
 import { readKey, writeKey, removeKey } from "../backend/storage.js";
-import { exportData, importData } from "../backend/store.js";
+import { exportData, importData, mergeData, getLibrary, getLibraryAll, getReviews, getCinemaShelf } from "../backend/store.js";
 
 const ACCOUNT_KEY = "voidpop:account:v1";
 const SYNC_KEY = "voidpop:sync-version:v1";
+const CHOICE_KEY = "voidpop:auth-choice:v1"; // "guest" once someone has chosen to go on without an account
 
 let baseUrl = "";
 export function configureCommunity({ baseUrl: url } = {}) {
@@ -21,29 +22,45 @@ export const hasCommunity = () => !!baseUrl;
 /* ---------- who is signed in ---------- */
 
 let account = null;        // { token, user } or null
-let loaded = false;
+let choice = null;         // "guest" or null (not chosen yet)
+let loading = null;        // the one read of the saved login, shared by everyone who asks
 const listeners = new Set();
 const emit = () => listeners.forEach((fn) => { try { fn(account?.user ?? null); } catch { /* a bad listener mustn't break others */ } });
 
 async function setAccount(next) {
   account = next;
-  if (next) await writeKey(ACCOUNT_KEY, JSON.stringify(next));
-  else { await removeKey(ACCOUNT_KEY); await removeKey(SYNC_KEY); }
+  if (next) {
+    await writeKey(ACCOUNT_KEY, JSON.stringify(next));
+    if (choice) { choice = null; await removeKey(CHOICE_KEY); } // signed in: "guest" no longer applies
+  } else { await removeKey(ACCOUNT_KEY); await removeKey(SYNC_KEY); }
   emit();
 }
 
 // call once at start-up (and it's cheap to call again): reads the saved login
 export async function loadAccount() {
-  if (!loaded) {
-    loaded = true;
+  loading ||= (async () => {
     try {
       const raw = await readKey(ACCOUNT_KEY);
       const a = raw ? JSON.parse(raw) : null;
       account = a?.token && a?.user ? a : null;
     } catch { account = null; }
+    try { choice = (await readKey(CHOICE_KEY)) === "guest" ? "guest" : null; } catch { choice = null; }
     emit();
-  }
+  })();
+  await loading; // a second caller waits for the read instead of seeing "nobody" while it is still going
   return account?.user ?? null;
+}
+
+// Going on without an account is a choice the person makes once; it is remembered so the sign-in screen isn't shown again.
+export async function chooseGuest() {
+  choice = "guest";
+  await writeKey(CHOICE_KEY, "guest");
+}
+// Show the sign-in screen? Only when there is a server to sign in to, nobody is signed in, and they haven't chosen guest.
+// (A login that expired counts as signed out and no guest choice: they are asked again.)
+export async function shouldAskSignIn() {
+  await loadAccount();
+  return hasCommunity() && !account && choice !== "guest";
 }
 export const currentUser = () => account?.user ?? null;
 export function onAccountChange(fn) { listeners.add(fn); return () => listeners.delete(fn); }
@@ -68,8 +85,9 @@ async function request(method, path, body) {
   }
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
-    // a saved login the server no longer accepts (expired, or the account was deleted): sign out locally
-    if (res.status === 401 && account && path !== "/api/auth/login") await setAccount(null);
+    // a saved login the server no longer accepts (expired, or the account was deleted): sign out locally.
+    // Not for /api/auth/*: a refused password or Google/Apple token isn't news about the login you already have.
+    if (res.status === 401 && account && !path.startsWith("/api/auth/")) await setAccount(null);
     throw new ApiError(res.status, json.error || "Something went wrong.", json);
   }
   return json;
@@ -87,10 +105,37 @@ export async function login({ identifier, password }) {
   await setAccount({ token: r.token, user: r.user });
   return r.user;
 }
-export async function logout() { await setAccount(null); }
+// Signing out (or deleting the account) leaves you as a guest: the app keeps working, no sign-in screen is forced on you
+export async function logout() { await setAccount(null); await chooseGuest(); }
 export async function deleteAccount() {
   await request("DELETE", "/api/me");
   await setAccount(null);
+  await chooseGuest();
+}
+
+// Google / Apple: the phone gets an ID token from them (app/src/services/socialSignIn.js) and the server checks it.
+// Signed out: signs in (or makes the account). Signed in: connects that Google/Apple account to this one.
+async function socialLogin(path, body) {
+  const r = await request("POST", path, body);
+  await setAccount({ token: r.token, user: r.user });
+  return { user: r.user, isNew: !!r.isNew, linked: !!r.linked };
+}
+export const loginWithGoogle = (idToken) => socialLogin("/api/auth/google", { idToken });
+export const loginWithApple = ({ identityToken, name }) => socialLogin("/api/auth/apple", { identityToken, ...(name ? { name } : {}) });
+
+// which of Google / Apple this server has set up, so only buttons that can work are shown. Cached once it is known.
+let providers = null;
+export async function fetchProviders() {
+  if (providers) return providers;
+  try { providers = await request("GET", "/api/auth/providers"); } catch { return { google: false, apple: false }; }
+  return providers;
+}
+
+// people who came in with Google/Apple get a made-up username: this changes it
+export async function updateUsername(username) {
+  const r = await request("PATCH", "/api/me", { username });
+  await setAccount({ token: account.token, user: r.user });
+  return r.user;
 }
 
 /* ---------- verdicts ---------- */
@@ -144,6 +189,54 @@ export async function pullBackup() {
   if (problem) throw new ApiError(0, problem);
   await writeKey(SYNC_KEY, String(r.version));
   return true;
+}
+
+/* ---------- a guest who signs in: bring what is already on this phone ---------- */
+
+// how many titles are on this phone (what a new sign-in would bring along)
+export async function localTitleCount() { return Object.keys(await getLibraryAll()).length; }
+
+// Every verdict on this phone, whatever the status. The server counts only the ones on finished or dropped titles in the
+// split, but keeps the rest (they show as your chip on your comments and come back as "yours" on another phone).
+async function localVerdicts() {
+  const [library, reviews, shelf] = await Promise.all([getLibrary(), getReviews(), getCinemaShelf()]);
+  const out = [];
+  for (const r of reviews) { // anime, manga and novels: the verdict is separate from the library entry
+    const e = library[`${r.segment}:${r.titleId}`];
+    if (!e) continue;
+    out.push({ segment: r.segment, id: String(r.titleId), verdict: r.verdict, status: e.status, moods: r.moods || [], title: e.item?.title, image: e.item?.imageSmall || e.item?.image });
+  }
+  for (const e of shelf) { // movies and TV keep it on the shelf entry
+    if (e.review) out.push({ segment: e.item.segment, id: String(e.item.id), verdict: e.review.verdict, status: e.status, moods: e.review.moods || [], title: e.item.title, image: e.item.imageSmall || e.item.image });
+  }
+  return out;
+}
+
+// Share every verdict already on this phone with the community (only new changes were shared before), 100 per request
+// until all are sent. → how many were saved
+export async function shareAllVerdicts() {
+  if (!hasCommunity() || !account) return 0;
+  const all = await localVerdicts();
+  let saved = 0;
+  for (let i = 0; i < all.length; i += 100) saved += (await request("POST", "/api/verdicts/bulk", { items: all.slice(i, i + 100) })).saved;
+  return saved;
+}
+
+// Put this phone's library and the account's backup together, losing nothing on either side (Restore replaces; this doesn't):
+// the account's titles are merged into this phone, the result is saved to the account, and your existing verdicts are shared.
+// → { fromAccount: titles that came from the account, verdicts: verdicts shared, version }
+export async function combineWithAccount() {
+  const r = await request("GET", "/api/sync");
+  let fromAccount = 0;
+  if (r.data) {
+    const m = await mergeData(r.data);
+    if (m.error) throw new ApiError(0, m.error);
+    fromAccount = m.added;
+    await writeKey(SYNC_KEY, String(r.version)); // now this phone has seen the account's latest, so saving it back is allowed
+  }
+  const version = await pushBackup();
+  const verdicts = await shareAllVerdicts();
+  return { fromAccount, verdicts, version };
 }
 
 /* ---------- keeping the community in step with your shelf ---------- */

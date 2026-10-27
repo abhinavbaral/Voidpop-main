@@ -4,12 +4,16 @@ import { createServer } from "node:http";
 import { openDb } from "../src/db.js";
 import { createApp } from "../src/app.js";
 import { makeTokens, hashPassword, checkPassword } from "../src/auth.js";
+import { makeVerifier, OidcError, GOOGLE } from "../src/oidc.js";
+import { makeIdp } from "./idp.js";
+import { generateKeyPairSync } from "node:crypto";
 
 let server, base, clock = Date.now(), ipN = 0;
 const SECRET = "test-secret";
+const idp = makeIdp(); // a fake Google/Apple: signs real tokens, serves its public key
 
 before(async () => {
-  const app = createApp({ db: openDb(":memory:"), secret: SECRET, trustProxy: true, now: () => clock });
+  const app = createApp({ db: openDb(":memory:"), secret: SECRET, trustProxy: true, now: () => clock, google: ["g-web"], apple: ["com.voidation.app"], fetchJson: idp.fetchJson });
   server = createServer(app);
   await new Promise((r) => server.listen(0, r));
   base = `http://localhost:${server.address().port}`;
@@ -206,4 +210,207 @@ test("odd requests get tidy errors", async () => {
   const res = await fetch(base + "/api/health", { method: "OPTIONS", headers: { Origin: "https://x.dev" } });
   assert.equal(res.status, 204);
   assert.equal(res.headers.get("access-control-allow-origin"), "*");
+});
+
+/* ---------- sign in with Google / Apple ---------- */
+
+const sec = () => Math.floor(clock / 1000);
+const gClaims = (over = {}) => ({ iss: "https://accounts.google.com", aud: "g-web", sub: "g-1001", email: "ria@gmail.com", email_verified: true, name: "Ria Sharma", iat: sec(), exp: sec() + 3600, ...over });
+const aClaims = (over = {}) => ({ iss: "https://appleid.apple.com", aud: "com.voidation.app", sub: "a-2001", email: "ria@privaterelay.appleid.com", email_verified: "true", iat: sec(), exp: sec() + 3600, ...over });
+const viaGoogle = (claims, { as, jwt, body } = {}) => call("POST", "/api/auth/google", { token: as, body: { idToken: idp.jwt(claims, jwt), ...body } });
+const viaApple = (claims, { as, jwt, name } = {}) => call("POST", "/api/auth/apple", { token: as, body: { identityToken: idp.jwt(claims, jwt), ...(name ? { name } : {}) } });
+
+test("which sign-ins the server has set up", async () => {
+  assert.deepEqual((await call("GET", "/api/auth/providers")).json, { google: true, apple: true });
+  const off = createServer(createApp({ db: openDb(":memory:"), secret: "x", now: () => clock }));
+  await new Promise((r) => off.listen(0, r));
+  const url = `http://localhost:${off.address().port}`;
+  try {
+    assert.deepEqual(await (await fetch(`${url}/api/auth/providers`)).json(), { google: false, apple: false });
+    const r = await fetch(`${url}/api/auth/google`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ idToken: idp.jwt(gClaims()) }) });
+    assert.equal(r.status, 503); // not set up: refused, not "verified" against nothing
+  } finally { off.close(); }
+});
+
+test("Google: the first sign-in makes an account, the next ones land in it; there is no password to guess", async () => {
+  const first = await viaGoogle(gClaims({ sub: "g-new-1" }));
+  assert.equal(first.status, 201);
+  assert.deepEqual([first.json.isNew, first.json.user.email, first.json.user.providers], [true, "ria@gmail.com", ["google"]]);
+  assert.equal(first.json.user.username, "Ria_Sharma"); // from the name Google gave
+  assert.ok(!JSON.stringify(first.json).includes("pass"));
+  assert.equal((await call("GET", "/api/me", { token: first.json.token })).json.user.id, first.json.user.id); // the token works
+
+  const again = await viaGoogle(gClaims({ sub: "g-new-1", name: "Changed Name" }));
+  assert.deepEqual([again.status, again.json.isNew, again.json.user.id], [200, false, first.json.user.id]); // the same person, not a second account
+  // an account with no password can't be reached by guessing one, by email or by username
+  for (const identifier of ["ria@gmail.com", "Ria_Sharma"]) {
+    for (const password of ["!", "", "password123"]) assert.equal((await call("POST", "/api/auth/login", { body: { identifier, password } })).status, 401);
+  }
+});
+
+test("Google: tokens that are forged, for another app, expired or tampered with are refused", async () => {
+  const other = generateKeyPairSync("rsa", { modulusLength: 2048 }).privateKey;
+  const good = idp.jwt(gClaims({ sub: "g-forge" }));
+  const [h, p] = good.split(".");
+  const forgedPayload = idp.b64(gClaims({ sub: "g-forge", email: "victim@gmail.com" }));
+  const bad = {
+    "another app's token": () => viaGoogle(gClaims({ aud: "someone-elses-app" })),
+    "an array of other audiences": () => viaGoogle(gClaims({ aud: ["x", "y"] })),
+    "not from Google": () => viaGoogle(gClaims({ iss: "https://evil.example" })),
+    "expired": () => viaGoogle(gClaims({ exp: sec() - 3600 })),
+    "issued in the future": () => viaGoogle(gClaims({ iat: sec() + 3600 })),
+    "no subject": () => viaGoogle(gClaims({ sub: "" })),
+    "signed with another key": () => viaGoogle(gClaims(), { jwt: { key: other } }),
+    "payload swapped, signature kept": () => call("POST", "/api/auth/google", { body: { idToken: `${h}.${forgedPayload}.${good.split(".")[2]}` } }),
+    "alg none": () => call("POST", "/api/auth/google", { body: { idToken: `${idp.b64({ alg: "none", kid: "key-1" })}.${p}.` } }),
+    "HS256 with a made-up secret": () => viaGoogle(gClaims(), { jwt: { alg: "HS256", key: null } }),
+    "unknown key id": () => viaGoogle(gClaims(), { jwt: { kid: "no-such-key" } }),
+    "not a token": () => call("POST", "/api/auth/google", { body: { idToken: "hello.world" } }),
+  };
+  for (const [what, run] of Object.entries(bad)) assert.equal((await run()).status, 401, what);
+  assert.equal((await call("POST", "/api/auth/google", { body: {} })).status, 400); // nothing sent
+  assert.equal((await call("POST", "/api/auth/google", { body: { idToken: "x".repeat(9000) } })).status, 400);
+  // an Apple token is not a Google token, whatever it says
+  assert.equal((await call("POST", "/api/auth/google", { body: { idToken: idp.jwt(aClaims()) } })).status, 401);
+});
+
+test("Google: an email that already has a password account is never linked on its own; sign in, then connect", async () => {
+  const pw = await signUp("sam_pw"); // sam_pw@x.com, made with a password
+  const claims = gClaims({ sub: "g-sam", email: "sam_pw@x.com", name: "Sam" });
+  const blocked = await viaGoogle(claims);
+  assert.equal(blocked.status, 409);
+  assert.match(blocked.json.error, /sign in with your password/i);
+  assert.deepEqual((await call("GET", "/api/me", { token: pw.token })).json.user.providers, []); // still nothing connected
+
+  const linked = await viaGoogle(claims, { as: pw.token }); // now signed in: connect it
+  assert.deepEqual([linked.status, linked.json.linked, linked.json.user.id, linked.json.user.providers], [200, true, pw.user.id, ["google"]]);
+  const afterwards = await viaGoogle(claims); // Google alone now opens that same account
+  assert.deepEqual([afterwards.status, afterwards.json.user.id], [200, pw.user.id]);
+
+  const stranger = await signUp("not_sam");
+  assert.equal((await viaGoogle(claims, { as: stranger.token })).status, 409); // one Google account, one VoidPop account
+});
+
+test("Google: an email Google hasn't verified is not trusted: the account gets no email", async () => {
+  await signUp("taken_em"); // taken_em@x.com
+  const r = await viaGoogle(gClaims({ sub: "g-unverified", email: "taken_em@x.com", email_verified: false, name: "Quiet One" }));
+  assert.equal(r.status, 201); // no clash: that email is not claimed
+  assert.equal(r.json.user.email, null);
+});
+
+test("Apple: a hidden or missing email is fine, the name comes from the phone, and a relay address counts as an email", async () => {
+  const hidden = await viaApple(aClaims({ sub: "a-hidden", email: undefined, email_verified: undefined }), { name: "Kiran Rai" });
+  assert.equal(hidden.status, 201);
+  assert.deepEqual([hidden.json.user.email, hidden.json.user.username, hidden.json.user.providers], [null, "Kiran_Rai", ["apple"]]);
+  assert.equal((await call("GET", "/api/me", { token: hidden.json.token })).json.user.email, null); // the made-up address never leaks
+  assert.equal((await viaApple(aClaims({ sub: "a-hidden", email: undefined }))).json.user.id, hidden.json.user.id); // no name this time: same account
+
+  const relay = await viaApple(aClaims({ sub: "a-relay" }));
+  assert.deepEqual([relay.json.user.email, relay.json.user.providers], ["ria@privaterelay.appleid.com", ["apple"]]);
+  assert.equal((await viaApple(aClaims({ aud: "g-web" }))).status, 401); // a Google client id is not an Apple one
+});
+
+test("usernames made for Google/Apple people: from the name, else the email, never taken, changeable", async () => {
+  const a = await viaGoogle(gClaims({ sub: "g-d1", email: undefined, name: "Dup Name" }));
+  const b = await viaGoogle(gClaims({ sub: "g-d2", email: undefined, name: "Dup Name" }));
+  assert.equal(a.json.user.username, "Dup_Name");
+  assert.ok(b.json.user.username.startsWith("Dup_Name") && b.json.user.username !== "Dup_Name");
+  // a name with nothing usable (another script) falls back to the start of the email, then to a plain default
+  assert.equal((await viaGoogle(gClaims({ sub: "g-n1", email: "nepali.user@gmail.com", name: "\u0928\u0947\u092a\u093e\u0932\u0940" }))).json.user.username, "nepali_user");
+  assert.ok((await viaGoogle(gClaims({ sub: "g-n2", email: undefined, name: "\u0928\u0947\u092a\u093e\u0932\u0940" }))).json.user.username.startsWith("voidpop"));
+
+  const t = a.json.token;
+  assert.equal((await call("PATCH", "/api/me", { token: t, body: { username: "my_own_name" } })).json.user.username, "my_own_name");
+  assert.equal((await call("PATCH", "/api/me", { token: t, body: { username: "MY_OWN_NAME" } })).status, 200); // your own name, any case
+  assert.equal((await call("PATCH", "/api/me", { token: b.json.token, body: { username: "my_own_name" } })).status, 409); // taken
+  assert.equal((await call("PATCH", "/api/me", { token: t, body: { username: "no spaces" } })).status, 400);
+  assert.equal((await call("PATCH", "/api/me", { token: t, body: { username: "ab" } })).status, 400);
+  assert.equal((await call("PATCH", "/api/me", { body: { username: "whoever" } })).status, 401);
+});
+
+test("deleting a Google account removes the link too: signing in with it again starts fresh", async () => {
+  const first = await viaGoogle(gClaims({ sub: "g-gone", email: "gone@gmail.com" }));
+  assert.equal((await call("DELETE", "/api/me", { token: first.json.token })).status, 200);
+  const again = await viaGoogle(gClaims({ sub: "g-gone", email: "gone@gmail.com" }));
+  assert.deepEqual([again.status, again.json.isNew], [201, true]);
+  assert.notEqual(again.json.user.id, first.json.user.id);
+});
+
+/* ---------- checking tokens: the provider's keys ---------- */
+
+test("the provider's keys are kept for a while, an unknown key id re-checks at most once a minute, and an outage is survived", async () => {
+  const fake = makeIdp({ kid: "k-a" });
+  let t = 1_000_000_000_000;
+  const verify = makeVerifier({ fetchJson: fake.fetchJson, now: () => t });
+  const rules = { ...GOOGLE, audiences: ["g-web"] };
+  const claims = (over = {}) => ({ iss: GOOGLE.issuers[0], aud: "g-web", sub: "s1", iat: Math.floor(t / 1000), exp: Math.floor(t / 1000) + 3600, ...over });
+
+  assert.equal((await verify(fake.jwt(claims()), rules)).sub, "s1");
+  assert.equal((await verify(fake.jwt(claims()), rules)).sub, "s1");
+  assert.equal(fake.state.calls, 1); // the second one used the kept keys
+
+  // junk tokens with a key id we don't know: one re-check, then none until a minute has passed
+  for (let i = 0; i < 5; i++) await assert.rejects(verify(fake.jwt(claims(), { kid: "nope" }), rules), (e) => e instanceof OidcError && e.kind === "invalid");
+  assert.ok(fake.state.calls <= 2, `fetched ${fake.state.calls} times`);
+
+  // the provider goes down: tokens signed with keys we already have still work
+  t += 2 * 60 * 60 * 1000; // past the hour the keys are kept for
+  fake.state.down = true;
+  assert.equal((await verify(fake.jwt(claims()), rules)).sub, "s1");
+
+  // ...but with nothing kept and the provider down, we can't tell: "unavailable", not "invalid"
+  const cold = makeVerifier({ fetchJson: fake.fetchJson, now: () => t });
+  await assert.rejects(cold(fake.jwt(claims()), rules), (e) => e instanceof OidcError && e.kind === "unavailable");
+  // a key the provider rotates in is picked up
+  fake.state.down = false;
+  const rotated = makeIdp({ kid: "k-b" });
+  fake.state.keys = [fake.jwk, rotated.jwk];
+  assert.equal((await verify(rotated.jwt(claims({ sub: "s2" })), rules)).sub, "s2");
+});
+
+test("a deleted account's login token never opens a newer account", async () => {
+  const gone = await signUp("soon_gone");
+  assert.equal((await call("DELETE", "/api/me", { token: gone.token })).status, 200);
+  const next = await signUp("brand_new"); // made right after: it must not inherit the deleted account's id
+  assert.notEqual(next.user.id, gone.user.id);
+  assert.equal((await call("GET", "/api/me", { token: gone.token })).status, 401);
+});
+
+test("bulk verdicts: a guest's existing library is shared in one go; bad items are skipped, repeats don't double count", async () => {
+  const u = await signUp("bulker");
+  const items = [
+    { segment: "anime", id: "bulk-1", verdict: "peak", status: "completed", moods: ["a"], title: "One", image: "https://img.example/1.jpg" },
+    { segment: "tv", id: "bulk-2", verdict: "voidit", status: "dropped", title: "Two" },
+    { segment: "anime", id: "bulk-3", verdict: "divein", status: "plan" },       // saved, but a Watchlist title doesn't count in the split
+    { segment: "nope", id: "bulk-4", verdict: "peak", status: "completed" },     // unknown kind: skipped
+    { segment: "anime", id: "bulk-5", verdict: "great", status: "completed" },   // unknown verdict: skipped
+    { segment: "anime", id: "bad id!", verdict: "peak", status: "completed" },   // bad id: skipped
+    null, "junk",
+  ];
+  const r = await call("POST", "/api/verdicts/bulk", { token: u.token, body: { items } });
+  assert.deepEqual([r.status, r.json.saved, r.json.skipped], [200, 3, 5]);
+  assert.equal((await call("GET", "/api/titles/anime/bulk-1/verdicts")).json.counts.peak, 1);
+  assert.equal((await call("GET", "/api/titles/tv/bulk-2/verdicts")).json.counts.voidit, 1);
+  assert.equal((await call("GET", "/api/titles/anime/bulk-3/verdicts")).json.total, 0);
+
+  await call("POST", "/api/verdicts/bulk", { token: u.token, body: { items } }); // sent again (a retry)
+  assert.equal((await call("GET", "/api/titles/anime/bulk-1/verdicts")).json.total, 1); // still one person, one verdict
+
+  assert.equal((await call("POST", "/api/verdicts/bulk", { body: { items } })).status, 401);
+  assert.equal((await call("POST", "/api/verdicts/bulk", { token: u.token, body: { items: "x" } })).status, 400);
+  const tooMany = Array.from({ length: 101 }, (_, i) => ({ segment: "anime", id: `m${i}`, verdict: "peak", status: "completed" }));
+  assert.equal((await call("POST", "/api/verdicts/bulk", { token: u.token, body: { items: tooMany } })).status, 400);
+  const full = Array.from({ length: 100 }, (_, i) => ({ segment: "anime", id: `f${i}`, verdict: "peak", status: "completed", title: "T".repeat(300), image: `https://x.example/${"p".repeat(600)}` }));
+  assert.equal((await call("POST", "/api/verdicts/bulk", { token: u.token, body: { items: full } })).json.saved, 100); // a full batch fits the body limit
+});
+
+test("a verdict is accepted with any status the app has, and a title being rewatched still counts", async () => {
+  const u = await signUp("statuser");
+  for (const status of ["completed", "dropped", "watched", "rewatching", "watching", "plan", "considering", "onhold", "paused"]) {
+    assert.equal((await call("PUT", `/api/verdicts/anime/st-${status}`, { token: u.token, body: { verdict: "peak", status } })).status, 200, status);
+  }
+  const total = async (status) => (await call("GET", `/api/titles/anime/st-${status}/verdicts`)).json.total;
+  assert.deepEqual([await total("completed"), await total("dropped"), await total("rewatching")], [1, 1, 1]); // finished or dropped: counted
+  assert.deepEqual([await total("watching"), await total("onhold"), await total("plan"), await total("considering")], [0, 0, 0, 0]); // not yet: kept, not counted
+  assert.equal((await call("PUT", "/api/verdicts/anime/st-bad", { token: u.token, body: { verdict: "peak", status: "finished" } })).status, 400);
 });
