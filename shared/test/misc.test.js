@@ -65,7 +65,8 @@ test("ranks: 15 in order; old 'seen' ranks map by titles needed; Voidmon's verdi
   const mins = s.TIERS.map((t) => t.min);
   assert.equal(s.TIERS.length, 15);
   assert.deepEqual([...mins].sort((a, b) => a - b), mins);
-  assert.equal(s.tierFor(0).key, "newbie");
+  assert.equal(s.tierFor(0).key, "unranked"); // no rank until the first finished title
+  assert.equal(s.tierFor(1).key, "newbie");
   assert.equal(s.tierFor(4).key, "newbie");
   assert.equal(s.tierFor(5).key, "rookie");
   assert.equal(s.tierFor(9999).key, "addicted");

@@ -1,5 +1,8 @@
-{
+﻿{
   "expo": {
+    "name": "VoidPop",
+    "slug": "voidation",
+    "version": "1.0.2",
     "extra": {
       "eas": {
         "projectId": "60c0d3f0-5f80-4f55-b21e-9d32892e270f"

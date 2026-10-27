@@ -36,14 +36,14 @@ test("shelf: moving back to the watchlist keeps the verdict; removing deletes it
   await assert.rejects(() => s.setCinemaStatus(film(1), "watching"), /Unknown status/);
 });
 
-test("shelf: snapshots stay small, and movies never enter the anime/manga library or stats", async () => {
+test("shelf: snapshots stay small, and movies never enter the Library (but a watched one counts as content consumed)", async () => {
   const before = (await s.getStats()).totalCompleted;
   await s.setCinemaStatus(film(2, { cast: ["a"], sampleVotes: { peak: 1 } }), "completed");
   const e = await s.getCinemaEntry("movie", 2);
   assert.equal(e.item.overview.length, 400);
   assert.equal(e.item.cast, undefined);
   assert.deepEqual(Object.keys(await s.getLibrary()).filter((k) => k.startsWith("movie:")), []);
-  assert.equal((await s.getStats()).totalCompleted, before);
+  assert.equal((await s.getStats()).totalCompleted, before + 1); // ranks count movies and TV too
 });
 
 test("shelf: backup round-trips it, old backups without it still restore, CSV lists it", async () => {

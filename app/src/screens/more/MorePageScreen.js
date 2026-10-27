@@ -91,7 +91,7 @@ function Statistics({ styles, C, navigation }) {
   );
   return (
     <>
-      {block("Overview", [[fmt(stats.tracking), "In library"], [fmt(stats.totalCompleted), "Completed & finished"], [durationLabel(stats.minutesWatched), "Time watched"]])}
+      {block("Overview", [[fmt(stats.tracking), "In library"], [fmt(stats.totalCompleted), "Content consumed"], [durationLabel(stats.minutesWatched), "Time watched"]])}
       {block("Anime", [[fmt(stats.episodesTotal), "Total"], [fmt(stats.episodesWatched), "Watched"], [fmt(stats.inLibrary.anime), "Entries"]])}
       {block("Chapters", [[fmt(stats.chaptersTotal), "Total"], [fmt(stats.chaptersRead), "Read"], [fmt(stats.inLibrary.manga), "Entries"]])}
       <YourPeople styles={styles} C={C} navigation={navigation} />
@@ -556,7 +556,7 @@ function Achievements({ styles, C }) {
   const earned = list.filter((a) => a.earned).length;
   return (
     <>
-      <Text style={[styles.note, { marginBottom: 10 }]}>{earned} of {list.length} earned. Ranks count what you finish; these are about how you watch.</Text>
+      <Text style={[styles.note, { marginBottom: 10 }]}>{earned} of {list.length} earned. Ranks count everything you finish; these are mostly about how you watch.</Text>
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
         {list.map((a) => {
           const isLevel = a.levels != null; // Blaze and Rank Collector grow through levels
@@ -621,10 +621,11 @@ function BadgePage({ styles, C }) {
       {tab === "ach" ? <Achievements styles={styles} C={C} /> : (
     <>
       <View style={[styles.card, { alignItems: "center", gap: 8 }]}>
-        {medal(tier, true, 130)}
+        {medal(tier, tier.key !== "unranked", 130)}
         <Text style={{ color: tier.color, fontWeight: "900", fontSize: 20, marginTop: 6 }}>{tier.label.toUpperCase()}</Text>
         <Text style={[styles.cardTitle, { fontSize: 18, textAlign: "center" }]}>{tier.title}</Text>
-        <Text style={styles.note}>{stats.anime} anime completed · {stats.manga} manga finished</Text>
+        <Text style={styles.note}>{n.toLocaleString("en-US")} content consumed</Text>
+        <Text style={[styles.note, { fontSize: 12, textAlign: "center" }]}>{stats.anime} anime · {stats.manga} manga · {stats.novel} novels · {stats.movie} movies · {stats.tv} TV</Text>
         {next ? (
           <>
             <View style={{ width: "100%", height: 8, borderRadius: 4, backgroundColor: C.border, overflow: "hidden", marginTop: 6 }}>
@@ -642,7 +643,7 @@ function BadgePage({ styles, C }) {
             {medal(t, earned, 44)}
             <View style={{ flex: 1 }}>
               <Text style={[styles.cardTitle, earned && { color: t.color }]}>{t.label}</Text>
-              <Text style={styles.note}>{t.min === 0 ? "Where everyone starts" : `${t.min} anime completed + manga finished`}</Text>
+              <Text style={styles.note}>{t.min === 1 ? "Finish your first title" : `${t.min.toLocaleString("en-US")} content consumed`}</Text>
             </View>
             <Text style={styles.note}>{earned ? "Earned" : `${t.min - n} to go`}</Text>
           </TouchableOpacity>

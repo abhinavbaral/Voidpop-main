@@ -47,8 +47,9 @@ test("achievements: leveled streak, bingeing, night owl, firsts", async () => {
   assert.equal(a.binger.have, 12); // 13 in a day, capped at the goal
   assert.equal(a.binger.done, true);
   assert.equal(a.owl.have, 3);
-  assert.equal(a.junior.done, true);
-  assert.equal(a.junior.earned, true);
+  assert.deepEqual([a.consumer.have, a.consumer.need, a.consumer.done], [1, 5, false]); // renamed from Junior: 5 finished titles of any kind
+  assert.equal(a.junior, undefined);
+  assert.equal(a.cinemaLover.level, 0);  // no movies or TV yet
   assert.equal(a.peak.have, 1);
   assert.equal(a.otaku.have, 12 + 14);
   // retired: the three separate streak badges and Round Two
