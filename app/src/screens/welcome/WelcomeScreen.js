@@ -1,7 +1,9 @@
 // The first screen on every launch: a drifting wall of anime covers and an arrow
 // button (App starts here, see hooks/useInitialRoute). Also opened from
 // More > Help > Welcome tour.
-// The button goes to Main, or to Onboarding on a first run and for the tour.
+// The button says "Login" and opens the sign-in page (email, Google, Apple, or Continue as guest) while there is a
+// VoidPop server and nobody is signed in or chose guest; otherwise it says "Let's go" and goes to Main, or to
+// Onboarding on a first run and for the tour.
 import { useEffect, useState } from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -16,18 +18,26 @@ const COPY = {
   title: "Track every anime, manga and novel",
   sub: "Discover new stories, keep up with your favorites, and never miss a release. All in one place.",
   button: "Let’s go",
+  login: "Login",
 };
 
 export default function WelcomeScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const logo = useLogo();
   const [covers, setCovers] = useState(null);
+  const [ask, setAsk] = useState(false); // true: the button is "Login" (not signed in, not a guest, and there is a server)
 
   useEffect(() => {
     let live = true;
     getCoversForWelcome().then((c) => live && setCovers(c)).catch(() => {});
     return () => { live = false; };
   }, []);
+
+  useEffect(() => {
+    let live = true;
+    if (!route?.params?.tour) shouldAskSignIn().then((v) => live && setAsk(!!v)).catch(() => {});
+    return () => { live = false; };
+  }, [route?.params?.tour]);
 
   // replace, not navigate: Welcome leaves the stack. Returning users go straight
   // to Main; a first run (or the tour from More) goes through Onboarding, which
@@ -47,7 +57,7 @@ export default function WelcomeScreen({ navigation, route }) {
         <Image source={logo} style={s.logo} resizeMode="contain" accessibilityLabel="VoidPop" />
         <Text style={s.title} accessibilityRole="header">{COPY.title}</Text>
         <Text style={s.sub}>{COPY.sub}</Text>
-        <ArrowButton label={COPY.button} onPress={start} />
+        <ArrowButton label={ask ? COPY.login : COPY.button} onPress={start} />
       </View>
     </View>
   );

@@ -1,5 +1,5 @@
 // Every way into an account, in one place: email + password (sign in or create account), Sign in with Apple (iOS),
-// Continue with Google, and "Continue as guest". Used by the sign-in screen and by More → Account.
+// Sign in with Google, and "Continue as guest". Used by the sign-in screen and by More → Account.
 // The look follows the VoidPop theme (colours come from the theme, so Void, Ember, Sakura... all apply).
 // A social button only appears when the server has that sign-in set up AND this phone can do it.
 import { useEffect, useState } from "react";
@@ -63,7 +63,7 @@ export function SocialButtons({ connect = false, skip = [], heading, divider = f
       {showGoogle && (
         <TouchableOpacity onPress={run("Google", signInWithGoogle, loginWithGoogle)} disabled={busy} accessibilityRole="button"
           style={[styles.social, { borderColor: C.border }, busy && { opacity: 0.5 }]}>
-          <Text style={{ color: C.text, fontWeight: "800", fontSize: 15 }}>{connect ? "Connect Google" : "Continue with Google"}</Text>
+          <Text style={{ color: C.text, fontWeight: "800", fontSize: 15 }}>{connect ? "Connect Google" : "Sign in with Google"}</Text>
         </TouchableOpacity>
       )}
     </View>

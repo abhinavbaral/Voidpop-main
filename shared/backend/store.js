@@ -744,9 +744,10 @@ export async function importMalEntries(entries) {
 
 export async function getStats() {
   const entries = Object.values((await load()).library);
+  const seen = Object.values((await load()).cinema || {}).filter((e) => isDone(e.status)); // movies and TV you have watched (their shelf is apart from the Library)
   const sum = (seg) => entries.filter((e) => (e.item.segment === "manga") === (seg === "manga")).reduce((n, e) => n + (seg === "manga" ? e.progress || 0 : watchedOf(e)), 0);
   const completed = entries.filter((e) => isDone(e.status)); // rewatching still counts as finished
-  const by = (seg) => completed.filter((e) => e.item.segment === seg).length;
+  const by = (kind) => completed.filter((e) => kindOf(e.item) === kind).length;
   // per list, per status: { anime: { watching: 3, completed: 9, … }, manga: {…} }
   const byStatus = { anime: {}, manga: {} };
   entries.forEach((e) => {
@@ -754,9 +755,13 @@ export async function getStats() {
     byStatus[seg][e.status] = (byStatus[seg][e.status] || 0) + 1;
   });
   return {
-    totalCompleted: completed.length,
+    // Content consumed: what the ranks count. Everything finished, of every kind, so a movie counts as much as a manga.
+    totalCompleted: completed.length + seen.length,
     anime: by("anime"),
     manga: by("manga"),
+    novel: by("novel"),
+    movie: seen.filter((e) => e.item.segment === "movie").length,
+    tv: seen.filter((e) => e.item.segment === "tv").length,
     tracking: entries.length,
     episodesWatched: sum("anime"),
     chaptersRead: sum("manga"),
@@ -821,42 +826,46 @@ export async function fillKinds(found) {
 
 /* ---------- tiers ---------- */
 
-// Ranks, by anime Completed + manga Finished. The gaps start
-// at 60 and grow, so each rank takes longer than the last.
+// Ranks, by Content consumed: everything you have finished, whatever it is (anime, manga, novels, movies
+// and TV). The gaps start at 60 and grow, so each rank takes longer than the last.
 export const TIERS = [
-  { key: "newbie", label: "Newbie", min: 0, color: "#9ca3af",
-    title: "You are a Newbie", message: "Welcome to VoidPop. Complete anime and finish manga to climb the ranks." },
+  { key: "newbie", label: "Newbie", min: 1, color: "#9ca3af",
+    title: "You are a Newbie", message: "Welcome to VoidPop. Finish anime, manga, novels, movies and TV to climb the ranks." },
   { key: "rookie", label: "Rookie", min: 5, color: "#60a5fa",
-    title: "You are a Rookie", message: "5 anime completed and manga finished. You've started something." },
+    title: "You are a Rookie", message: "5 titles consumed. You've started something." },
   { key: "amateur", label: "Amateur", min: 10, color: "#38bdf8",
-    title: "You are an Amateur", message: "10 anime completed and manga finished. It's becoming a habit." },
+    title: "You are an Amateur", message: "10 titles consumed. It's becoming a habit." },
   { key: "collector", label: "Collector", min: 25, color: "#22d3ee",
-    title: "You are a Collector", message: "25 anime completed and manga finished. That's the start of a proper collection." },
+    title: "You are a Collector", message: "25 titles consumed. That's the start of a proper collection." },
   { key: "critic", label: "Critic", min: 60, color: "#2dd4bf",
-    title: "You are a Critic", message: "60 anime completed and manga finished. Your verdicts carry weight now." },
+    title: "You are a Critic", message: "60 titles consumed. Your verdicts carry weight now." },
   { key: "seasonkeeper", label: "Season Keeper", min: 130, color: "#34d399",
-    title: "You are a Season Keeper", message: "130 anime completed and manga finished. You keep up with every season." },
+    title: "You are a Season Keeper", message: "130 titles consumed. You keep up with every season." },
   { key: "seasonmaster", label: "Season Master", min: 210, color: "#10b981",
-    title: "You are a Season Master", message: "210 anime completed and manga finished. Seasons answer to you now." },
+    title: "You are a Season Master", message: "210 titles consumed. Seasons answer to you now." },
   { key: "relentless", label: "Relentless Watcher", min: 300, color: "#a3e635",
-    title: "You are a Relentless Watcher", message: "300 anime completed and manga finished. Nothing slows you down." },
+    title: "You are a Relentless Watcher", message: "300 titles consumed. Nothing slows you down." },
   { key: "champion", label: "Champion", min: 490, color: "#facc15",
-    title: "You are a Champion", message: "490 anime completed and manga finished. Very few get this far." },
+    title: "You are a Champion", message: "490 titles consumed. Very few get this far." },
   { key: "elite", label: "Elite", min: 700, color: "#f59e0b",
-    title: "You are Elite", message: "700 anime completed and manga finished. People ask you what to watch." },
+    title: "You are Elite", message: "700 titles consumed. People ask you what to watch." },
   { key: "legend", label: "Legend", min: 1000, color: "#fb923c",
-    title: "You are a Legend", message: "1,000 anime completed and manga finished. A thousand stories, and counting." },
+    title: "You are a Legend", message: "1,000 titles consumed. A thousand stories, and counting." },
   { key: "mythic", label: "Mythic", min: 1500, color: "#f43f5e",
-    title: "You are Mythic", message: "1,500 anime completed and manga finished. They tell stories about you now." },
+    title: "You are Mythic", message: "1,500 titles consumed. They tell stories about you now." },
   { key: "unrivalled", label: "Unrivalled", min: 2000, color: "#ec4899",
-    title: "You are Unrivalled", message: "2,000 anime completed and manga finished. No one is close." },
+    title: "You are Unrivalled", message: "2,000 titles consumed. No one is close." },
   { key: "godly", label: "Godly", min: 3000, color: "#e879f9",
-    title: "You are Godly", message: "3,000 anime completed and manga finished. This is beyond human." },
+    title: "You are Godly", message: "3,000 titles consumed. This is beyond human." },
   { key: "addicted", label: "Addicted", min: 3500, color: "#a855f7",
-    title: "You have become an Addict", message: "3,500 anime completed and manga finished. Seriously: take a break, drink some water, go outside." },
+    title: "You have become an Addict", message: "3,500 titles consumed. Seriously: take a break, drink some water, go outside." },
 ];
 
-export const tierFor = (n) => [...TIERS].reverse().find((t) => n >= t.min) || TIERS[0];
+// Before your first finished title you have no rank at all: Newbie is earned, not given. (It is not in TIERS, so
+// it never counts as a rank collected and is never celebrated.)
+export const UNRANKED = { key: "unranked", label: "Unranked", min: 0, color: "#6b7280",
+  title: "You have no rank yet", message: "Finish your first title to become a Newbie." };
+export const tierFor = (n) => [...TIERS].reverse().find((t) => n >= t.min) || UNRANKED;
 
 export async function getUserTier() {
   const stats = await getStats();
