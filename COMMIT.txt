@@ -1,3 +1,0 @@
-Widgets: Pending view (4x4) and Pending (4x2) with arrows
-
-Exactly two Android home-screen widgets. Pending view (4x4, the existing list widget updated): every ongoing show, pending ones first, each with its pending count and next episode. Pending (4x2): the shows with pending episodes one at a time, longest-waiting first, with arrows to go to the next; no upcoming episodes. Ongoing only: finished shows under You are watching are not counted. Includes the login, rank and backup update.

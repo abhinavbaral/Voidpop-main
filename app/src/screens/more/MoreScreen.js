@@ -4,13 +4,16 @@
 // Appearance (theme, colour, name) and Settings (24-hour clock, countdown badges,
 // episode alerts, welcome tour),
 // Help and About (MorePageScreen).
+// When a VoidPop server is set up, the account rows sit next to Sync: someone who is not signed in (a guest, or
+// anyone who skipped the login screen) sees "Sign in"; someone signed in sees "Account" (their username) and "Log out".
 
 import { ScrollView, View, Text, Pressable, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import { getUserTier } from "@voidpop/shared/backend/store";
-import { hasCommunity } from "@voidpop/shared/api/community";
+import { logout } from "@voidpop/shared/api/community";
+import { useAccount } from "@voidpop/shared/backend/useCommunity";
 import { useTheme } from "../../context/ThemeContext.js";
 import Voidmon from "../../components/brand/Voidmon.js";
 import AnimatedBanner from "../../components/brand/AnimatedBanner.js";
@@ -20,7 +23,7 @@ import OtherPopup from "../../components/more/OtherPopup.js";
 const GROUPS = [
   [["statistics", "stats", "Statistics"], ["compare", "list", "Compare"], ["data", "storage", "Data and storage"]],
   [["other", "menu", "Other"]], // opens a popup with You're watching and New announcements
-  [["anilist", "sync", "Sync"], ["account", "profile", "Account"]],
+  [["anilist", "sync", "Sync"], ["account", "profile", "Account"]], // the account rows are worked out below (Sign in / Account + Log out)
   [["appearance", "palette", "Appearance"], ["settings", "settings", "Settings"], ["help", "help", "Help"], ["about", "info", "About"]],
 ];
 
@@ -29,6 +32,34 @@ export default function MoreScreen({ navigation }) {
   const styles = makeStyles(C);
   const [rank, setRank] = useState(null);
   const [otherOpen, setOtherOpen] = useState(false);
+  const { user, ready, enabled } = useAccount();
+  const [confirmLogout, setConfirmLogout] = useState(false); // logging out takes two taps, since Alert doesn't exist on web
+  useEffect(() => {
+    if (!confirmLogout) return undefined;
+    const t = setTimeout(() => setConfirmLogout(false), 4000);
+    return () => clearTimeout(t);
+  }, [confirmLogout]);
+
+  // the rows of a group: the Account row turns into "Sign in", or "Account" and "Log out"
+  const rowsOf = (group) => group.flatMap(([page, icon, label]) => {
+    if (page !== "account") return [{ page, icon, label }];
+    if (!enabled || !ready) return [];
+    if (!user) return [{ page: "signin", icon: "login", label: "Sign in", sub: "Comments, shared Void Verdicts and cloud backup" }];
+    return [
+      { page: "account", icon: "profile", label: "Account", sub: user.username },
+      { page: "logout", icon: "logout", label: confirmLogout ? "Tap again to log out" : "Log out", danger: confirmLogout },
+    ];
+  });
+  const open = (page) => {
+    if (page === "other") setOtherOpen(true);
+    else if (page === "signin") navigation.navigate("SignIn", { inApp: true }); // the same login page; backs up a guest's library first, then returns here
+    else if (page === "account") navigation.navigate("Account");
+    else if (page === "logout") {
+      if (!confirmLogout) { setConfirmLogout(true); return; }
+      setConfirmLogout(false);
+      logout().catch(() => {}); // signed out; the app carries on in guest mode with everything still on this phone
+    } else navigation.navigate("MorePage", { page });
+  };
   useFocusEffect(useCallback(() => {
     getUserTier().then(setRank).catch(() => {});
   }, []));
@@ -55,14 +86,18 @@ export default function MoreScreen({ navigation }) {
         </View>
         {GROUPS.map((group, i) => (
           <View key={i} style={styles.group}>
-            {group.filter(([page]) => page !== "account" || hasCommunity()).map(([page, icon, label]) => (
+            {rowsOf(group).map(({ page, icon, label, sub, danger }) => (
               <Pressable
                 key={page}
                 style={({ pressed }) => [styles.row, pressed && { backgroundColor: C.card }]}
-                onPress={() => (page === "other" ? setOtherOpen(true) : page === "account" ? navigation.navigate("Account") : navigation.navigate("MorePage", { page }))}
+                onPress={() => open(page)}
+                accessibilityRole="button"
               >
-                <View style={styles.icon}><Icon name={icon} size={21} color={C.purple} /></View>
-                <Text style={[styles.label, { flex: 1 }]}>{label}</Text>
+                <View style={styles.icon}><Icon name={icon} size={21} color={danger ? C.rose : C.purple} /></View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.label, danger && { color: C.rose }]}>{label}</Text>
+                  {!!sub && <Text style={styles.sub} numberOfLines={1}>{sub}</Text>}
+                </View>
               </Pressable>
             ))}
           </View>
@@ -82,4 +117,5 @@ const makeStyles = (C) => StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", gap: 22, paddingHorizontal: 22, paddingVertical: 16 },
   icon: { width: 24, alignItems: "center" },
   label: { color: C.text, fontSize: 16, fontWeight: "600" },
+  sub: { color: C.sub, fontSize: 12, marginTop: 2 },
 });
