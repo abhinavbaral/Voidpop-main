@@ -59,16 +59,29 @@
           "widgets": [
             {
               "name": "NextEpisodes",
-              "label": "VoidPop · Next episodes",
-              "description": "Countdowns for up to 30 anime you follow",
+              "label": "VoidPop · Pending view",
+              "description": "Your ongoing shows with how many episodes are pending and when the next one airs",
               "minWidth": "250dp",
-              "minHeight": "180dp",
+              "minHeight": "250dp",
               "targetCellWidth": 4,
-              "targetCellHeight": 3,
+              "targetCellHeight": 4,
               "maxResizeHeight": "600dp",
               "resizeMode": "horizontal|vertical",
               "updatePeriodMillis": 1800000,
-              "previewImage": "./assets/widget-preview.png"
+              "previewImage": "./assets/widget-preview-view.png"
+            },
+            {
+              "name": "PendingPager",
+              "label": "VoidPop · Pending",
+              "description": "Shows with pending episodes, one at a time. Tap the arrows for the next one",
+              "minWidth": "250dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 4,
+              "targetCellHeight": 2,
+              "maxResizeHeight": "180dp",
+              "resizeMode": "horizontal|vertical",
+              "updatePeriodMillis": 1800000,
+              "previewImage": "./assets/widget-preview-pager.png"
             }
           ]
         }

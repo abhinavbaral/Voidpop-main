@@ -48,7 +48,10 @@ open it and use it. Accounts, comments and community verdicts switch on when you
 - **Verdict recommendations:** "Peak like X", "Dive in like X", "One time like X" (Void It gets none)
 - **Add to calendar:** the phone's own event screen (app), Google Calendar or an .ics file (website), weekly for the remaining episodes
 - **Share a countdown** as an image
-- **Android widget** with the next episode of up to 30 shows you follow (needs the APK; not available in Expo Go)
+- **Android widgets** (need the APK; not available in Expo Go). There are two:
+  - **Pending view (4x4):** every ongoing show you follow, pending ones first. Each row shows how many episodes are pending ("3 episodes pending") and the next episode with its air time
+  - **Pending (4x2):** the shows with pending episodes, one at a time, the longest-waiting first, with arrows on each side to go to the next one (no upcoming episodes here)
+  Pending counts only ongoing shows you are Watching, not the finished ones under More → You're watching. Widgets are part of the built app, so a new build is needed to add or change them
 - **Where to watch / read:** official streaming and reading services for each title (from AniList)
 - **Episode alerts (app):** a notification when an episode airs for anything you follow or are Excited about
 - **Automatic backups (Android, Mihon-style):** pick a folder once; backups run on a schedule (12h / daily / weekly),
@@ -203,7 +206,10 @@ on Windows and on EAS's servers, which broke builds.)
 - **Verdict recommendations:** "Peak like X", "Dive in like X", "One time like X" (Void It gets none)
 - **Add to calendar:** the phone's own event screen (app), Google Calendar or an .ics file (website), weekly for the remaining episodes
 - **Share a countdown** as an image
-- **Android widget** with the next episode of up to 30 shows you follow (needs the APK; not available in Expo Go)
+- **Android widgets** (need the APK; not available in Expo Go). There are two:
+  - **Pending view (4x4):** every ongoing show you follow, pending ones first. Each row shows how many episodes are pending ("3 episodes pending") and the next episode with its air time
+  - **Pending (4x2):** the shows with pending episodes, one at a time, the longest-waiting first, with arrows on each side to go to the next one (no upcoming episodes here)
+  Pending counts only ongoing shows you are Watching, not the finished ones under More → You're watching. Widgets are part of the built app, so a new build is needed to add or change them
 - **Where to watch / read:** official streaming and reading services for each title (from AniList)
 - **Episode alerts (app):** a notification when an episode airs for anything you follow or are Excited about
 - **Automatic backups (Android, Mihon-style):** pick a folder once; backups run on a schedule (12h / daily / weekly),
