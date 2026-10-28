@@ -12,6 +12,7 @@ import { exportData, importData, mergeData, getLibrary, getLibraryAll, getReview
 const ACCOUNT_KEY = "voidpop:account:v1";
 const SYNC_KEY = "voidpop:sync-version:v1";
 const CHOICE_KEY = "voidpop:auth-choice:v1"; // "guest" once someone has chosen to go on without an account
+const ASKED_KEY = "voidpop:signin-asked:v1"; // the last verdict milestone a guest was asked "Want to sign in?" at
 
 let baseUrl = "";
 export function configureCommunity({ baseUrl: url } = {}) {
@@ -24,6 +25,7 @@ export const hasCommunity = () => !!baseUrl;
 let account = null;        // { token, user } or null
 let choice = null;         // "guest" or null (not chosen yet)
 let loading = null;        // the one read of the saved login, shared by everyone who asks
+let asked = 0;             // the highest verdict milestone already asked at
 const listeners = new Set();
 const emit = () => listeners.forEach((fn) => { try { fn(account?.user ?? null); } catch { /* a bad listener mustn't break others */ } });
 
@@ -45,6 +47,7 @@ export async function loadAccount() {
       account = a?.token && a?.user ? a : null;
     } catch { account = null; }
     try { choice = (await readKey(CHOICE_KEY)) === "guest" ? "guest" : null; } catch { choice = null; }
+    try { asked = Number(await readKey(ASKED_KEY)) || 0; } catch { asked = 0; }
     emit();
   })();
   await loading; // a second caller waits for the read instead of seeing "nobody" while it is still going
@@ -55,6 +58,36 @@ export async function loadAccount() {
 export async function chooseGuest() {
   choice = "guest";
   await writeKey(CHOICE_KEY, "guest");
+}
+// While someone uses the app without an account they are asked "Want to sign in?" at their 1st verdict, then at every
+// 30 more: 1, 30, 60, 90... The milestone a count has reached (0 = none yet). Reaching it again later asks nothing new.
+export const askMilestone = (count) => (count < 1 ? 0 : count < 30 ? 1 : Math.floor(count / 30) * 30);
+
+// → { milestone, count } when the person should be asked now, else null. Only on a build with a server (nothing to sign in
+// to otherwise) and only while signed out. A count that jumps past a milestone (an import) still asks once, at the latest one.
+export async function nextSignInAsk() {
+  await loadAccount();
+  if (!hasCommunity() || account) return null;
+  const count = (await localVerdicts()).length;
+  const milestone = askMilestone(count);
+  return milestone > asked ? { milestone, count } : null;
+}
+// Call when the question is shown: it is asked once per milestone, whatever the answer.
+export async function markSignInAsked(milestone) {
+  asked = Math.max(asked, milestone);
+  await writeKey(ASKED_KEY, String(asked));
+}
+
+// Someone who picked Guest mode and hasn't signed in since: the welcome screen asks them, gently, whether they want to.
+export async function isGuest() {
+  await loadAccount();
+  return !account && choice === "guest";
+}
+// Should the welcome screen say "Login"? Anyone who isn't signed in and hasn't chosen guest mode, server or not: the login screen
+// itself says when accounts aren't available yet, and offers Guest mode.
+export async function shouldOfferLogin() {
+  await loadAccount();
+  return !account && choice !== "guest";
 }
 // Show the sign-in screen? Only when there is a server to sign in to, nobody is signed in, and they haven't chosen guest.
 // (A login that expired counts as signed out and no guest choice: they are asked again.)

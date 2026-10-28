@@ -44,6 +44,8 @@ async function saveConfig(patch) {
 }
 
 export const setFrequency = (freq) => saveConfig({ freq });
+// A backup made another way (the iPhone share sheet) still counts as "backed up just now" for the sign-in check
+export const markBackedUp = () => saveConfig({ last: new Date().toISOString() });
 
 // A readable name for a SAF folder URI, e.g. ".../tree/primary%3ADownload%2FVoidPop" → "Download/VoidPop"
 function folderName(uri) {

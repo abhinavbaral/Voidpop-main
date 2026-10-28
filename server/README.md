@@ -24,11 +24,26 @@ signed out on every restart.
 | website (`web/.env.local`) | `VITE_VOIDPOP_API=http://localhost:8787` |
 | app (`app/.env`) | `EXPO_PUBLIC_VOIDPOP_API=http://<your computer's address>:8787` (a phone can't reach `localhost`) |
 
+### Trying login on a phone
+
+1. Start the server (`npm run server`, from the repo root).
+2. Give the app its address in `app/.env`: `EXPO_PUBLIC_VOIDPOP_API=https://...` (no trailing slash). It is read when you run
+   `eas update` or `eas build`, so run one again after changing it. Without it the app has no server: the **Login** screen
+   says so and only Guest mode works.
+3. **A release APK refuses plain `http://` addresses on Android.** For testing, put the server behind an https tunnel
+   (e.g. `npx localtunnel --port 8787`, or `cloudflared tunnel --url http://localhost:8787`) and use that https address.
+   A real deployment gets https from its host anyway.
+4. The server keeps accounts in a file (`server/data/voidpop.db`). A host without a persistent disk loses every account
+   on each redeploy.
+
+On the Login screen a button that can't work yet (server not set up, Google/Apple not switched on, an APK older than the
+Google library, Apple on Android) looks muted and says why when tapped.
+
 ## Sign in with Google / Apple (and guest)
 
 Email + password works out of the box. Google and Apple are **off until you set their client ids**; the
-app only shows a button when the server has that sign-in on *and* the phone can do it. Anyone can also
-**continue as a guest**: no account, everything stays on the phone, as before.
+Login screen only makes a button work when the server has that sign-in on *and* the phone can do it. Anyone can also
+use **Guest mode**: no account, everything stays on the phone, as before.
 
 How it works: the phone asks Google/Apple who you are and gets a signed token; the server checks the
 signature, that it was issued for *your* app, and that it hasn't expired ([`src/oidc.js`](src/oidc.js)).

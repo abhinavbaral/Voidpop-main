@@ -16,6 +16,7 @@ import useBackgroundChores from "./src/hooks/useBackgroundChores";
 import useInitialRoute from "./src/hooks/useInitialRoute";
 import OfflineBanner from "./src/components/ui/OfflineBanner";
 import RankUp from "./src/components/library/RankUp";
+import SignInNudge from "./src/components/account/SignInNudge";
 
 function ThemedApp() {
   const { C, dark } = useTheme();
@@ -36,6 +37,7 @@ function ThemedApp() {
       <RootNavigator initialRouteName={initialRoute} />
       <OfflineBanner />
       <RankUp />
+      <SignInNudge />
     </NavigationContainer>
   );
 }

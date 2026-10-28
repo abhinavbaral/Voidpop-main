@@ -25,3 +25,14 @@ export function sortBackups(files) {
     return String(b.name).localeCompare(String(a.name));
   });
 }
+
+// Before someone without an account signs in, their library gets a backup first: signing in combines it with the
+// account, so keep a copy of what is on the phone. Only when there is something to lose (titles on the phone), only
+// while nobody is signed in, and not when a backup from the last day already exists (the daily automatic one counts).
+export const FRESH_BACKUP_MS = 24 * 3600e3;
+export function needsBackupFirst({ signedIn, titles, lastBackup, now = Date.now() }) {
+  if (signedIn || !(titles > 0)) return false;
+  const t = lastBackup ? new Date(lastBackup).getTime() : NaN;
+  const age = now - t;
+  return !(Number.isFinite(t) && age < FRESH_BACKUP_MS && age > -60000); // a backup dated in the future isn't trusted
+}

@@ -1,21 +1,21 @@
-// Every way into an account, in one place: email + password (sign in or create account), Sign in with Apple (iOS),
-// Sign in with Google, and "Continue as guest". Used by the sign-in screen and by More → Account.
-// The look follows the VoidPop theme (colours come from the theme, so Void, Ember, Sakura... all apply).
-// A social button only appears when the server has that sign-in set up AND this phone can do it.
+// Every way into an account, in one place: email + password (Login or Sign up), Log in with Google, Log in with Apple,
+// and Guest mode. Used by the login screen and by More → Account. Colours come from the theme (Void, Ember, Sakura...).
+//
+// The Google and Apple buttons are always shown here. When one can't work yet (no server set up, not switched on, this build
+// is older than the library, Apple on Android) it looks muted and tells you why when tapped, instead of silently doing nothing.
 import { useEffect, useState } from "react";
-import { ActivityIndicator, View, Text, TextInput, TouchableOpacity, StyleSheet } from "react-native";
-import * as AppleAuthentication from "expo-apple-authentication";
-import { ApiError, register, login, loginWithGoogle, loginWithApple, fetchProviders } from "@voidpop/shared/api/community";
+import { ActivityIndicator, Platform, View, Text, TextInput, TouchableOpacity, StyleSheet } from "react-native";
+import { ApiError, register, login, loginWithGoogle, loginWithApple, fetchProviders, hasCommunity } from "@voidpop/shared/api/community";
 import { useTheme } from "../../context/ThemeContext.js";
-import { googleConfigured, signInWithGoogle, appleAvailable, signInWithApple } from "../../services/socialSignIn.js";
+import { appleModule, googleConfigured, googleSupported, signInWithGoogle, appleAvailable, signInWithApple } from "../../services/socialSignIn.js";
 
-const humanError = (e, label) => (e instanceof ApiError ? e.message : `Couldn't sign in with ${label}. Try again.`);
+const humanError = (e, label) => (e instanceof ApiError || e?.message ? e.message : `Couldn't log in with ${label}. Try again.`);
 
-// connect: you are already signed in and are adding Google/Apple to this account. skip: providers already connected.
-// divider: an "or" line above the buttons (only drawn when there is a button to show).
-export function SocialButtons({ connect = false, skip = [], heading, divider = false, onDone, onError }) {
+// connect: you are already signed in and are adding Google/Apple to this account (unavailable buttons are hidden, not explained).
+// showAll: show both buttons even when one can't work yet. skip: providers already connected. divider: an "or" line above.
+export function SocialButtons({ connect = false, showAll = false, skip = [], heading, divider = false, onDone, onError }) {
   const { C, dark } = useTheme();
-  const [providers, setProviders] = useState({ google: false, apple: false });
+  const [providers, setProviders] = useState(null); // null = still asking the server
   const [appleOk, setAppleOk] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -26,12 +26,27 @@ export function SocialButtons({ connect = false, skip = [], heading, divider = f
     return () => { live = false; };
   }, []);
 
-  const showGoogle = providers.google && googleConfigured() && !skip.includes("google");
-  const showApple = providers.apple && appleOk && !skip.includes("apple");
-  if (!showGoogle && !showApple) return null;
+  // why a button can't work right now; null = it can
+  const whyNot = (kind) => {
+    if (!hasCommunity()) return "Login needs the VoidPop server, which this version of the app isn't connected to yet. Guest mode works fully.";
+    if (!providers) return "One moment, checking what is available. Try again.";
+    if (!providers[kind]) return `${kind === "google" ? "Google" : "Apple"} login isn't switched on on the server yet.`;
+    if (kind === "google") {
+      if (!googleConfigured()) return "Google login isn't set up in this version yet.";
+      if (!googleSupported()) return "Google login needs the latest version of the app.";
+      return null;
+    }
+    if (Platform.OS !== "ios") return "Apple login is only available on iPhone and iPad.";
+    if (!appleModule()) return "Apple login needs the latest version of the app.";
+    return appleOk ? null : "Sign in with Apple isn't available on this device.";
+  };
+  const show = (kind) => !skip.includes(kind) && (showAll || whyNot(kind) === null);
+  if (!show("google") && !show("apple")) return null;
 
   // get() asks Google/Apple (null = they closed it); send() gives the token to VoidPop
-  const run = (label, get, send) => async () => {
+  const run = (kind, label, get, send) => async () => {
+    const why = whyNot(kind);
+    if (why) { onError?.(why); return; }
     if (busy) return;
     setBusy(true); onError?.("");
     try {
@@ -43,6 +58,8 @@ export function SocialButtons({ connect = false, skip = [], heading, divider = f
     finally { setBusy(false); }
   };
 
+  const ready = (kind) => whyNot(kind) === null;
+  const apple = appleModule();
   return (
     <View style={{ gap: 10, alignSelf: "stretch" }}>
       {divider && (
@@ -53,19 +70,27 @@ export function SocialButtons({ connect = false, skip = [], heading, divider = f
         </View>
       )}
       {!!heading && <Text style={{ color: C.sub, fontSize: 12, fontWeight: "700" }}>{heading}</Text>}
-      {showApple && (
-        <AppleAuthentication.AppleAuthenticationButton
-          buttonType={AppleAuthentication.AppleAuthenticationButtonType[connect ? "CONTINUE" : "SIGN_IN"]}
-          buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle[dark ? "WHITE" : "BLACK"]}
-          cornerRadius={10} style={{ height: 46, opacity: busy ? 0.5 : 1 }}
-          onPress={run("Apple", signInWithApple, loginWithApple)} />
-      )}
-      {showGoogle && (
-        <TouchableOpacity onPress={run("Google", signInWithGoogle, loginWithGoogle)} disabled={busy} accessibilityRole="button"
-          style={[styles.social, { borderColor: C.border }, busy && { opacity: 0.5 }]}>
-          <Text style={{ color: C.text, fontWeight: "800", fontSize: 15 }}>{connect ? "Connect Google" : "Sign in with Google"}</Text>
+
+      {show("google") && (
+        <TouchableOpacity onPress={run("google", "Google", signInWithGoogle, loginWithGoogle)} disabled={busy} accessibilityRole="button"
+          style={[styles.social, { borderColor: C.border }, (busy || !ready("google")) && { opacity: busy ? 0.5 : 0.6 }]}>
+          <Text style={{ color: C.text, fontWeight: "800", fontSize: 15 }}>{connect ? "Connect Google" : "Log in with Google"}</Text>
         </TouchableOpacity>
       )}
+
+      {show("apple") && (ready("apple") && apple?.AppleAuthenticationButton ? (
+        // Apple's own button: Apple decides its wording ("Sign in with Apple")
+        <apple.AppleAuthenticationButton
+          buttonType={apple.AppleAuthenticationButtonType[connect ? "CONTINUE" : "SIGN_IN"]}
+          buttonStyle={apple.AppleAuthenticationButtonStyle[dark ? "WHITE" : "BLACK"]}
+          cornerRadius={10} style={{ height: 46, opacity: busy ? 0.5 : 1 }}
+          onPress={run("apple", "Apple", signInWithApple, loginWithApple)} />
+      ) : (
+        <TouchableOpacity onPress={run("apple", "Apple", signInWithApple, loginWithApple)} accessibilityRole="button"
+          style={[styles.social, { borderColor: C.border, opacity: 0.6 }]}>
+          <Text style={{ color: C.text, fontWeight: "800", fontSize: 15 }}>{connect ? "Connect Apple" : "Log in with Apple"}</Text>
+        </TouchableOpacity>
+      ))}
     </View>
   );
 }
@@ -80,7 +105,7 @@ function Field({ label, C, ...rest }) {
   );
 }
 
-// onDone(user): signed in. onGuest: when given, a "Continue as guest" button is shown (the sign-in screen).
+// onDone(user): signed in. onGuest: when given, a "Guest mode" button is shown (the login screen).
 export default function AuthForm({ onDone, onGuest }) {
   const { C } = useTheme();
   const [mode, setMode] = useState("login");
@@ -88,12 +113,12 @@ export default function AuthForm({ onDone, onGuest }) {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const set = (k) => (v) => setF((x) => ({ ...x, [k]: v }));
-  const login_ = mode === "login";
+  const isLogin = mode === "login";
 
   const submit = async () => {
     setBusy(true); setErr("");
     try {
-      const user = login_
+      const user = isLogin
         ? await login({ identifier: f.identifier.trim(), password: f.password })
         : await register({ email: f.email.trim(), username: f.username.trim(), password: f.password });
       setF((x) => ({ ...x, password: "" }));
@@ -104,9 +129,9 @@ export default function AuthForm({ onDone, onGuest }) {
 
   return (
     <View style={{ gap: 12, alignSelf: "stretch" }}>
-      <Text style={{ color: C.text, fontSize: 20, fontWeight: "700" }} accessibilityRole="header">{login_ ? "Sign in" : "Create account"}</Text>
+      <Text style={{ color: C.text, fontSize: 20, fontWeight: "700" }} accessibilityRole="header">{isLogin ? "Login" : "Sign up"}</Text>
 
-      {login_ ? (
+      {isLogin ? (
         <Field C={C} label="Email or username" value={f.identifier} onChangeText={set("identifier")} textContentType="username" />
       ) : (
         <>
@@ -114,27 +139,27 @@ export default function AuthForm({ onDone, onGuest }) {
           <Field C={C} label="Username (letters, numbers, _)" value={f.username} onChangeText={set("username")} maxLength={24} />
         </>
       )}
-      <Field C={C} label="Password" value={f.password} onChangeText={set("password")} secureTextEntry textContentType={login_ ? "password" : "newPassword"} />
-      {!login_ && <Text style={{ color: C.sub, fontSize: 13, lineHeight: 19 }}>At least 8 characters. Your email is only used to sign in; it is never shown to others.</Text>}
-      {!!err && <Text style={{ color: C.rose, fontSize: 13 }} accessibilityRole="alert">{err}</Text>}
+      <Field C={C} label="Password" value={f.password} onChangeText={set("password")} secureTextEntry textContentType={isLogin ? "password" : "newPassword"} />
+      {!isLogin && <Text style={{ color: C.sub, fontSize: 13, lineHeight: 19 }}>At least 8 characters. Your email is only used to log in; it is never shown to others.</Text>}
+      {!!err && <Text style={{ color: C.rose, fontSize: 13, lineHeight: 19 }} accessibilityRole="alert">{err}</Text>}
 
       {/* a glass button: a see-through wash of the accent colour with an accent border */}
       <TouchableOpacity onPress={submit} disabled={busy} accessibilityRole="button" accessibilityState={{ busy }}
         style={[styles.primary, { backgroundColor: `${C.purple}2e`, borderColor: C.purple }, busy && { opacity: 0.7 }]}>
-        {busy ? <ActivityIndicator color={C.purple} /> : <Text style={{ color: C.text, fontWeight: "800", fontSize: 15 }}>{login_ ? "Sign in" : "Create account"}</Text>}
+        {busy ? <ActivityIndicator color={C.purple} /> : <Text style={{ color: C.text, fontWeight: "800", fontSize: 15 }}>{isLogin ? "Login" : "Sign up"}</Text>}
       </TouchableOpacity>
 
       <Text style={{ textAlign: "center", color: C.sub, fontSize: 13 }}>
-        {login_ ? "New to VoidPop?" : "Already have an account?"}
-        <Text onPress={() => { setMode(login_ ? "register" : "login"); setErr(""); }} accessibilityRole="link"
-          style={{ color: C.purple, fontWeight: "700" }}>{login_ ? "  Create account" : "  Sign in"}</Text>
+        {isLogin ? "New to VoidPop?" : "Already have an account?"}
+        <Text onPress={() => { setMode(isLogin ? "register" : "login"); setErr(""); }} accessibilityRole="link"
+          style={{ color: C.purple, fontWeight: "700" }}>{isLogin ? "  Sign up" : "  Login"}</Text>
       </Text>
 
-      <SocialButtons divider onDone={onDone} onError={setErr} />
+      <SocialButtons divider showAll onDone={onDone} onError={setErr} />
 
       {onGuest && (
         <TouchableOpacity onPress={onGuest} accessibilityRole="button" style={[styles.guest, { borderColor: C.border }]}>
-          <Text style={{ color: C.sub, fontWeight: "700" }}>Continue as guest</Text>
+          <Text style={{ color: C.text, fontWeight: "700" }}>Guest mode</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -144,7 +169,7 @@ export default function AuthForm({ onDone, onGuest }) {
 const styles = StyleSheet.create({
   social: { height: 46, borderRadius: 10, borderWidth: 2, alignItems: "center", justifyContent: "center" },
   primary: { borderWidth: 2, borderRadius: 10, minHeight: 46, paddingHorizontal: 16, alignItems: "center", justifyContent: "center" },
-  guest: { borderWidth: 2, borderRadius: 10, minHeight: 44, alignItems: "center", justifyContent: "center", borderStyle: "dashed" },
+  guest: { borderWidth: 2, borderRadius: 10, minHeight: 46, alignItems: "center", justifyContent: "center", borderStyle: "dashed" },
   divider: { flexDirection: "row", alignItems: "center", gap: 10 },
   line: { flex: 1, height: 1 },
 });

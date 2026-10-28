@@ -1,31 +1,43 @@
 // The first screen on every launch: a drifting wall of anime covers and an arrow
 // button (App starts here, see hooks/useInitialRoute). Also opened from
 // More > Help > Welcome tour.
-// The button says "Login" and opens the sign-in page (email, Google, Apple, or Continue as guest) while there is a
-// VoidPop server and nobody is signed in or chose guest; otherwise it says "Let's go" and goes to Main, or to
-// Onboarding on a first run and for the tour.
+// The button goes to Main, or to Onboarding on a first run and for the tour.
 import { useEffect, useState } from "react";
-import { Image, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CoverWall from "../../components/welcome/CoverWall";
 import ArrowButton from "../../components/welcome/ArrowButton";
 import { useLogo } from "../../components/brand/Brand";
 import { isOnboarded } from "@voidpop/shared/backend/store";
-import { shouldAskSignIn } from "@voidpop/shared/api/community";
+import { shouldOfferLogin, isGuest, hasCommunity } from "@voidpop/shared/api/community";
 import { getCoversForWelcome } from "../../services/swipeCovers";
 
 const COPY = {
   title: "Track every anime, manga and novel",
   sub: "Discover new stories, keep up with your favorites, and never miss a release. All in one place.",
-  button: "Let’s go",
-  login: "Login",
+  button: "Continue", // for someone already signed in or in guest mode, and for the tour; everyone else sees "Login"
 };
 
 export default function WelcomeScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const logo = useLogo();
   const [covers, setCovers] = useState(null);
-  const [ask, setAsk] = useState(false); // true: the button is "Login" (not signed in, not a guest, and there is a server)
+  const [offerLogin, setOfferLogin] = useState(null); // null until we know: true = the button says "Login"
+  const tour = !!route?.params?.tour;
+  const [askSignIn, setAskSignIn] = useState(false); // a guest, on a build with a server: "Want to sign in?"
+
+  useEffect(() => {
+    let live = true;
+    if (!tour) isGuest().then((g) => live && setAskSignIn(g && hasCommunity())).catch(() => {});
+    return () => { live = false; };
+  }, [tour]);
+
+  useEffect(() => {
+    let live = true;
+    if (tour) setOfferLogin(false);
+    else shouldOfferLogin().then((v) => live && setOfferLogin(v)).catch(() => live && setOfferLogin(false));
+    return () => { live = false; };
+  }, [tour]);
 
   useEffect(() => {
     let live = true;
@@ -33,18 +45,12 @@ export default function WelcomeScreen({ navigation, route }) {
     return () => { live = false; };
   }, []);
 
-  useEffect(() => {
-    let live = true;
-    if (!route?.params?.tour) shouldAskSignIn().then((v) => live && setAsk(!!v)).catch(() => {});
-    return () => { live = false; };
-  }, [route?.params?.tour]);
-
   // replace, not navigate: Welcome leaves the stack. Returning users go straight
   // to Main; a first run (or the tour from More) goes through Onboarding, which
   // lands on Main (first run) or goes back to More (the tour) when it finishes.
   const start = async () => {
-    // a build with a VoidPop server: offer sign-in (or guest) first, once. Not for the tour from More.
-    if (!route?.params?.tour && await shouldAskSignIn().catch(() => false)) { navigation.replace("SignIn"); return; }
+    // someone who hasn't signed in or chosen guest mode: "Login" opens the login screen (email, Google, Apple, Guest mode)
+    if (offerLogin) { navigation.replace("SignIn"); return; }
     const done = await isOnboarded().catch(() => true); // can't read it: don't trap the user in Onboarding
     if (done && !route?.params?.tour) navigation.replace("Main");
     else navigation.replace("Onboarding");
@@ -57,7 +63,13 @@ export default function WelcomeScreen({ navigation, route }) {
         <Image source={logo} style={s.logo} resizeMode="contain" accessibilityLabel="VoidPop" />
         <Text style={s.title} accessibilityRole="header">{COPY.title}</Text>
         <Text style={s.sub}>{COPY.sub}</Text>
-        <ArrowButton label={ask ? COPY.login : COPY.button} onPress={start} />
+        {offerLogin !== null && <ArrowButton label={offerLogin ? "Login" : COPY.button} onPress={start} />}
+        {/* picked Guest mode earlier: remembered, and asked again here each launch, without getting in the way */}
+        {askSignIn && (
+          <Pressable onPress={() => navigation.replace("SignIn")} accessibilityRole="button" hitSlop={10} style={s.ask}>
+            <Text style={s.askText}>Want to sign in?</Text>
+          </Pressable>
+        )}
       </View>
     </View>
   );
@@ -69,4 +81,6 @@ const s = StyleSheet.create({
   logo: { width: 72, height: 72 },
   title: { color: "#fff", fontSize: 36, fontWeight: "800", textAlign: "center", lineHeight: 42, marginTop: 10 },
   sub: { color: "rgba(255,255,255,0.78)", fontSize: 16, lineHeight: 23, textAlign: "center", marginBottom: 18, maxWidth: 340 },
+  ask: { paddingVertical: 6 },
+  askText: { color: "#fff", fontSize: 15, fontWeight: "700", textDecorationLine: "underline" },
 });

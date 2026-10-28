@@ -27,6 +27,7 @@ after(() => server.close());
 test("with no server set up the sign-in screen is never asked for", async () => {
   assert.equal(c.hasCommunity(), false);
   assert.equal(await c.shouldAskSignIn(), false); // the app works exactly as it did, on the phone
+  assert.equal(await c.shouldOfferLogin(), true);  // ...but the welcome screen still says "Login": that screen explains and offers Guest mode
   assert.deepEqual(await c.fetchProviders(), { google: false, apple: false });
 });
 
@@ -36,6 +37,8 @@ test("with a server and nobody signed in: ask once; \"guest\" is remembered", as
   assert.deepEqual(await c.fetchProviders(), { google: true, apple: false });
   await c.chooseGuest();
   assert.equal(await c.shouldAskSignIn(), false);
+  assert.equal(await c.shouldOfferLogin(), false);     // guest chosen: the welcome button is "Continue" from now on
+  assert.equal(await c.isGuest(), true);               // ...and the welcome screen asks "Want to sign in?" 
   assert.equal(mem["voidpop:auth-choice:v1"], "guest"); // saved, so the next launch doesn't ask again
   assert.equal(c.currentUser(), null);               // a guest is simply nobody: everything stays on the phone
   assert.equal(await c.pushVerdict("anime", "1", { verdict: "peak", status: "completed" }), false);
@@ -49,6 +52,8 @@ test("Google sign-in: makes the account, signs this device in, and clears the gu
   assert.equal(c.currentUser().username, "Ria_Sharma");
   assert.equal(mem["voidpop:auth-choice:v1"], undefined);
   assert.equal(await c.shouldAskSignIn(), false); // signed in
+  assert.equal(await c.shouldOfferLogin(), false);
+  assert.equal(await c.isGuest(), false);              // signed in: nobody asks again
   assert.equal(await c.pushVerdict("anime", "1", { verdict: "peak", status: "completed" }), true); // the token works
   off();
   assert.deepEqual(seen, ["Ria_Sharma"]);
@@ -58,6 +63,7 @@ test("signing out leaves you a guest, and the same Google account signs back in 
   const id = c.currentUser().id;
   await c.logout();
   assert.deepEqual([c.currentUser(), await c.shouldAskSignIn()], [null, false]);
+  assert.equal(await c.isGuest(), true);               // signing out leaves you a guest, so you are asked again
   const r = await c.loginWithGoogle(idp.jwt(claims({ name: "Other" })));
   assert.deepEqual([r.isNew, r.user.id], [false, id]);
 });

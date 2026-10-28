@@ -7,7 +7,7 @@ import {
 } from "react-native";
 import { fetchAniListUserList, cacheSize, cacheClear } from "@voidpop/shared/api/anilist";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
 import {
   getUserTier, TIERS, statusesFor, exportData, clearData, storageSize, importAniListEntries,
   celebrate, exportLibraryCsv, exportLibraryMarkdown,
@@ -18,7 +18,7 @@ import { useTheme } from "../../context/ThemeContext.js";
 import { goBackOrHome } from "../../utils/nav";
 import { durationLabel } from "@voidpop/shared/lib/format";
 import {
-  FREQUENCIES, getBackupConfig, setFrequency, chooseFolder, backupNow, restoreFromFile, listBackups, restoreFromUri,
+  FREQUENCIES, getBackupConfig, setFrequency, chooseFolder, backupNow, restoreFromFile, listBackups, restoreFromUri, markBackedUp,
 } from "../../services/backup";
 import { ensurePermission, rescheduleEpisodeAlerts } from "../../services/episodeAlerts";
 import AniListSync from "../../components/library/AniListSync.js";
@@ -325,6 +325,14 @@ function DataStorage({ styles, C }) {
   const [message, setMessage] = useState("");
   const [freqOpen, setFreqOpen] = useState(false);
   const [restoreFiles, setRestoreFiles] = useState(null); // the files in the Voidpop folder, while choosing one
+  // Sent here by the login screen: make a backup first, then it takes you straight back to signing in
+  const navigation = useNavigation();
+  const forSignIn = !!useRoute().params?.forSignIn;
+  const backedUp = async () => {
+    if (!forSignIn) return;
+    await markBackedUp().catch(() => {});
+    navigation.navigate({ name: "SignIn", params: { backedUp: true }, merge: true });
+  };
   const measure = useCallback(() => {
     storageSize().then(setSize);
     cacheSize().then(setOfflineSize);
@@ -344,6 +352,7 @@ function DataStorage({ styles, C }) {
     if (next) {
       const saved = await backupNow().catch(() => null); // first backup right away, so the folder is proven writable
       setMessage(saved ? `Backups go to the ${next.dirName} folder. First one saved as ${saved.lastFile}.` : `Backups will go to the ${next.dirName} folder.`);
+      if (saved) await backedUp();
     }
   });
   const shareFile = async (name, text, mime) => {
@@ -364,6 +373,7 @@ function DataStorage({ styles, C }) {
         setMessage(`Backup saved as ${saved.lastFile} in ${dir.dirName}.`);
       }
       else await shareFile(`voidpop-backup-${new Date().toISOString().slice(0, 10)}.json`, await exportData(), "application/json");
+      await backedUp(); // from the login screen: now on to signing in
     } catch { setMessage("Couldn't create the backup. Choose the backup folder again."); }
   });
   const afterRestore = (err) => {
@@ -430,6 +440,12 @@ function DataStorage({ styles, C }) {
 
   return (
     <>
+      {forSignIn && (
+        <View style={{ borderWidth: 1, borderColor: C.purple, borderRadius: 10, padding: 12, marginBottom: 12 }}>
+          <Text style={[styles.note, { color: C.text, fontWeight: "700" }]}>Before you sign in</Text>
+          <Text style={[styles.note, { fontSize: 13, marginTop: 4 }]}>Tap Create backup to keep a copy of your library. When it is saved you go straight on to signing in.</Text>
+        </View>
+      )}
       {AUTO_BACKUP && cfg && (
         <>
           <Row title="Storage location" sub={cfg.dirUri ? cfg.dirName : "Tap to choose where the Voidpop folder goes, e.g. Documents"} onPress={pickFolder} />
