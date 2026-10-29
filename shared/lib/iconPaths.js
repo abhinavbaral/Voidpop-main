@@ -1,6 +1,9 @@
 // Stroke icons (24×24, drawn with currentColor) shared by the app and the site.
 // No emoji anywhere in the UI — these are the icons.
 export const ICON_PATHS = {
+  ai: "M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 15l1 2.5 2.5 1-2.5 1L19 22l-1-2.5-2.5-1 2.5-1z",
+  send: "M22 2L11 13M22 2l-7 20-4-9-9-4z",
+  cpu: "M9 9h6v6H9zM9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4M7 4H5a1 1 0 0 0-1 1v2M17 4h2a1 1 0 0 1 1 1v2M7 20H5a1 1 0 0 1-1-1v-2M17 20h2a1 1 0 0 0 1-1v-2",
   explore: "M12 3l2.4 5.6L20 11l-5.6 2.4L12 19l-2.4-5.6L4 11l5.6-2.4z",
   browse: "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z",
   schedule: "M12 3a9 9 0 1 1 0 18a9 9 0 0 1 0-18zM12 7v5l3 2",

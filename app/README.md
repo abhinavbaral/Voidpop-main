@@ -18,3 +18,8 @@ The full map is in [../ARCHITECTURE.md](../ARCHITECTURE.md).
 
 Everything else (the library, tiers, the AniList client, countdown formatting) is
 imported from `@voidpop/shared`.
+
+
+## Void AI (Android)
+
+See `../VOID_AI_SETUP.md` for setup and build instructions. Void AI's generative on-device model requires a custom Android build and a compatible `.litertlm` file; Expo Go uses the offline Local Quick Mode only.

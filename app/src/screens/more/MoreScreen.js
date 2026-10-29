@@ -22,7 +22,7 @@ import OtherPopup from "../../components/more/OtherPopup.js";
 
 const GROUPS = [
   [["statistics", "stats", "Statistics"], ["compare", "list", "Compare"], ["data", "storage", "Data and storage"]],
-  [["other", "menu", "Other"]], // opens a popup with You're watching and New announcements
+  [["voidai", "explore", "Void AI"], ["other", "menu", "Other"]], // opens a popup with You're watching and New announcements
   [["anilist", "sync", "Sync"], ["account", "profile", "Account"]], // the account rows are worked out below (Sign in / Account + Log out)
   [["appearance", "palette", "Appearance"], ["settings", "settings", "Settings"], ["help", "help", "Help"], ["about", "info", "About"]],
 ];
@@ -51,7 +51,8 @@ export default function MoreScreen({ navigation }) {
     ];
   });
   const open = (page) => {
-    if (page === "other") setOtherOpen(true);
+    if (page === "voidai") navigation.navigate("VoidAI");
+    else if (page === "other") setOtherOpen(true);
     else if (page === "signin") navigation.navigate("SignIn", { inApp: true }); // the same login page; backs up a guest's library first, then returns here
     else if (page === "account") navigation.navigate("Account");
     else if (page === "logout") {
