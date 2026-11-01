@@ -1,4 +1,4 @@
-﻿{
+{
   "expo": {
     "name": "VoidPop",
     "slug": "voidation",
@@ -14,7 +14,9 @@
     "updates": {
       "url": "https://u.expo.dev/60c0d3f0-5f80-4f55-b21e-9d32892e270f"
     },
-    "android": {},
+    "android": {
+      "package": "com.abhinavbaral.voidation"
+    },
     "ios": {}
   }
 }

@@ -193,12 +193,12 @@ export async function getEntry(segment, id) {
 export const unitFor = (segment) => (segment === "manga" ? "Ch" : "Ep");
 export const totalFor = (item) => (item.segment === "manga" ? item.chapters : item.episodes) ?? null;
 // Episodes out so far: everything before the next one to air, or all of them once finished.
-export function airedFor(item) {
+export function airedFor(item, now = Date.now()) {
   if (item.segment !== "anime") return null;
   if (item.nextEpisode) {
     // a saved "next episode" whose time has passed is out, even before we
     // get fresh data (offline, or the app hasn't checked yet)
-    const out = item.nextEpisode.airingAt <= Date.now() / 1000;
+    const out = item.nextEpisode.airingAt <= now / 1000;
     return item.nextEpisode.episode - (out ? 0 : 1);
   }
   return item.finished ? item.episodes ?? null : null;
@@ -307,8 +307,8 @@ export async function fillCompleted(item) {
 }
 
 // How many aired episodes you haven't watched yet (anime only).
-export function behindBy(entry) {
-  const aired = airedFor(entry.item);
+export function behindBy(entry, now = Date.now()) {
+  const aired = airedFor(entry.item, now);
   if (aired == null) return 0;
   const progress = entry.progress || 0;
   return Math.max(0, aired - progress - countIn(skippedOf(entry), progress + 1, aired));
@@ -566,7 +566,7 @@ export function yourShows(lib, fresh = {}, now = Date.now()) {
       const next = item.nextEpisode && item.nextEpisode.airingAt > nowS ? item.nextEpisode : null;
       return {
         entry, item, next,
-        pending: e.status === "watching" ? behindBy(entry) : 0,
+        pending: e.status === "watching" ? behindBy(entry, now) : 0, // the same "now" as `next` above: the two must agree
         delay: e.delay && e.delay.episode === item.nextEpisode?.episode ? e.delay : null,
       };
     })

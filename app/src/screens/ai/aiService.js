@@ -1,6 +1,6 @@
 import { requireOptionalNativeModule } from "expo-modules-core";
-import { getLibraryAll } from "@voidpop/shared/backend/store";
-import { buildModelPrompt, makeLocalReply } from "./localAssistant";
+import { libraryContext, buildModelPrompt, localReply } from "@voidpop/shared/features/voidAi";
+import { loadEntries } from "./localAssistant";
 
 const nativeRuntime = requireOptionalNativeModule("VoidAiRuntime");
 
@@ -8,23 +8,19 @@ export function getOnDeviceRuntime() {
   return nativeRuntime;
 }
 
-export async function createLibraryContext(maxEntries = 80) {
-  const all = await getLibraryAll().catch(() => ({}));
-  return Object.values(all).filter((entry) => entry?.item).slice(0, maxEntries).map((entry) => {
-    const item = entry.item || {};
-    const title = (typeof item.title === "string" ? item.title : null) ||
-      item.title?.english || item.title?.romaji || item.title?.userPreferred || item.name || "Unknown title";
-    return `${title} | ${entry.status || "unknown"} | ${item.segment || "anime"}`;
-  }).join("\n");
+export async function createLibraryContext(maxLines = 60) {
+  return libraryContext(await loadEntries(), { maxLines });
 }
 
-export async function generateVoidAIReply({ question, modelPath }) {
-  if (!modelPath || !nativeRuntime) return makeLocalReply(question);
-  const context = await createLibraryContext();
-  const prompt = buildModelPrompt(question, context || "The local library is empty.");
+// → { text, local }  local: true = answered without a model (Local Quick Mode), so it isn't kept in the chat the model sees.
+// history: the chat so far, for a model (it remembers nothing between questions).
+export async function generateVoidAIReply({ question, modelPath, history = [] }) {
+  const entries = await loadEntries();
+  if (!modelPath || !nativeRuntime) return { text: localReply(question, entries), local: true };
+  const prompt = buildModelPrompt(question, libraryContext(entries) || "The library is empty.", history);
   const reply = await nativeRuntime.generate(modelPath, prompt);
   if (!reply || !String(reply).trim()) throw new Error("The model returned an empty response.");
-  return String(reply).trim();
+  return { text: String(reply).trim(), local: false };
 }
 
 // Future hosted inference should implement the same input/output contract and

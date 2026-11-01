@@ -13,6 +13,7 @@ import { generateVoidAIReply, getOnDeviceRuntime } from "./aiService";
 
 const HISTORY_KEY = "voidation:void-ai:history:v1";
 const MODEL_KEY = "voidation:void-ai:model-path:v1";
+const MODEL_HEADROOM = 300 * 1024 * 1024; // free space to keep after copying a model in
 const NativeVoidAI = getOnDeviceRuntime();
 const STARTER_PROMPTS = [
   "What can you help me with?",
@@ -33,6 +34,7 @@ export default function VoidAIScreen({ navigation }) {
       id: "welcome",
       role: "assistant",
       text: "Hey, I'm Void AI. I can help you explore your Voidation library. Load a compatible on-device model for generative chat, or try Local Quick Mode for basic library questions.",
+      skip: true, // greetings, canned answers and errors are not part of the chat a model is shown
     },
   ]);
   const [input, setInput] = useState("");
@@ -71,6 +73,7 @@ export default function VoidAIScreen({ navigation }) {
   }, [messages]);
 
   const loadModel = useCallback(async () => {
+    if (busy) return; // a model loading or answering already holds the phone's memory: a second one at once could run it out
     if (!NativeVoidAI) {
       Alert.alert(
         "Native runtime not available",
@@ -78,25 +81,36 @@ export default function VoidAIScreen({ navigation }) {
       );
       return;
     }
+    let temp = null;
     try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: "*/*",
-        copyToCacheDirectory: true,
-        multiple: false,
-      });
+      // copyToCacheDirectory: false. With true the picker first copies the whole model (gigabytes) into the cache, and we
+      // would then copy it AGAIN below: three copies on the phone at once, and the cache one is never cleaned up.
+      const result = await DocumentPicker.getDocumentAsync({ type: "*/*", copyToCacheDirectory: false, multiple: false });
       if (result.canceled || !result.assets?.[0]) return;
       const asset = result.assets[0];
       if (!String(asset.name || "").toLowerCase().endsWith(".litertlm")) {
         Alert.alert("Unsupported model file", "Choose a LiteRT-LM model file ending in .litertlm.");
         return;
       }
-      const destination = `${FileSystem.documentDirectory}void-ai-model.litertlm`;
+      // check there is room BEFORE copying, so a copy that can't finish doesn't leave the phone full
+      const free = await FileSystem.getFreeDiskStorageAsync().catch(() => null);
+      if (asset.size && free != null && free < asset.size + MODEL_HEADROOM) {
+        const gb = (n) => (n / 1e9).toFixed(1);
+        Alert.alert("Not enough storage", `This model needs about ${gb(asset.size)} GB and the phone has ${gb(free)} GB free. Free some space and try again.`);
+        return;
+      }
       setModelError("");
-      await FileSystem.deleteAsync(destination, { idempotent: true }).catch(() => {});
-      await FileSystem.copyAsync({ from: asset.uri, to: destination });
-      // Verify the native runtime can open the model before saving it as active.
       setBusy(true);
-      await NativeVoidAI.checkModel(destination);
+      // The new model is copied beside the working one and only replaces it once the runtime has opened it: a failed copy
+      // or a model that won't load leaves the old one untouched (before, the old one was deleted first).
+      temp = `${FileSystem.documentDirectory}void-ai-model.new.litertlm`;
+      await FileSystem.deleteAsync(temp, { idempotent: true }).catch(() => {});
+      await FileSystem.copyAsync({ from: asset.uri, to: temp });
+      await NativeVoidAI.checkModel(temp);
+      const destination = `${FileSystem.documentDirectory}void-ai-model.litertlm`;
+      await FileSystem.deleteAsync(destination, { idempotent: true });
+      await FileSystem.moveAsync({ from: temp, to: destination });
+      temp = null;
       setModelPath(destination);
       setModelName(asset.name || "On-device model");
       await AsyncStorage.setItem(MODEL_KEY, destination);
@@ -106,16 +120,17 @@ export default function VoidAIScreen({ navigation }) {
       setModelError(message);
       Alert.alert("Couldn't load model", message);
     } finally {
+      if (temp) await FileSystem.deleteAsync(temp, { idempotent: true }).catch(() => {}); // never leave a half-copied model behind
       setBusy(false);
     }
-  }, []);
+  }, [busy]);
 
   const clearChat = useCallback(() => {
     Alert.alert("Clear conversation?", "This deletes the saved Void AI chat history on this device.", [
       { text: "Cancel", style: "cancel" },
       { text: "Clear", style: "destructive", onPress: () => {
         const fresh = [{
-          id: makeId(), role: "assistant",
+          id: makeId(), role: "assistant", skip: true,
           text: "Conversation cleared. I'm ready when you are."
         }];
         setMessages(fresh);
@@ -134,13 +149,14 @@ export default function VoidAIScreen({ navigation }) {
     setBusy(true);
     setModelError("");
     try {
-      const reply = await generateVoidAIReply({ question, modelPath });
-      setMessages((current) => [...current, { id: makeId(), role: "assistant", text: String(reply).trim() }]);
+      // `messages` is the chat before this question: a model remembers nothing between questions, so it is sent along
+      const { text, local } = await generateVoidAIReply({ question, modelPath, history: messages });
+      setMessages((current) => [...current, { id: makeId(), role: "assistant", text, ...(local ? { skip: true } : {}) }]);
     } catch (error) {
       const message = error?.message || "Something went wrong.";
       setModelError(message);
       setMessages((current) => [...current, {
-        id: makeId(), role: "assistant",
+        id: makeId(), role: "assistant", skip: true,
         text: `I couldn't get a response from the on-device model. Your conversation is still here. Check that the selected model is compatible and that your phone has enough memory.\n\nDetails: ${message}`,
       }]);
     } finally {
@@ -170,7 +186,7 @@ export default function VoidAIScreen({ navigation }) {
           <Text style={styles.title}>Void AI</Text>
           <Text style={styles.subtitle}>{modelPath ? "On-device model" : "Local Quick Mode"}</Text>
         </View>
-        <Pressable onPress={loadModel} style={styles.headerButton} accessibilityRole="button" accessibilityLabel="Load on-device model">
+        <Pressable onPress={loadModel} disabled={busy} style={[styles.headerButton, busy && { opacity: 0.4 }]} accessibilityRole="button" accessibilityLabel="Load on-device model">
           <Icon name="cpu" size={21} color={C.purple} />
         </Pressable>
         <Pressable onPress={clearChat} style={styles.headerButton} accessibilityRole="button" accessibilityLabel="Clear chat">
