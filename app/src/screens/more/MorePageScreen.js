@@ -759,7 +759,7 @@ function About({ styles, C }) {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Your data</Text>
         <Text style={[styles.note, { marginTop: 6 }]}>
-          Your library and verdicts are saved on this phone. A VoidPop account is optional. If you make one, your comments and the verdicts you give are visible to others (with your username, never your email), and a cloud backup of your library is private to you. You can delete the account and everything on it from More → Account. The app looks up shows online, and talks to your synced AniList account only if you sign in to sync. Back up or move your data in Data and storage.
+          Your library and verdicts are saved on this phone. A VoidPop account is optional. If you make one, your comments and the verdicts you give are visible to others (with your username, never your email), and a cloud backup of your library is private to you. You can delete the account and everything on it from More → Account. The app looks up shows online, reads news from public feeds (Anime News Network, MyAnimeList, Anime Corner) and opens each story from the publisher's own site inside the app (your verdicts on stories stay on this phone), and talks to your synced AniList account only if you sign in to sync. Back up or move your data in Data and storage.
         </Text>
       </View>
     </>

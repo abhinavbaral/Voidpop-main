@@ -22,7 +22,7 @@ import OtherPopup from "../../components/more/OtherPopup.js";
 
 const GROUPS = [
   [["statistics", "stats", "Statistics"], ["compare", "list", "Compare"], ["data", "storage", "Data and storage"]],
-  [["voidai", "explore", "Void AI"], ["other", "menu", "Other"]], // opens a popup with You're watching and New announcements
+  [["voidai", "explore", "Void AI"], ["other", "menu", "Other"]], // opens a popup with You're watching, New announcements and News
   [["anilist", "sync", "Sync"], ["account", "profile", "Account"]], // the account rows are worked out below (Sign in / Account + Log out)
   [["appearance", "palette", "Appearance"], ["settings", "settings", "Settings"], ["help", "help", "Help"], ["about", "info", "About"]],
 ];

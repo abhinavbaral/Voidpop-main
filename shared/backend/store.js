@@ -30,7 +30,7 @@ function renameWatched(cinema) {
   return cinema;
 }
 
-const EMPTY = () => ({ library: {}, reviews: {}, excited: {}, cinema: {}, notes: {}, log: [], categories: [], meta: {}, settings: { ...DEFAULT_SETTINGS } });
+const EMPTY = () => ({ library: {}, reviews: {}, excited: {}, cinema: {}, newsVerdicts: {}, notes: {}, log: [], categories: [], meta: {}, settings: { ...DEFAULT_SETTINGS } });
 
 let cache = null;
 let writing = Promise.resolve();
@@ -44,6 +44,7 @@ async function load() {
       categories: Array.isArray(saved.categories) ? saved.categories : [], settings: { ...DEFAULT_SETTINGS, ...(saved.settings || {}) } };
     if (!cache.cinema || typeof cache.cinema !== "object") cache.cinema = {}; // data saved before Movies & TV has none
     renameWatched(cache.cinema);
+    if (!cache.newsVerdicts || typeof cache.newsVerdicts !== "object") cache.newsVerdicts = {};
   } catch {
     cache = EMPTY(); // corrupt or unreadable storage: start clean rather than crash
   }
@@ -993,6 +994,30 @@ export async function getMyReview(_user, segment, id) {
   return (await load()).reviews[keyOf(segment, id)] ?? null;
 }
 
+/* ---------- News verdicts ---------- */
+// A Void Verdict on a news article, kept by its link. No moods and no note: just how it landed.
+// Stored on the device only (and in backups). At most 500, newest kept.
+
+export async function getNewsVerdicts() {
+  return { ...(await load()).newsVerdicts };
+}
+
+// verdict: a key from VERDICTS, or null to take it back
+export async function setNewsVerdict(article, verdict) {
+  const db = await load();
+  if (verdict == null) {
+    delete db.newsVerdicts[article.url];
+    return save();
+  }
+  if (!VERDICTS.some((v) => v.key === verdict)) throw new Error(`Unknown verdict: ${verdict}`);
+  db.newsVerdicts[article.url] = { verdict, title: article.title, source: article.sourceName || article.source || null, at: Date.now() };
+  const keys = Object.keys(db.newsVerdicts);
+  if (keys.length > 500) {
+    keys.sort((a, b) => db.newsVerdicts[a].at - db.newsVerdicts[b].at).slice(0, keys.length - 500).forEach((k) => { delete db.newsVerdicts[k]; });
+  }
+  return save();
+}
+
 /* ---------- first-run welcome ---------- */
 // The welcome screens show once. More > Help can show them again.
 export async function isOnboarded() {
@@ -1078,6 +1103,7 @@ export async function importData(json) {
   cache = {
     library: data.library || {}, reviews: data.reviews || {}, excited: data.excited || {},
     cinema: renameWatched(data.cinema && typeof data.cinema === "object" ? data.cinema : {}), // backups made before Movies & TV have none
+    newsVerdicts: data.newsVerdicts && typeof data.newsVerdicts === "object" ? data.newsVerdicts : {}, // before News there were none
     notes: data.notes && typeof data.notes === "object" ? data.notes : {}, // an old backup has none; removing a title deletes its note, so it must exist
     log: Array.isArray(data.log) ? data.log : [],
     categories: Array.isArray(data.categories) ? data.categories : [],

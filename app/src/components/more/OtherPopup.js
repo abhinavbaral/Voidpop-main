@@ -1,9 +1,11 @@
-// More → Other: one popup that holds "You're watching" and "New announcements". The popup opens on a short
-// list of the two; picking one shows its content in the same popup, with ← to go back.
-// (They used to be two pages of their own under More.)
+// More → Other: one popup that holds "You're watching", "New announcements" and "News". The popup opens on a short
+// list; picking one shows its content in the same popup, with ← to go back.
+//
+// It is drawn inside the More screen (not as a system Modal), so opening a title or a news story from it just puts
+// that screen on top. Going back lands on the popup exactly as you left it: same section, same place in the list.
 
 import { useCallback, useEffect, useState } from "react";
-import { Modal, View, Text, Pressable, TouchableOpacity, ScrollView, Image, StyleSheet } from "react-native";
+import { View, Text, Pressable, TouchableOpacity, ScrollView, Image, BackHandler, StyleSheet } from "react-native";
 import { useAuth } from "@voidpop/shared/backend/AuthContext";
 import {
   getLibrary, youreWatching, setProgress, setStatus, addReview, totalFor, getExcited, toggleExcited,
@@ -15,10 +17,12 @@ import { openDetail } from "../../utils/nav";
 import VerdictModal from "../title/VerdictModal.js";
 import Icon from "../ui/Icon.js";
 import { SkeletonList } from "../ui/Skeleton.js";
+import NewsSection from "./NewsSection.js";
 
 const SECTIONS = [
   { key: "youwatching", icon: "play", label: "You're watching", Body: YoureWatching },
   { key: "announced", icon: "bell", label: "New announcements", Body: Announced },
+  { key: "news", icon: "news", label: "News", Body: NewsSection },
 ];
 
 export default function OtherPopup({ visible, onClose, navigation }) {
@@ -27,11 +31,24 @@ export default function OtherPopup({ visible, onClose, navigation }) {
   const [open, setOpen] = useState(null); // null = the short list of the two
   const section = SECTIONS.find((s) => s.key === open);
   const close = () => { setOpen(null); onClose(); };
-  // tapping a title closes the popup first, then opens it
-  const goTo = (item) => { close(); openDetail(navigation, item); };
+  // a title or a story opens on top of this screen; the popup stays here, untouched, until you come back
+  const goTo = (item) => openDetail(navigation, item);
+  const openArticle = (article) => navigation.navigate("NewsReader", { article });
 
+  // Android back: out of a section first, then out of the popup (only while this screen is the one showing)
+  useEffect(() => {
+    if (!visible) return undefined;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (!navigation.isFocused()) return false;
+      if (open) setOpen(null); else close();
+      return true;
+    });
+    return () => sub.remove();
+  }, [visible, open, navigation]); // eslint-disable-line react-hooks/exhaustive-deps -- close only uses setters
+
+  if (!visible) return null;
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={() => (open ? setOpen(null) : close())}>
+    <View style={styles.overlay} accessibilityViewIsModal>
       <Pressable style={styles.backdrop} onPress={close}>
         <Pressable style={styles.popup} onPress={() => {}}>
           <View style={styles.head}>
@@ -47,7 +64,7 @@ export default function OtherPopup({ visible, onClose, navigation }) {
           </View>
           {section ? (
             <ScrollView contentContainerStyle={{ padding: 16, paddingTop: 4 }}>
-              <section.Body styles={styles} C={C} goTo={goTo} />
+              <section.Body styles={styles} C={C} goTo={goTo} onOpenArticle={openArticle} />
             </ScrollView>
           ) : (
             SECTIONS.map((s, i) => (
@@ -60,7 +77,7 @@ export default function OtherPopup({ visible, onClose, navigation }) {
           )}
         </Pressable>
       </Pressable>
-    </Modal>
+    </View>
   );
 }
 
@@ -171,6 +188,7 @@ function Announced({ styles, C, goTo }) {
 }
 
 const makeStyles = (C) => StyleSheet.create({
+  overlay: { ...StyleSheet.absoluteFillObject, zIndex: 50, elevation: 50 },
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", padding: 18 },
   popup: { backgroundColor: C.card, borderRadius: 18, borderWidth: 1, borderColor: C.border, maxHeight: "82%", overflow: "hidden" },
   head: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14 },

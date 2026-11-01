@@ -3,6 +3,7 @@
 //   2. moods (up to 3, five to pick from for each verdict) and an optional note,
 //      in one speech bubble, then Save
 // Vibes aren't asked any more; any already on this verdict are kept as they are.
+// simple: just the four verdicts and Save, no moods and no note (used for news). onRemove adds a Remove button.
 
 import { useEffect, useState } from "react";
 import {
@@ -16,7 +17,7 @@ import Voidmon from "../brand/Voidmon.js";
 // moods from an older review (or another verdict) that this verdict doesn't offer are dropped
 const keepMoods = (verdict, moods) => (moods || []).filter((m) => moodsFor(verdict).includes(m));
 
-export default function VerdictModal({ visible, initial, onSave, onClose }) {
+export default function VerdictModal({ visible, initial, onSave, onClose, simple = false, onRemove }) {
   const { C } = useTheme();
   const styles = makeStyles(C);
   const [step, setStep] = useState("verdict");
@@ -30,21 +31,23 @@ export default function VerdictModal({ visible, initial, onSave, onClose }) {
   }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps -- reset only when it opens
   const toggleMood = (m) => setMoods((prev) => (prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m].slice(-3)));
   const prompt = verdictPrompt({ step, verdict, moods });
-  const pick = (key) => { setVerdict(key); setMoods((prev) => keepMoods(key, prev)); setStep("feel"); };
-  const save = () => onSave({ verdict, vibes: initial?.vibes || [], moods, comment: comment.trim() });
+  const pick = (key) => { setVerdict(key); setMoods((prev) => keepMoods(key, prev)); if (!simple) setStep("feel"); };
+  const save = () => onSave({ verdict, vibes: initial?.vibes || [], moods: simple ? [] : moods, comment: simple ? "" : comment.trim() });
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <View style={styles.sheet}>
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            <View style={styles.dots}>
-              <View style={[styles.dot, styles.dotOn]} />
-              <View style={[styles.dot, step === "feel" && styles.dotOn]} />
-            </View>
+            {!simple && (
+              <View style={styles.dots}>
+                <View style={[styles.dot, styles.dotOn]} />
+                <View style={[styles.dot, step === "feel" && styles.dotOn]} />
+              </View>
+            )}
             <View style={styles.guide}>
               <Voidmon pose={prompt.pose} size={72} />
-              {step === "verdict" && <View style={styles.bubble}><Text style={styles.bubbleText}>{prompt.text}</Text></View>}
+              {step === "verdict" && <View style={styles.bubble}><Text style={styles.bubbleText}>{simple ? "How did this one land?" : prompt.text}</Text></View>}
             </View>
 
             {step === "verdict" ? (
@@ -61,9 +64,14 @@ export default function VerdictModal({ visible, initial, onSave, onClose }) {
                   })}
                 </View>
                 <View style={styles.actions}>
+                  {simple && !!initial?.verdict && !!onRemove && (
+                    <TouchableOpacity onPress={onRemove} style={styles.cancel} accessibilityRole="button"><Text style={{ color: C.rose }}>Remove</Text></TouchableOpacity>
+                  )}
                   <TouchableOpacity onPress={onClose} style={styles.cancel}><Text style={{ color: C.sub }}>Cancel</Text></TouchableOpacity>
                   {verdict && (
-                    <TouchableOpacity onPress={() => setStep("feel")} style={styles.save}><Text style={{ color: "#fff", fontWeight: "700" }}>Next</Text></TouchableOpacity>
+                    <TouchableOpacity onPress={() => (simple ? save() : setStep("feel"))} style={styles.save} accessibilityRole="button">
+                      <Text style={{ color: "#fff", fontWeight: "700" }}>{simple ? "Save" : "Next"}</Text>
+                    </TouchableOpacity>
                   )}
                 </View>
               </>

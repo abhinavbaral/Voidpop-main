@@ -12,6 +12,7 @@ open it and use it. Accounts, comments and community verdicts switch on when you
   countdowns, search across everything, then a grid of tiles (Coming soon, Anime of the Year, Oscars, Emmys, Jump back in,
   New seasons, Don't Miss This for each kind, VoidPop Angles) and poster rows that mix anime, manga, novels, movies and TV
   (Popular in town, Peak like …, Dive in like …, One time like …, Most loved)
+- **News** (More → Other → News): the latest anime, manga and novel news from Anime News Network, MyAnimeList and Anime Corner. Stories open from the publisher's own site inside the app, and you can give each a Void Verdict (the four verdicts only, no moods; kept on your phone and in backups)
 - **Movies & TV (app: Explore → Browse → Movies / TV; website: `/cinema`):** browse films and series by
   genre, country and sort, save each to your Library (Movies and TV are separate kinds: TV has the same playlists as Anime, Movies have their own), and give it a Void Verdict. Sample titles out of the box;
   a free TMDB key makes it live
