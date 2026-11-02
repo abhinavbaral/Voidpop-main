@@ -33,6 +33,33 @@ The app uses Expo SDK 54 / React Native 0.81.5. Do not use Expo Go for the nativ
 
 Model files can be large and inference can use substantial RAM and battery. Performance varies by device. The app does not bundle a model in the APK, and it does not automatically download one.
 
+## If the build fails with "was compiled with an incompatible version of Kotlin"
+
+This is what an EAS build showed at `:void-ai-runtime:compileReleaseKotlin`:
+
+- Expo SDK 54 compiles with Kotlin **2.1.20**, which reads libraries built with Kotlin 2.1 or 2.2.
+- LiteRT-LM **0.18.0** was built with Kotlin **2.4** and also pulls `kotlin-stdlib` and `kotlin-reflect` 2.4.0, which the compiler can't read ("The actual metadata version is 2.4.0, but the compiler version 2.1.0 can read versions up to 2.2.0").
+- The `Unresolved reference 'require'` / `'extension'` / `'isNotBlank'` lines in that log are a side effect: the standard library itself was unreadable.
+- A second, separate error was in the same log: `Suspend function 'withContext' can only be called from a coroutine`. The module's functions now use `AsyncFunction(...) Coroutine { }`, which is how Expo modules call suspend code.
+
+What the module does now (see `android/build.gradle`):
+
+1. Its own compile classpath is forced onto the app's Kotlin libraries, so the 2.4.0 libraries are no longer on it. (The app itself still receives the newer ones at run time; a newer standard library runs older code.)
+2. The compiler gets `-Xskip-metadata-version-check`, so it reads LiteRT-LM's newer metadata.
+3. The LiteRT-LM version comes from the `LITERTLM_VERSION` environment variable (default `0.18.0`), so you can try another release without changing code.
+
+If it still fails, find a release built with Kotlin 2.2 or older (needs internet):
+
+```sh
+node tools/find-litertlm-version.mjs
+```
+
+It lists each release, the Kotlin it was built with and which ones your compiler can read, and prints the one to use. Then build with `LITERTLM_VERSION=<that version>` (an EAS environment variable, or `"env"` in the profile in `eas.json`). An older release can have a slightly different Kotlin API; if `VoidAiRuntimeModule.kt` then shows errors about `Engine`, `EngineConfig` or `sendMessageAsync`, send the first few lines.
+
+Upgrading Kotlin for the whole app to 2.4 is not recommended on Expo SDK 54: Expo's Gradle plugins and KSP are pinned to 2.1.20.
+
+None of this could be compiled in the environment where it was written (no Android SDK or Google/Maven access), so treat the first build as the test.
+
 ## Architecture for a future hosted provider
 
 `aiService.js` defines the boundary for generation. A future hosted implementation should preserve the same `{ question, modelPath }`-style UI contract and call a backend endpoint. Do not embed hosted provider API keys in the app. Hosted mode should be opt-in, disclose that prompts leave the phone, and only send the minimum context required.

@@ -4,6 +4,21 @@ version = '0.1.0'
 apply plugin: 'com.android.library'
 apply plugin: 'expo-module-gradle-plugin'
 
+// ---------------------------------------------------------------------------------------------------------------
+// Kotlin compatibility. Expo SDK 54 builds with Kotlin 2.1.20 (that compiler reads libraries up to Kotlin 2.2).
+// LiteRT-LM 0.18.0 was built with Kotlin 2.4 and drags in kotlin-stdlib / kotlin-reflect 2.4.0, which made
+// ":void-ai-runtime:compileReleaseKotlin" fail with "was compiled with an incompatible version of Kotlin".
+// Two things below keep this module compiling WITHOUT upgrading Kotlin for the whole app:
+//   1. this module's own compile classpath uses the app's Kotlin libraries (the app itself still gets the newer ones
+//      at run time, which is safe: a newer stdlib runs older code);
+//   2. -Xskip-metadata-version-check lets the 2.1 compiler read LiteRT-LM's newer Kotlin metadata.
+// If it still fails, use a LiteRT-LM version built with Kotlin 2.2 or older: run `node tools/find-litertlm-version.mjs`
+// in the repo, then build with the environment variable LITERTLM_VERSION=<that version> (an EAS environment variable
+// works) and no code change.
+// ---------------------------------------------------------------------------------------------------------------
+def litertLmVersion = System.getenv("LITERTLM_VERSION") ?: "0.18.0"
+def appKotlin = project.findProperty("kotlinVersion") ?: rootProject.findProperty("kotlinVersion") ?: "2.1.20" // the app's Kotlin (Expo sets it), e.g. 2.1.20
+
 android {
   namespace "expo.modules.voidairuntime"
 
@@ -12,6 +27,22 @@ android {
   }
 }
 
+configurations.configureEach {
+  resolutionStrategy.eachDependency { details ->
+    if (details.requested.group == "org.jetbrains.kotlin" &&
+        (details.requested.name.startsWith("kotlin-stdlib") || details.requested.name == "kotlin-reflect")) {
+      details.useVersion(appKotlin)
+      details.because("LiteRT-LM pulls Kotlin 2.4 libraries; this module is compiled by the app's Kotlin")
+    }
+  }
+}
+
+tasks.configureEach { task ->
+  if (task.name.startsWith("compile") && task.name.endsWith("Kotlin") && task.hasProperty("compilerOptions")) {
+    task.compilerOptions.freeCompilerArgs.add("-Xskip-metadata-version-check")
+  }
+}
+
 dependencies {
-  implementation("com.google.ai.edge.litertlm:litertlm-android:0.18.0")
+  implementation("com.google.ai.edge.litertlm:litertlm-android:${litertLmVersion}")
 }
