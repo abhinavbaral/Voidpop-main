@@ -1,5 +1,9 @@
 # VoidPop
 
+**Anime and manga tracker with live countdowns to the next episode.** A website and an
+Android app, built from one codebase. No sign-up and no API keys: open it and use it.
+# VoidPop
+
 **Anime, manga, movies and series, with live countdowns to the next episode.** A website, an
 Android app and an optional backend, built from one codebase. No sign-up and no API keys needed:
 open it and use it. Accounts, comments and community verdicts switch on when you run the server.

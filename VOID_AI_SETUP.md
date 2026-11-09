@@ -67,3 +67,7 @@ None of this could be compiled in the environment where it was written (no Andro
 ## Validation status
 
 The source files have been integrated into the ZIP, but an Android Gradle build has not been run in this environment. The LiteRT-LM native dependency and Kotlin API therefore still need to be verified by building on your development machine. If Gradle reports a version or API mismatch, follow the official Android guide and pin the compatible LiteRT-LM release: https://developers.google.com/edge/litert-lm/android
+
+### Second failure: `:expo:compileReleaseKotlin` with `kotlin-stdlib-2.4.0.jar`
+
+The module-level fix above is not enough on its own: the `expo` module depends on every autolinked module, so the Kotlin 2.4.0 libraries also reached `expo`'s compile classpath, and the build stopped there ("The binary version of its metadata is 2.4.0, expected version is 2.1.0"). `app/android` is generated on EAS, so the fix is a config plugin, `app/plugins/withKotlinCompilePin.js` (listed in `app/app.json`). It adds a block to the root `build.gradle` that pins the Kotlin libraries to the app's Kotlin on every module's compile classpath only, and lets the compiler read newer metadata. At run time the app still gets the newer libraries LiteRT-LM needs. Not verified by a Gradle run here; if the next EAS build fails again, send the log and try `LITERTLM_VERSION` with a release built on Kotlin 2.2 or older.
