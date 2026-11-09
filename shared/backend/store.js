@@ -30,7 +30,7 @@ function renameWatched(cinema) {
   return cinema;
 }
 
-const EMPTY = () => ({ library: {}, reviews: {}, excited: {}, cinema: {}, notes: {}, log: [], categories: [], meta: {}, settings: { ...DEFAULT_SETTINGS } });
+const EMPTY = () => ({ library: {}, reviews: {}, excited: {}, cinema: {}, notes: {}, newsVerdicts: {}, log: [], categories: [], meta: {}, settings: { ...DEFAULT_SETTINGS } });
 
 let cache = null;
 let writing = Promise.resolve();
@@ -43,6 +43,7 @@ async function load() {
     cache = { ...EMPTY(), ...saved, log: Array.isArray(saved.log) ? saved.log : [],
       categories: Array.isArray(saved.categories) ? saved.categories : [], settings: { ...DEFAULT_SETTINGS, ...(saved.settings || {}) } };
     if (!cache.cinema || typeof cache.cinema !== "object") cache.cinema = {}; // data saved before Movies & TV has none
+    if (!cache.newsVerdicts || typeof cache.newsVerdicts !== "object") cache.newsVerdicts = {}; // data saved before News has none
     renameWatched(cache.cinema);
   } catch {
     cache = EMPTY(); // corrupt or unreadable storage: start clean rather than crash
@@ -1127,6 +1128,29 @@ export async function setOnboarded(done = true) {
   await save();
 }
 
+/* ---------- verdicts on news articles ---------- */
+// One verdict per article (keyed by its link), no moods or comment. Kept in backups; never synced.
+// Only the newest NEWS_VERDICT_MAX are kept so the list can't grow without limit.
+const NEWS_VERDICT_MAX = 500;
+
+export async function getNewsVerdicts() {
+  return { ...((await load()).newsVerdicts || {}) };
+}
+
+// verdict: a VERDICTS key, or null to remove it
+export async function setNewsVerdict(article, verdict) {
+  if (verdict != null && !VERDICTS.some((v) => v.key === verdict)) throw new Error("Unknown verdict");
+  const db = await load();
+  db.newsVerdicts = db.newsVerdicts || {};
+  delete db.newsVerdicts[article.url]; // a changed verdict moves to the newest end
+  if (verdict != null) {
+    db.newsVerdicts[article.url] = { verdict, title: article.title || "", sourceName: article.sourceName || "", at: new Date().toISOString() };
+    const keys = Object.keys(db.newsVerdicts);
+    for (const k of keys.slice(0, Math.max(0, keys.length - NEWS_VERDICT_MAX))) delete db.newsVerdicts[k];
+  }
+  await save();
+}
+
 /* ---------- personal notes (legacy) ---------- */
 // Notes are no longer written anywhere in the UI (comments replaced them), but notes you already
 // saved are kept and still appear in the Markdown export. One private note per title, any title (in your library or not). Kept in
@@ -1202,6 +1226,7 @@ export async function importData(json) {
     library: data.library || {}, reviews: data.reviews || {}, excited: data.excited || {},
     cinema: renameWatched(data.cinema && typeof data.cinema === "object" ? data.cinema : {}), // backups made before Movies & TV have none
     notes: data.notes && typeof data.notes === "object" ? data.notes : {}, // an old backup has none; removing a title deletes its note, so it must exist
+    newsVerdicts: data.newsVerdicts && typeof data.newsVerdicts === "object" ? data.newsVerdicts : {}, // a backup from before News has none
     log: Array.isArray(data.log) ? data.log : [],
     categories: Array.isArray(data.categories) ? data.categories : [],
     meta: data.meta && typeof data.meta === "object" ? data.meta : {},
@@ -1292,6 +1317,8 @@ export async function mergeData(json) {
   take(db.reviews, data.reviews, (r) => stampOf(r.date));
   take(db.excited, data.excited, (x) => stampOf(x.at));
   take(db.notes, data.notes, (x) => stampOf(x.at));
+  db.newsVerdicts = db.newsVerdicts || {};
+  take(db.newsVerdicts, data.newsVerdicts, (x) => stampOf(x.at));
   if (Array.isArray(data.log)) { // both histories, each entry once, oldest first
     const seen = new Set(db.log.map((e) => JSON.stringify(e)));
     for (const e of data.log) if (Array.isArray(e) && !seen.has(JSON.stringify(e))) db.log.push(e);

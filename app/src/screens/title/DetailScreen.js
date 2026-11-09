@@ -345,7 +345,8 @@ function DetailBody({ item, navigation }) {
           {nextEpisode && (
             <View style={[styles.box, styles.nextBox]}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.nextLabel}>NEXT EPISODE</Text>
+                {/* a saved countdown that has passed is not "next" any more: AniList's newer one is still loading or couldn't be reached */}
+                <Text style={styles.nextLabel}>{nextEpisode.airingAt * 1000 < now ? "LATEST EPISODE" : "NEXT EPISODE"}</Text>
                 <Text style={styles.nextTitle}>
                   Episode {nextEpisode.episode}{item.episodes ? ` of ${item.episodes}` : ""}
                 </Text>
