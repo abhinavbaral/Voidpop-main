@@ -1,6 +1,7 @@
 // SCHEDULE — when does the next episode drop? (same as the website)
 //   Pending:         the aired episodes you haven't watched yet (+1); the tab is hidden while there are none
-//   Anime this week: every episode of this calendar week, plus aired ones you still haven't watched
+//   Anime this week: the shows you follow with their next-episode countdown (the old "Your watch"), except the ones
+//                    that are pending: those are in Pending only, and come back here once you've watched them
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, RefreshControl } from "react-native";
@@ -13,7 +14,6 @@ import { useNow } from "@voidpop/shared/lib/useNow";
 import { useTheme } from "../../context/ThemeContext.js";
 import { openDetail } from "../../utils/nav";
 import YourShows from "../../components/library/YourShows.js";
-import AnimeThisWeek from "../../components/schedule/AnimeThisWeek.js";
 
 const FOLLOWING = new Set(["watching", "plan", "onhold"]);
 
@@ -84,14 +84,19 @@ export default function ScheduleScreen({ navigation }) {
               </TouchableOpacity>
             ))}
           </View>
-        ) : (
-          <Text style={styles.section} accessibilityRole="header">Anime this week</Text>
-        )}
+        ) : null}
 
         {active === "pending" && (
           <YourShows now={now} refreshKey={fetched} title="Pending" onlyPending onOpen={(it) => openDetail(navigation, it)} />
         )}
-        {active === "week" && <AnimeThisWeek navigation={navigation} refreshKey={fetched} />}
+        {active === "week" && (
+          <YourShows
+            now={now} refreshKey={fetched} title="Anime this week" hidePending onOpen={(it) => openDetail(navigation, it)}
+            emptyText={hasPending
+              ? "Everything you follow is in Pending. Watch those episodes and the show comes back here."
+              : "Nothing you follow is airing right now. Mark an airing anime as Watching or Plan to Watch and its countdown shows up here."}
+          />
+        )}
       </ScrollView>
     </SafeAreaView>
   );

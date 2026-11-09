@@ -179,7 +179,12 @@ export async function setStatus(_user, segment, item, status) {
 // creator until its page is opened once.
 function freshest(prev, next) {
   if (!prev) return next;
-  return next.partial && !prev.partial ? { ...prev, ...pick(next, ["nextEpisode", "finished", "episodes", "chapters", "endDate"]) } : next;
+  const merged = next.partial && !prev.partial ? { ...prev, ...pick(next, ["nextEpisode", "finished", "episodes", "chapters", "endDate"]) } : next;
+  // "Episodes out" you set yourself (AniList's schedule is wrong) must survive every refresh from AniList
+  const keep = {};
+  if (prev.knownAired != null && merged.knownAired == null) keep.knownAired = prev.knownAired;
+  if (prev.manualNext && !merged.manualNext) keep.manualNext = prev.manualNext;
+  return Object.keys(keep).length ? { ...merged, ...keep } : merged;
 }
 const pick = (o, keys) => Object.fromEntries(keys.filter((k) => o[k] !== undefined).map((k) => [k, o[k]]));
 
@@ -191,10 +196,46 @@ export async function getEntry(segment, id) {
 /* ---------- progress: episodes watched / chapters read ---------- */
 
 export const unitFor = (segment) => (segment === "manga" ? "Ch" : "Ep");
-export const totalFor = (item) => (item.segment === "manga" ? item.chapters : item.episodes) ?? null;
+export const totalFor = (item) => {
+  if (item.segment === "manga") return item.chapters ?? null;
+  // you set more episodes out than AniList lists: its count is wrong, so the real total is unknown
+  if (aniListCounting(item)) return item.episodes ?? null;
+  if (item.knownAired != null && item.episodes != null && item.knownAired > item.episodes) return null;
+  if (item.manualNext && item.episodes != null && item.manualNext.episode > item.episodes) return null; // same for the episode you entered
+  return item.episodes ?? null;
+};
 // Episodes out so far: everything before the next one to air, or all of them once finished.
+// item.knownAired = what YOU say is out when AniList's schedule is wrong (see setKnownAired); the higher number wins.
 export function airedFor(item, now = Date.now()) {
   if (item.segment !== "anime") return null;
+  let out = airedByAniList(item, now);
+  if (aniListCounting(item, now)) return out; // AniList has a countdown: it is the schedule, whatever you entered no longer counts
+  const mine = [item.knownAired, manualNextState(item, now).aired].filter((v) => v != null);
+  if (mine.length) out = Math.max(out ?? 0, ...mine);
+  return out;
+}
+
+// A next episode you entered yourself (item.manualNext = { episode, airingAt (unix s), weekly }) for a show whose
+// AniList schedule is missing or stale (e.g. AniList thinks it ended at 1000, but 1001 airs Sunday).
+// weekly: after it airs, the following episodes are assumed to come every 7 days (until the known total).
+// { aired: the latest of your episodes that is already out | null, next: { episode, airingAt } still to come | null }
+const WEEK_S = 7 * 86400;
+// AniList has an episode coming up for this show (a countdown is running)
+export const aniListCounting = (item, now = Date.now()) => !!item?.nextEpisode && item.nextEpisode.airingAt > now / 1000;
+export function manualNextState(item, now = Date.now()) {
+  const m = item?.manualNext;
+  if (!m || !(m.episode >= 1) || !(m.airingAt > 0)) return { aired: null, next: null };
+  const nowS = now / 1000;
+  if (m.airingAt > nowS) return { aired: null, next: { episode: m.episode, airingAt: m.airingAt } };
+  if (!m.weekly) return { aired: m.episode, next: null };
+  const k = Math.floor((nowS - m.airingAt) / WEEK_S); // weeks since: episode m.episode + k is the latest out
+  // AniList's total only limits the guesses while it agrees with you (an episode past it means its total is wrong)
+  const last = item.episodes != null && m.episode <= item.episodes ? item.episodes : Infinity;
+  const aired = Math.min(m.episode + k, last);
+  if (m.episode + k + 1 > last) return { aired, next: null };
+  return { aired, next: { episode: m.episode + k + 1, airingAt: m.airingAt + (k + 1) * WEEK_S } };
+}
+function airedByAniList(item, now) {
   if (item.nextEpisode) {
     // a saved "next episode" whose time has passed is out, even before we
     // get fresh data (offline, or the app hasn't checked yet)
@@ -212,6 +253,7 @@ export const WRAP_UP_DAYS = 14;
 // and the date arrives with the next AniList refresh.
 export function pastWrapUp(item, now = Date.now()) {
   if (item.segment !== "anime" || !item.finished) return false;
+  if (item.knownAired != null || item.manualNext) return false; // you said AniList is wrong: it isn't over
   if (!item.endDate) return true;
   const end = Date.parse(`${item.endDate}T23:59:59Z`); // the last episode aired on this day
   return Number.isNaN(end) ? true : now - end > WRAP_UP_DAYS * 86400000;
@@ -344,8 +386,10 @@ export async function setProgress(_user, item, n, source = "plus") {
   const db = await load();
   const key = keyOf(item.segment, item.id);
   const prev = db.library[key];
-  const total = totalFor(item);
-  const max = maxProgress(item);
+  // a fresh copy of the item from AniList doesn't carry what you set yourself: take it from the saved one
+  const eff = item.knownAired == null && prev?.item?.knownAired != null ? { ...item, knownAired: prev.item.knownAired } : item;
+  const total = totalFor(eff);
+  const max = maxProgress(eff);
   let progress = Math.max(0, Math.floor(Number(n) || 0));
   const was = prev?.progress || 0;
   const skipped = skippedOf(prev);
@@ -374,6 +418,45 @@ export async function setProgress(_user, item, n, source = "plus") {
   entryChanged(key, db.library[key]);
   await save();
   return { progress, status, rewatchDone, reachedEnd: !rewatchDone && !!total && progress >= total && status !== "completed" };
+}
+
+// AniList's schedule is sometimes wrong: it says a show has aired everything (or has nothing scheduled) while
+// more episodes are really out. Tell the app how many are out: pending, +1 and the Schedule follow that number
+// (never lower than what AniList counts). null clears it. It also clears itself once AniList catches up
+// (noteAiring). Local only: AniList has no such field, so nothing is synced.
+export async function setKnownAired(item, n) {
+  const db = await load();
+  const e = db.library[keyOf("anime", item.id)];
+  if (!e || e.item.segment !== "anime") return { ok: false };
+  const v = n == null || n === "" ? null : Math.floor(Number(n));
+  if (v != null && (!Number.isFinite(v) || v < 1)) return { ok: false };
+  if (v != null && (aniListCounting(item) || aniListCounting(e.item))) return { ok: false, reason: "anilist" }; // AniList's countdown is the schedule
+  const { knownAired: _old, ...rest } = e.item;
+  e.item = v == null ? rest : { ...rest, knownAired: v };
+  await save(); // listeners redraw Schedule, so a show jumps to Pending at once
+  return { ok: true, knownAired: v };
+}
+
+// Set (or, with null, clear) the next episode of a show whose AniList schedule is missing or stale.
+// airingAt: unix seconds, in the future. weekly: keep counting down every 7 days after it airs.
+export async function setManualNext(item, next) {
+  const db = await load();
+  const e = db.library[keyOf("anime", item.id)];
+  if (!e || e.item.segment !== "anime") return { ok: false };
+  const { manualNext: _old, ...rest } = e.item;
+  if (next == null) {
+    e.item = rest;
+  } else {
+    // AniList has a countdown for this show: it is the schedule, nothing can be added next to it
+    // (the caller's copy of the item is the freshest one; the saved one is the fallback)
+    if (aniListCounting(item) || aniListCounting(e.item)) return { ok: false, reason: "anilist" };
+    const episode = Math.floor(Number(next.episode));
+    const airingAt = Math.floor(Number(next.airingAt));
+    if (!(episode >= 1) || !(airingAt > 0)) return { ok: false };
+    e.item = { ...rest, manualNext: { episode, airingAt, weekly: next.weekly !== false } };
+  }
+  await save();
+  return { ok: true };
 }
 
 /* ---------- library sorting (app + website) ---------- */
@@ -561,7 +644,10 @@ export function yourShows(lib, fresh = {}, now = Date.now()) {
   return Object.values(lib)
     .filter((e) => e.item.segment === "anime" && FOLLOWING.has(e.status))
     .map((e) => {
-      const item = { ...e.item, ...(fresh[e.item.id] || {}) };
+      let item = { ...e.item, ...(fresh[e.item.id] || {}) };
+      // AniList has nothing coming but you entered the next episode yourself: that one counts down
+      const mine = manualNextState(item, now).next;
+      if (mine && !(item.nextEpisode && item.nextEpisode.airingAt > nowS)) item = { ...item, nextEpisode: mine };
       const entry = { ...e, item };
       const next = item.nextEpisode && item.nextEpisode.airingAt > nowS ? item.nextEpisode : null;
       return {
@@ -574,6 +660,34 @@ export function yourShows(lib, fresh = {}, now = Date.now()) {
     // lives in More > You're watching (see youreWatching)
     .filter((x) => x.next || (x.pending > 0 && !pastWrapUp(x.item, now)))
     .sort(scheduleOrder);
+}
+
+// The next few episodes of a manual entry (weekly ones continue every 7 days, up to the known total): [{ episode, airingAt }]
+export function manualUpcoming(item, now = Date.now(), count = 4) {
+  const first = manualNextState(item, now).next;
+  if (!first) return [];
+  const out = [first];
+  const m = item.manualNext;
+  const last = item.episodes != null && m.episode <= item.episodes ? item.episodes : Infinity;
+  while (m.weekly && out.length < count && out[out.length - 1].episode < last) {
+    const p = out[out.length - 1];
+    out.push({ episode: p.episode + 1, airingAt: p.airingAt + WEEK_S });
+  }
+  return out;
+}
+
+// "New episode" alerts for the episodes you entered yourself: [{ item, episode, airingAt }] still to come.
+// None for a show AniList has a countdown for (its own alert covers it, and your entry is being deleted).
+//   fresh: { id -> item } from fetchNextEpisodes, when there is one
+export function manualAlerts(lib, fresh = {}, now = Date.now()) {
+  const rows = [];
+  Object.values(lib).forEach((e) => {
+    if (e.item.segment !== "anime" || !FOLLOWING.has(e.status) || !e.item.manualNext) return;
+    const item = { ...e.item, ...(fresh[e.item.id] || {}) };
+    if (aniListCounting(item, now)) return;
+    manualUpcoming(item, now).forEach((n) => rows.push({ item: e.item, ...n }));
+  });
+  return rows;
 }
 
 // More > You're watching: finished shows you are watching again, or catching up
@@ -646,8 +760,17 @@ export async function noteAiring(fresh) {
       delete e.delay; // that episode aired; the next one is on its own schedule
       changed = true;
     }
-    if (JSON.stringify(before) !== JSON.stringify(now) || e.item.finished !== f.finished || !!e.item.unreleased !== !!f.unreleased || (f.endDate ?? null) !== (e.item.endDate ?? null)) {
-      e.item = { ...e.item, nextEpisode: now, finished: f.finished, unreleased: f.unreleased, episodes: f.episodes ?? e.item.episodes, endDate: f.endDate ?? null };
+    // AniList has caught up with the number you set yourself: it's right now, so the override isn't needed
+    // (or AniList has a countdown running: then it is the schedule and the number you set goes too)
+    const counting = aniListCounting(f);
+    const caughtUp = e.item.knownAired != null && (counting || (airedFor({ ...f, segment: "anime", knownAired: undefined, manualNext: undefined }) ?? -1) >= e.item.knownAired);
+    // AniList has a countdown now (whatever episode and day it says): it is the schedule again, your entry goes
+    const manualDone = !!e.item.manualNext && counting;
+    if (manualDone || caughtUp || JSON.stringify(before) !== JSON.stringify(now) || e.item.finished !== f.finished || !!e.item.unreleased !== !!f.unreleased || (f.endDate ?? null) !== (e.item.endDate ?? null)) {
+      const next = { ...e.item, nextEpisode: now, finished: f.finished, unreleased: f.unreleased, episodes: f.episodes ?? e.item.episodes, endDate: f.endDate ?? null };
+      if (caughtUp) delete next.knownAired;
+      if (manualDone) delete next.manualNext;
+      e.item = next;
       changed = true;
     }
   });

@@ -10,7 +10,7 @@
 import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 import { fetchNextEpisodes } from "@voidpop/shared/api/anilist";
-import { getLibrary, getExcited, getSettings } from "@voidpop/shared/backend/store";
+import { getLibrary, getExcited, getSettings, noteAiring, manualAlerts } from "@voidpop/shared/backend/store";
 
 const FOLLOWING = new Set(["watching", "plan", "onhold"]);
 const CHANNEL = "episodes";
@@ -71,12 +71,13 @@ export function rescheduleEpisodeAlerts() {
       Object.values(excited).forEach((e) => { if (e.item.segment === "anime") ids.add(e.item.id); });
       if (!ids.size) return 0;
 
-      const fresh = await fetchNextEpisodes([...ids]);
+      // offline: AniList's alerts can't be built, but the ones for episodes you entered yourself still can
+      const fresh = await fetchNextEpisodes([...ids]).catch(() => ({}));
+      // AniList has a countdown for a show: your own entries for it are deleted before anything is scheduled
+      await noteAiring(fresh);
       const nowSec = Date.now() / 1000;
       let count = 0;
-      for (const item of Object.values(fresh)) {
-        const next = item.nextEpisode;
-        if (!next || next.airingAt <= nowSec + 30) continue;
+      const alert = async (item, next) => {
         await Notifications.scheduleNotificationAsync({
           content: {
             title: `Episode ${next.episode} is out`,
@@ -90,6 +91,15 @@ export function rescheduleEpisodeAlerts() {
           },
         });
         count++;
+      };
+      for (const item of Object.values(fresh)) {
+        const next = item.nextEpisode;
+        if (!next || next.airingAt <= nowSec + 30) continue;
+        await alert(item, next);
+      }
+      // episodes you entered yourself (AniList has nothing for those shows); weekly ones for the next few weeks
+      for (const m of manualAlerts(await getLibrary(), fresh)) {
+        if (m.airingAt > nowSec + 30) await alert(m.item, m);
       }
       return count;
     } catch {

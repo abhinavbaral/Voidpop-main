@@ -20,7 +20,9 @@ import { VoidmonEmpty, VoidmonCheer } from "../brand/Voidmon.js";
 const FOLLOWING = new Set(["watching", "plan", "onhold"]);
 
 // onlyPending: just the shows with aired episodes you haven't watched (Schedule's Pending); nothing at all when there are none
-export default function YourShows({ now, layout = "stack", title = "Your shows", emptyText, onOpen, refreshKey = 0, onlyPending = false }) {
+// hidePending: the opposite, for Schedule's Anime this week: the shows you're caught up on. A show with pending episodes
+//   lives in Pending only; the moment you watch them (or none are pending) it shows here.
+export default function YourShows({ now, layout = "stack", title = "Your shows", emptyText, onOpen, refreshKey = 0, onlyPending = false, hidePending = false }) {
   const { C } = useTheme();
   const { user } = useAuth();
   const { width } = useWindowDimensions();
@@ -48,12 +50,12 @@ export default function YourShows({ now, layout = "stack", title = "Your shows",
 
   if (!lib) return null;
   const all = yourShows(lib, fresh, now);
-  const shows = onlyPending ? all.filter((s) => s.pending > 0) : all;
+  const shows = onlyPending ? all.filter((s) => s.pending > 0) : hidePending ? all.filter((s) => !(s.pending > 0)) : all;
   const pending = shows.reduce((n, s) => n + s.pending, 0);
   const head = (
     <View style={styles.head}>
       <Text style={{ color: C.text, fontWeight: "800", fontSize: 15 }}>{title}</Text>
-      {shows.length > 0 && (
+      {shows.length > 0 && !hidePending && ( // "All caught up" would be wrong when the pending ones are in the other tab
         <Text style={{ color: pending ? C.orange : C.green, fontWeight: "800", fontSize: 12 }}>{pending ? `${pending} pending` : "All caught up"}</Text>
       )}
     </View>
@@ -81,7 +83,7 @@ export default function YourShows({ now, layout = "stack", title = "Your shows",
   return (
     <View style={{ marginTop: 14 }}>
       {head}
-      {!pending && layout === "stack" && <VoidmonCheer sub="New episodes show up here the moment they air." style={{ marginHorizontal: 14, marginBottom: 10 }} />}
+      {!pending && !hidePending && layout === "stack" && <VoidmonCheer sub="New episodes show up here the moment they air." style={{ marginHorizontal: 14, marginBottom: 10 }} />}
       {layout === "row" ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingHorizontal: 14 }}>
           {shows.map((s) => card(s, Math.min(340, width * 0.86)))}

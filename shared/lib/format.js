@@ -101,3 +101,13 @@ export function hypeLabel(n) {
   const v = n >= 1e6 ? `${(n / 1e6).toFixed(1).replace(/\.0$/, "")}M` : n >= 1000 ? `${(n / 1000).toFixed(1).replace(/\.0$/, "")}k` : String(n);
   return `${v} following`;
 }
+
+// "2026-11-15 23:30" (or "2026-11-15T23:30"), read in the user's own time zone → unix seconds, or null if it isn't a date.
+export function parseLocalDateTime(text) {
+  const m = /^\s*(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?\s*$/.exec(String(text));
+  if (!m) return null;
+  const [y, mo, d, h = 0, mi = 0] = m.slice(1).map(Number);
+  const date = new Date(y, mo - 1, d, h, mi, 0);
+  if (date.getFullYear() !== y || date.getMonth() !== mo - 1 || date.getDate() !== d || h > 23 || mi > 59) return null;
+  return Math.floor(date.getTime() / 1000);
+}

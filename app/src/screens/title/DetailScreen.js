@@ -24,14 +24,14 @@ import Comments from "../../components/community/Comments.js";
 import { addToCalendar } from "../../services/calendar";
 import { completeEarlierSeasons, undoEarlierSeasons } from "@voidpop/shared/features/earlierSeasons";
 import { getCachedItem, cacheItem, openDetail, goBackOrHome } from "../../utils/nav";
-import { releaseLabel, formatCountdown, dayLabel, airTime } from "@voidpop/shared/lib/format";
+import { releaseLabel, formatCountdown, dayLabel, airTime, parseLocalDateTime } from "@voidpop/shared/lib/format";
 import { useNow } from "@voidpop/shared/lib/useNow";
 import { useSettings } from "@voidpop/shared/backend/SettingsContext";
 import { useIsWide } from "../../utils/layout";
 import { useAuth } from "@voidpop/shared/backend/AuthContext";
 import {
   statusesAllowed, getStatus, setStatus, addReview, getMyReview,
-  getExcited, toggleExcited, getEntry, setProgress, noteAiring, totalFor, unitFor, airedFor, maxProgress, checkProgress,
+  getExcited, toggleExcited, getEntry, setProgress, setKnownAired, setManualNext, aniListCounting, noteAiring, totalFor, unitFor, airedFor, maxProgress, checkProgress,
   doneLabel, fillCompleted,
 } from "@voidpop/shared/backend/store";
 import { fetchAniListDetail, fetchAniListItem, fetchNextEpisodes } from "@voidpop/shared/api/anilist";
@@ -119,6 +119,8 @@ function DetailBody({ item, navigation }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [isExcited, setIsExcited] = useState(false);
   const [progress, setProgressState] = useState(0);
+  const [knownAired, setKnownAiredState] = useState(null); // episodes out that YOU set because AniList's schedule is wrong
+  const [manualNext, setManualNextState] = useState(null); // a next episode YOU entered because AniList has none
   const [delay, setDelay] = useState(null);
   // "not out yet" can change while you look: refreshed from AniList below
   const [unreleased, setUnreleased] = useState(!!item.unreleased);
@@ -143,6 +145,8 @@ function DetailBody({ item, navigation }) {
     await fillCompleted(item); // completed = all watched, once the count is known
     const entry = await getEntry(item.segment, item.id);
     setProgressState(entry?.progress || 0);
+    setKnownAiredState(entry?.item?.knownAired ?? null);
+    setManualNextState(entry?.item?.manualNext ?? null);
     setDelay(entry?.delay?.episode === entry?.item.nextEpisode?.episode ? entry?.delay : null);
     setStatusState(await getStatus(user, item.segment, item.id));
     setMyReview(await getMyReview(user, item.segment, item.id));
@@ -161,7 +165,7 @@ function DetailBody({ item, navigation }) {
     fetchAniListDetail(item.segment, item.id)
       .then((d) => { if (alive) { setTrailer(d.trailer); setRelated(d.related); setWatch(d.whereToWatch || []); setYoutube(d.whereToYouTube || []); setRead(d.whereToRead || null); setSource(d.source || null); setCast({ characters: d.characters || [], staff: d.staff || [], themes: d.themes || [] }); setEpisodes(d.episodes || []); } })
       .catch(() => {});
-    if (item.segment === "anime" && !item.finished) {
+    if (item.segment === "anime") { // finished ones too: AniList may have a countdown now, and then what you entered goes
       fetchNextEpisodes([item.id])
         .then(async (fresh) => {
           if (!alive || !fresh[item.id]) return;
@@ -371,7 +375,9 @@ function DetailBody({ item, navigation }) {
             </View>
           )}
           {!unreleased && status !== "completed" && (status || progress > 0) && (
-            <ProgressBox item={{ ...item, nextEpisode }} progress={progress} onChange={changeProgress} styles={styles} C={C} />
+            <ProgressBox item={{ ...item, nextEpisode, knownAired, manualNext }} progress={progress} onChange={changeProgress}
+              onSetOut={async (n) => { await setKnownAired({ ...item, nextEpisode }, n); await refresh(); }}
+              onSetNext={async (n) => { await setManualNext({ ...item, nextEpisode }, n); await refresh(); }} styles={styles} C={C} />
           )}
           {item.segment === "anime" && <FillerGuide item={item} progress={progress} />}
 
@@ -447,7 +453,7 @@ function DetailBody({ item, navigation }) {
 
 // Episodes watched / chapters read: − 7 / 12 +1. Tap the number to type one.
 // You can't go past what's out (aired episodes / a finished manga's chapters).
-function ProgressBox({ item, progress, onChange, styles, C }) {
+function ProgressBox({ item, progress, onChange, onSetOut, onSetNext, styles, C }) {
   const total = totalFor(item);
   const max = maxProgress(item);
   const aired = airedFor(item);
@@ -456,6 +462,35 @@ function ProgressBox({ item, progress, onChange, styles, C }) {
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
   const atMax = max != null && progress >= max;
+  // AniList's schedule is sometimes wrong (it says everything has aired, or lists too few episodes): say how many are really out
+  const [outEditing, setOutEditing] = useState(false);
+  const [outDraft, setOutDraft] = useState("");
+  const [outError, setOutError] = useState("");
+  const saveOut = async () => {
+    const n = Number(outDraft);
+    const byAniList = airedFor({ ...item, knownAired: null });
+    if (!Number.isInteger(n) || n < 1) return setOutError("Enter a whole number.");
+    if (byAniList != null && n <= byAniList) return setOutError(`AniList already counts ${byAniList} out.`);
+    setOutEditing(false);
+    await onSetOut(n);
+  };
+
+  // the next episode AniList doesn't know about (it thinks the show ended): its number and when it airs → a countdown
+  const counting = aniListCounting(item); // AniList has a countdown: nothing can be added next to it
+  const [nextEditing, setNextEditing] = useState(false);
+  const [epDraft, setEpDraft] = useState("");
+  const [whenDraft, setWhenDraft] = useState("");
+  const [weekly, setWeekly] = useState(true);
+  const [nextError, setNextError] = useState("");
+  const saveNext = async () => {
+    const episode = Number(epDraft);
+    const airingAt = parseLocalDateTime(whenDraft);
+    if (!Number.isInteger(episode) || episode < 1) return setNextError("Enter the episode number.");
+    if (airingAt == null) return setNextError("Date and time like 2026-11-15 23:30 (your time).");
+    if (airingAt * 1000 <= Date.now()) return setNextError("That time has already passed.");
+    setNextEditing(false);
+    await onSetNext({ episode, airingAt, weekly });
+  };
 
   const commit = () => {
     const err = checkProgress(item, draft);
@@ -521,6 +556,63 @@ function ProgressBox({ item, progress, onChange, styles, C }) {
       {!!total && (
         <View style={styles.bar}><View style={[styles.barFill, { width: `${Math.min(100, (progress / total) * 100)}%` }]} /></View>
       )}
+      {item.segment === "anime" && !counting && (outEditing ? (
+        <View style={{ marginTop: 10 }}>
+          <Text style={styles.nextSub}>How many episodes are out? (more than AniList counts)</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 6 }}>
+            <TextInput value={outDraft} onChangeText={(t) => { setOutDraft(t.replace(/[^0-9]/g, "")); setOutError(""); }}
+              keyboardType="number-pad" autoFocus onSubmitEditing={saveOut} returnKeyType="done" style={[styles.progressInput, { minWidth: 70 }]} />
+            <TouchableOpacity onPress={() => setOutEditing(false)} style={styles.stepBtn}><Text style={styles.stepText}>Cancel</Text></TouchableOpacity>
+            <TouchableOpacity onPress={saveOut} style={[styles.stepBtn, styles.stepPlus]}><Text style={[styles.stepText, { color: "#fff" }]}>Save</Text></TouchableOpacity>
+          </View>
+          {!!outError && <Text style={{ color: C.rose, fontSize: 12, fontWeight: "700", marginTop: 6 }}>{outError}</Text>}
+        </View>
+      ) : (
+        <View style={{ flexDirection: "row", gap: 14, marginTop: 10 }}>
+          <TouchableOpacity onPress={() => { setOutDraft(String(item.knownAired ?? "")); setOutError(""); setOutEditing(true); }} hitSlop={6} accessibilityRole="button">
+            <Text style={{ color: C.purple, fontSize: 12, fontWeight: "700" }}>
+              {item.knownAired != null ? `You set ${item.knownAired} episodes out · Change` : "AniList's schedule wrong? Set episodes out"}
+            </Text>
+          </TouchableOpacity>
+          {item.knownAired != null && (
+            <TouchableOpacity onPress={() => onSetOut(null)} hitSlop={6} accessibilityRole="button">
+              <Text style={{ color: C.faint, fontSize: 12, fontWeight: "700" }}>Reset</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      ))}
+      {item.segment === "anime" && !counting && (nextEditing ? (
+        <View style={{ marginTop: 10 }}>
+          <Text style={styles.nextSub}>Next episode (AniList doesn't list it)</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 6 }}>
+            <TextInput value={epDraft} onChangeText={(t) => { setEpDraft(t.replace(/[^0-9]/g, "")); setNextError(""); }} placeholder="Ep #"
+              placeholderTextColor={C.faint} keyboardType="number-pad" style={[styles.progressInput, { minWidth: 70 }]} />
+            <TextInput value={whenDraft} onChangeText={(t) => { setWhenDraft(t); setNextError(""); }} placeholder="2026-11-15 23:30"
+              placeholderTextColor={C.faint} autoCapitalize="none" autoCorrect={false} style={[styles.progressInput, { flex: 1 }]} />
+          </View>
+          <TouchableOpacity onPress={() => setWeekly((w) => !w)} style={{ marginTop: 8 }} accessibilityRole="checkbox" accessibilityState={{ checked: weekly }}>
+            <Text style={{ color: C.text, fontSize: 12, fontWeight: "700" }}>{weekly ? "☑" : "☐"} Repeats every week after that</Text>
+          </TouchableOpacity>
+          <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
+            <TouchableOpacity onPress={() => setNextEditing(false)} style={styles.stepBtn}><Text style={styles.stepText}>Cancel</Text></TouchableOpacity>
+            <TouchableOpacity onPress={saveNext} style={[styles.stepBtn, styles.stepPlus]}><Text style={[styles.stepText, { color: "#fff" }]}>Save</Text></TouchableOpacity>
+          </View>
+          {!!nextError && <Text style={{ color: C.rose, fontSize: 12, fontWeight: "700", marginTop: 6 }}>{nextError}</Text>}
+        </View>
+      ) : (
+        <View style={{ flexDirection: "row", gap: 14, marginTop: 8 }}>
+          <TouchableOpacity onPress={() => { const m = item.manualNext; setEpDraft(m ? String(m.episode) : ""); setWhenDraft(""); setWeekly(m ? m.weekly !== false : true); setNextError(""); setNextEditing(true); }} hitSlop={6} accessibilityRole="button">
+            <Text style={{ color: C.purple, fontSize: 12, fontWeight: "700" }}>
+              {item.manualNext ? `Next episode set by you: Ep ${item.manualNext.episode} · Change` : "AniList missing the next episode? Set it"}
+            </Text>
+          </TouchableOpacity>
+          {item.manualNext && (
+            <TouchableOpacity onPress={() => onSetNext(null)} hitSlop={6} accessibilityRole="button">
+              <Text style={{ color: C.faint, fontSize: 12, fontWeight: "700" }}>Reset</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      ))}
     </View>
   );
 }
