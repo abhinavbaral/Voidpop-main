@@ -6,8 +6,8 @@ import { CRUNCHYROLL_AOTY } from "../features/awards.js";
 import { officialYouTube } from "../features/officialYouTube.js";
 import { readingLinks } from "../features/readLinks.js";
 import { formatDateParts } from "../lib/format.js";
-import { cacheKey, cacheGet, cachePut, isDeviceOnline, noteSavedShown } from "./cache.js";
-export { onNetState, cacheClear, cacheSize, setDeviceOnline, isDeviceOnline } from "./cache.js";
+import { cacheKey, cacheGet, cachePut, isDeviceOnline, noteSavedShown } from "../api/cache.js";
+export { onNetState, cacheClear, cacheSize, setDeviceOnline, isDeviceOnline } from "../api/cache.js";
 
 const URL = "https://graphql.anilist.co";
 
