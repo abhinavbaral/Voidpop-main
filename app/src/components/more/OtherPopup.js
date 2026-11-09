@@ -1,7 +1,7 @@
-// More → Other: one popup that holds "You're watching", "New announcements" and "News". The popup opens on a short
+// More → Other: one popup that holds "You're watching" and "New announcements". The popup opens on a short
 // list; picking one shows its content in the same popup, with ← to go back.
 //
-// It is drawn inside the More screen (not as a system Modal), so opening a title or a news story from it just puts
+// It is drawn inside the More screen (not as a system Modal), so opening a title from it just puts
 // that screen on top. Going back lands on the popup exactly as you left it: same section, same place in the list.
 
 import { useCallback, useEffect, useState } from "react";
@@ -17,23 +17,22 @@ import { openDetail } from "../../utils/nav";
 import VerdictModal from "../title/VerdictModal.js";
 import Icon from "../ui/Icon.js";
 import { SkeletonList } from "../ui/Skeleton.js";
-import NewsSection from "./NewsSection.js";
 
 const SECTIONS = [
   { key: "youwatching", icon: "play", label: "You're watching", Body: YoureWatching },
   { key: "announced", icon: "bell", label: "New announcements", Body: Announced },
-  { key: "news", icon: "news", label: "News", Body: NewsSection },
 ];
 
-export default function OtherPopup({ visible, onClose, navigation }) {
+export default function OtherPopup({ visible, onClose, navigation, initial = null }) {
   const { C } = useTheme();
   const styles = makeStyles(C);
   const [open, setOpen] = useState(null); // null = the short list of the two
+  // opened on a given section (Explore's "View more") or on the short list
+  useEffect(() => { if (visible) setOpen(SECTIONS.some((x) => x.key === initial) ? initial : null); }, [visible, initial]);
   const section = SECTIONS.find((s) => s.key === open);
   const close = () => { setOpen(null); onClose(); };
-  // a title or a story opens on top of this screen; the popup stays here, untouched, until you come back
+  // a title opens on top of this screen; the popup stays here, untouched, until you come back
   const goTo = (item) => openDetail(navigation, item);
-  const openArticle = (article) => navigation.navigate("NewsReader", { article });
 
   // Android back: out of a section first, then out of the popup (only while this screen is the one showing)
   useEffect(() => {
@@ -64,7 +63,7 @@ export default function OtherPopup({ visible, onClose, navigation }) {
           </View>
           {section ? (
             <ScrollView contentContainerStyle={{ padding: 16, paddingTop: 4 }}>
-              <section.Body styles={styles} C={C} goTo={goTo} onOpenArticle={openArticle} />
+              <section.Body styles={styles} C={C} goTo={goTo} />
             </ScrollView>
           ) : (
             SECTIONS.map((s, i) => (

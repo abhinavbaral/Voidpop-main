@@ -22,16 +22,24 @@ import OtherPopup from "../../components/more/OtherPopup.js";
 
 const GROUPS = [
   [["statistics", "stats", "Statistics"], ["compare", "list", "Compare"], ["data", "storage", "Data and storage"]],
-  [["voidai", "explore", "Void AI"], ["other", "menu", "Other"]], // opens a popup with You're watching, New announcements and News
+  [["voidai", "explore", "Void AI"], ["other", "menu", "Other"]], // opens a popup with You're watching and New announcements
   [["anilist", "sync", "Sync"], ["account", "profile", "Account"]], // the account rows are worked out below (Sign in / Account + Log out)
   [["appearance", "palette", "Appearance"], ["settings", "settings", "Settings"], ["help", "help", "Help"], ["about", "info", "About"]],
 ];
 
-export default function MoreScreen({ navigation }) {
+export default function MoreScreen({ navigation, route }) {
   const { C, dark } = useTheme();
   const styles = makeStyles(C);
   const [rank, setRank] = useState(null);
   const [otherOpen, setOtherOpen] = useState(false);
+  const [otherSection, setOtherSection] = useState(null); // which section Other opens on (Explore's "View more" sends "announced")
+  const wanted = route?.params?.openOther;
+  useEffect(() => {
+    if (!wanted) return;
+    setOtherSection(wanted);
+    setOtherOpen(true);
+    navigation.setParams({ openOther: undefined }); // used up: coming back to More later shouldn't reopen it
+  }, [wanted, navigation]);
   const { user, ready, enabled } = useAccount();
   const [confirmLogout, setConfirmLogout] = useState(false); // logging out takes two taps, since Alert doesn't exist on web
   useEffect(() => {
@@ -104,7 +112,7 @@ export default function MoreScreen({ navigation }) {
           </View>
         ))}
       </ScrollView>
-      <OtherPopup visible={otherOpen} onClose={() => setOtherOpen(false)} navigation={navigation} />
+      <OtherPopup visible={otherOpen} initial={otherSection} onClose={() => { setOtherOpen(false); setOtherSection(null); }} navigation={navigation} />
     </SafeAreaView>
   );
 }

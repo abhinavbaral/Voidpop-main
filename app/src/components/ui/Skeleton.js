@@ -31,7 +31,7 @@ export default function Skeleton({ width, height, style, radius = 12 }) {
 // Placeholder shapes that match the real layouts, so the page doesn't jump
 // when content arrives.
 
-// list rows: thumbnail + two text lines (History, Out this week, More pages)
+// list rows: thumbnail + two text lines (History, Anime this week, More pages)
 export function SkeletonList({ rows = 5, thumb = true, style }) {
   return (
     <View style={[{ paddingHorizontal: 14, paddingTop: 8, gap: 14 }, style]} accessibilityLabel="Loading" accessible>

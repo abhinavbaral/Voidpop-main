@@ -19,7 +19,8 @@ import { VoidmonEmpty, VoidmonCheer } from "../brand/Voidmon.js";
 
 const FOLLOWING = new Set(["watching", "plan", "onhold"]);
 
-export default function YourShows({ now, layout = "stack", title = "Your shows", emptyText, onOpen, refreshKey = 0 }) {
+// onlyPending: just the shows with aired episodes you haven't watched (Schedule's Pending); nothing at all when there are none
+export default function YourShows({ now, layout = "stack", title = "Your shows", emptyText, onOpen, refreshKey = 0, onlyPending = false }) {
   const { C } = useTheme();
   const { user } = useAuth();
   const { width } = useWindowDimensions();
@@ -46,7 +47,8 @@ export default function YourShows({ now, layout = "stack", title = "Your shows",
   useEffect(() => onDataChange(readLib), [readLib]);
 
   if (!lib) return null;
-  const shows = yourShows(lib, fresh, now);
+  const all = yourShows(lib, fresh, now);
+  const shows = onlyPending ? all.filter((s) => s.pending > 0) : all;
   const pending = shows.reduce((n, s) => n + s.pending, 0);
   const head = (
     <View style={styles.head}>

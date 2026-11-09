@@ -14,7 +14,7 @@ import { openDetail } from "../../utils/nav";
 import { useIsWide } from "../../utils/layout";
 import Icon from "../../components/ui/Icon.js";
 import AnimatedBanner from "../../components/brand/AnimatedBanner.js";
-import { NewEpisodeCards, Countdowns } from "../../components/explore/ExploreCards.js";
+import { NewEpisodeCards, Countdowns, LatestAnnouncement } from "../../components/explore/ExploreCards.js";
 import Billboard from "../../components/explore/Billboard.js";
 import TileGrid from "../../components/explore/TileGrid.js";
 import { useExplore, initExplore, refreshPersonal, rerollAll } from "../../state/explore";
@@ -67,6 +67,8 @@ export default function ExploreScreen({ navigation }) {
     featured && row("billboard", () => <Billboard item={featured} onOpen={open} />),
     row("new-eps", () => <NewEpisodeCards onOpen={open} />),
     row("coming-up", () => <Countdowns onOpen={open} />),
+    // only the newest announcement; View more opens More → Other → New announcements
+    row("announced", () => <LatestAnnouncement onOpen={open} onMore={() => navigation.navigate("More", { openOther: "announced" })} />),
     !wide && row("search", () => searchRow),
     row("tiles", () => <TileGrid state={ex} keys={GRID_KEYS} onOpen={openCategory} />),
     // poster rows below the tiles: most mix all five kinds; Popular in town shows one kind at a time (chips),

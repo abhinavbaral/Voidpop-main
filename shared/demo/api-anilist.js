@@ -129,15 +129,17 @@ export async function fetchAniListDetail(segment, id) {
 
 // Every episode airing in the next `days` days: each airing demo title gets its
 // next episode plus the following weekly ones inside the window.
-export async function fetchAiringSchedule(days = 7) {
+export async function fetchAiringSchedule(days = 7, { from } = {}) {
   await wait();
-  const end = Date.now() / 1000 + days * 86400;
+  const start = from ?? Date.now() / 1000;
+  const end = start + days * 86400;
   const out = [];
   CATALOG.anime.filter((a) => a.nextEpisode).forEach((a) => {
-    for (let k = 0; ; k++) {
+    for (let k = -8; ; k++) { // a few weeks back too: a window that starts earlier includes what already aired
       const airingAt = a.nextEpisode.airingAt + k * 7 * 86400;
       const episode = a.nextEpisode.episode + k;
       if (airingAt > end || (a.episodes && episode > a.episodes)) break;
+      if (airingAt <= start || episode < 1) continue;
       out.push({ episode, airingAt, item: toAppItem(a) });
     }
   });

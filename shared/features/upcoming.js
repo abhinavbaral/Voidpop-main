@@ -48,6 +48,20 @@ export async function loadAiringWeek(days = 7) {
   return out;
 }
 
+// Monday 00:00 (local) of the week that `d` falls in: the week Schedule's "Anime this week" covers.
+export function weekStart(d = new Date()) {
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+  return x;
+}
+
+// Every episode of this calendar week (Monday to Sunday), aired and still to air, soonest first:
+// [{ item, episode, airingAt }, …]
+export async function loadAnimeThisWeek(now = Date.now()) {
+  const from = Math.floor(weekStart(new Date(now)).getTime() / 1000);
+  return fetchAiringSchedule(7, { from });
+}
+
 // Anime whose first episode came out in the last `days` days, newest first.
 export async function loadLatestPremieres(days = 21) {
   const today = new Date();

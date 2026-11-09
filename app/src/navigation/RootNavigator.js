@@ -16,7 +16,6 @@ import MorePageScreen from "../screens/more/MorePageScreen";
 import WelcomeScreen from "../screens/welcome/WelcomeScreen";
 import OnboardingScreen from "../screens/welcome/OnboardingScreen";
 import VoidAIScreen from "../screens/ai/VoidAIScreen";
-import NewsReaderScreen from "../screens/news/NewsReaderScreen";
 
 const Stack = createNativeStackNavigator();
 const fade = { animation: "fade", gestureEnabled: false };
@@ -45,7 +44,6 @@ export default function RootNavigator({ initialRouteName }) {
       <Stack.Screen name="ExploreCategory" component={ExploreCategoryScreen} />
       <Stack.Screen name="Playlist" component={PlaylistScreen} />
       <Stack.Screen name="VoidAI" component={VoidAIScreen} />
-      <Stack.Screen name="NewsReader" component={NewsReaderScreen} />
     </Stack.Navigator>
   );
 }

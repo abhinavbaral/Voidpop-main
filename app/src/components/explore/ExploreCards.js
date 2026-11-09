@@ -5,7 +5,7 @@
 //                     banner card for every anime you're Watching or Excited
 //                     about, soonest first, with "3 pending" / "All caught up"
 //                     in the heading and +1 on cards you're behind on
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { View, Text, Image, ScrollView, Pressable, StyleSheet, useWindowDimensions } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import Svg, { Defs, LinearGradient, Stop, Rect } from "react-native-svg";
@@ -14,6 +14,8 @@ import { useAuth } from "@voidpop/shared/backend/AuthContext";
 import { fetchNextEpisodes } from "@voidpop/shared/api/anilist";
 import { useNow } from "@voidpop/shared/lib/useNow";
 import { readableAccent } from "@voidpop/shared/lib/color";
+import { loadAnnounced, daysLeft } from "@voidpop/shared/features/announced";
+import { releaseLabel } from "@voidpop/shared/lib/format";
 import { useTheme } from "../../context/ThemeContext.js";
 import Icon from "../ui/Icon.js";
 import VerdictModal from "../title/VerdictModal.js";
@@ -204,7 +206,51 @@ export function Countdowns({ onOpen }) {
   );
 }
 
+// The newest announcement only (More → Other → New announcements holds the whole week's list).
+// "View more" opens that list. Hidden when nothing has been announced.
+export function LatestAnnouncement({ onOpen, onMore }) {
+  const { C } = useTheme();
+  const [first, setFirst] = useState(null);
+  const lastRead = useRef(0);
+  const read = useCallback(async () => {
+    if (Date.now() - lastRead.current < 5 * 60 * 1000) return; // Explore comes into focus a lot; AniList needn't hear about it each time
+    lastRead.current = Date.now();
+    const list = await loadAnnounced();
+    setFirst(list[0] || null);
+  }, []);
+  useFocusEffect(useCallback(() => { read().catch(() => {}); }, [read]));
+  if (!first) return null;
+  const { item, seenAt } = first;
+  const left = daysLeft(seenAt);
+  return (
+    <View style={{ marginTop: 22 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, marginBottom: 10 }}>
+        <Icon name="bell" size={17} color={C.orange} />
+        <Text style={{ color: C.text, fontWeight: "800", fontSize: 16, flex: 1 }} accessibilityRole="header">New announcement</Text>
+        <Pressable onPress={onMore} hitSlop={10} accessibilityRole="button" accessibilityLabel="View more new announcements">
+          <Text style={{ color: C.purple, fontWeight: "800", fontSize: 12 }}>View more ›</Text>
+        </Pressable>
+      </View>
+      <Pressable onPress={() => onOpen(item)} accessibilityRole="button" accessibilityLabel={`${item.title}, newly announced`}
+        style={[s.annCard, { backgroundColor: C.card, borderColor: C.border }]}>
+        {item.image
+          ? <Image source={{ uri: item.image }} style={s.annPoster} />
+          : <View style={[s.annPoster, { backgroundColor: C.border }]} />}
+        <View style={{ flex: 1, justifyContent: "center", gap: 3 }}>
+          <Text style={{ color: C.text, fontSize: 15, fontWeight: "800" }} numberOfLines={2}>{item.title}</Text>
+          <Text style={{ color: C.faint, fontSize: 12 }} numberOfLines={1}>
+            {item.date ? releaseLabel(item) : "Release date TBA"}{item.creator ? ` · ${item.creator}` : ""}
+          </Text>
+          <Text style={{ color: C.faint, fontSize: 10 }}>{left} day{left === 1 ? "" : "s"} left in New announcements</Text>
+        </View>
+      </Pressable>
+    </View>
+  );
+}
+
 const s = StyleSheet.create({
+  annCard: { flexDirection: "row", gap: 12, marginHorizontal: 14, padding: 10, borderRadius: 14, borderWidth: 1 },
+  annPoster: { width: 54, height: 76, borderRadius: 8 },
   epCard: { width: 300, height: 130, borderRadius: 18, overflow: "hidden", flexDirection: "row" },
   badge: { flexDirection: "row", alignItems: "center", gap: 5, alignSelf: "flex-start", backgroundColor: "#fde68a", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
   badgeText: { color: "#7c2d12", fontSize: 11, fontWeight: "800" },

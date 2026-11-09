@@ -808,8 +808,9 @@ export function otherLinks(links, { segment = "anime", idMal = null, siteUrl = n
 }
 
 // Every episode airing in the next `days` days, soonest first (Schedule page).
-export async function fetchAiringSchedule(days = 7) {
-  const start = Math.floor(Date.now() / 1000);
+// from (unix seconds): start there instead of now, so a window can include episodes that already aired.
+export async function fetchAiringSchedule(days = 7, { from } = {}) {
+  const start = from ?? Math.floor(Date.now() / 1000);
   const end = start + days * 86400;
   const query = `query ($page: Int, $start: Int, $end: Int) {
     Page(page: $page, perPage: 25) {

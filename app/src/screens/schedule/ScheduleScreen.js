@@ -1,19 +1,19 @@
 // SCHEDULE — when does the next episode drop? (same as the website)
-//   Your watch:    countdowns for the anime you follow, and what you're behind on
-//   Out this week: premiere calendar, airing in the next 24 hours, latest premieres
+//   Pending:         the aired episodes you haven't watched yet (+1); the tab is hidden while there are none
+//   Anime this week: every episode of this calendar week, plus aired ones you still haven't watched
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import { fetchNextEpisodes } from "@voidpop/shared/api/anilist";
 import { useAuth } from "@voidpop/shared/backend/AuthContext";
-import { getLibrary, noteAiring } from "@voidpop/shared/backend/store";
+import { getLibrary, noteAiring, yourShows, onDataChange } from "@voidpop/shared/backend/store";
 import { useNow } from "@voidpop/shared/lib/useNow";
 import { useTheme } from "../../context/ThemeContext.js";
 import { openDetail } from "../../utils/nav";
 import YourShows from "../../components/library/YourShows.js";
-import OutThisWeek from "../../components/explore/OutThisWeek.js";
+import AnimeThisWeek from "../../components/schedule/AnimeThisWeek.js";
 
 const FOLLOWING = new Set(["watching", "plan", "onhold"]);
 
@@ -22,21 +22,34 @@ export default function ScheduleScreen({ navigation }) {
   const styles = makeStyles(C);
   const { user } = useAuth();
   const now = useNow(1000);
-  // the Schedule tab's two views: your shows' countdowns, or everything out this week
-  const [view, setView] = useState("mine");
+  // the Schedule tab's two views: Pending (only while something is pending) and Anime this week
+  const [view, setView] = useState("pending");
+  const [snap, setSnap] = useState({ lib: {}, fresh: {} }); // what the pending count is worked out from
   const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [fetched, setFetched] = useState(0); // bumps after fresh air times are saved
 
   const load = useCallback(async () => {
     setError(false);
-    const lib = Object.values(await getLibrary(user));
-    const following = lib.filter((e) => e.item.segment === "anime" && FOLLOWING.has(e.status));
+    const saved = await getLibrary(user);
+    setSnap((s) => ({ ...s, lib: saved })); // the saved copy already says what's pending; fresh air times refine it
+    const following = Object.values(saved).filter((e) => e.item.segment === "anime" && FOLLOWING.has(e.status));
     const fresh = await fetchNextEpisodes(following.map((e) => e.item.id)).catch(() => { setError(true); return {}; });
     // compare with the saved times to spot delays
     await noteAiring(fresh);
+    setSnap({ lib: await getLibrary(user), fresh });
     setFetched((n) => n + 1);
   }, [user]);
+  // +1 on a pending show, or any other change to your library: recount
+  useEffect(() => onDataChange(() => { getLibrary(user).then((lib) => setSnap((s) => ({ ...s, lib }))).catch(() => {}); }), [user]);
+
+  const minute = Math.floor(now / 60000);
+  const pendingCount = useMemo(
+    () => yourShows(snap.lib, snap.fresh, minute * 60000).filter((x) => x.pending > 0).length,
+    [snap, minute],
+  );
+  const hasPending = pendingCount > 0;
+  const active = hasPending ? view : "week"; // no pending: the Pending tab is gone and so is the tab bar
 
   // reload whenever the tab is opened: you may have just tracked something
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -63,23 +76,22 @@ export default function ScheduleScreen({ navigation }) {
           <Text style={styles.error}>Couldn't load the latest airing times. Pull down to retry.</Text>
         )}
 
-        <View style={styles.viewTabs}>
-          {[["mine", "Your watch"], ["week", "Out this week"]].map(([k, label]) => (
-            <TouchableOpacity key={k} onPress={() => setView(k)} style={[styles.viewTab, view === k && styles.viewTabOn]}>
-              <Text style={[styles.viewTabText, view === k && { color: "#fff" }]}>{label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {view === "mine" && (
-          <YourShows
-            now={now}
-            refreshKey={fetched}
-            onOpen={(it) => openDetail(navigation, it)}
-            emptyText="Nothing you follow is airing right now. Mark an airing anime as Watching or Plan to Watch and its countdown shows up here, or see what's coming in Out this week."
-          />
+        {hasPending ? (
+          <View style={styles.viewTabs}>
+            {[["pending", "Pending"], ["week", "Anime this week"]].map(([k, label]) => (
+              <TouchableOpacity key={k} onPress={() => setView(k)} style={[styles.viewTab, active === k && styles.viewTabOn]}>
+                <Text style={[styles.viewTabText, active === k && { color: "#fff" }]}>{label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        ) : (
+          <Text style={styles.section} accessibilityRole="header">Anime this week</Text>
         )}
-        {view === "week" && <OutThisWeek navigation={navigation} refreshKey={fetched} />}
+
+        {active === "pending" && (
+          <YourShows now={now} refreshKey={fetched} title="Pending" onlyPending onOpen={(it) => openDetail(navigation, it)} />
+        )}
+        {active === "week" && <AnimeThisWeek navigation={navigation} refreshKey={fetched} />}
       </ScrollView>
     </SafeAreaView>
   );
