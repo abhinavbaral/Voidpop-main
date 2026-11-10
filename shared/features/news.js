@@ -1,3 +1,4 @@
+// FILE: shared/features/news.js — turns RSS/Atom feeds into a clean news list (no network). NOT shared/api/news.js, which fetches them.
 // Anime, manga and novel news: turning RSS / Atom feeds into a clean list. Pure functions, no network and no
 // screens (the fetching is in api/news.js, the reading is in the app's News screen).
 //

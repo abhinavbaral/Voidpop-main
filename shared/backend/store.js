@@ -222,7 +222,8 @@ export function airedFor(item, now = Date.now()) {
 // { aired: the latest of your episodes that is already out | null, next: { episode, airingAt } still to come | null }
 const WEEK_S = 7 * 86400;
 // AniList has an episode coming up for this show (a countdown is running)
-export const aniListCounting = (item, now = Date.now()) => !!item?.nextEpisode && item.nextEpisode.airingAt > now / 1000;
+// (a weekly estimate, or a time that only another schedule gave, is not AniList counting: what you entered still counts)
+export const aniListCounting = (item, now = Date.now()) => !!item?.nextEpisode && !item.nextEpisode.estimated && !item.nextEpisode.source && item.nextEpisode.airingAt > now / 1000;
 export function manualNextState(item, now = Date.now()) {
   const m = item?.manualNext;
   if (!m || !(m.episode >= 1) || !(m.airingAt > 0)) return { aired: null, next: null };
@@ -741,6 +742,9 @@ export async function getPending() {
 /* ---------- delays: "Episode 8 moved from Wed to next Wed" ---------- */
 
 const HOUR = 3600;
+// What is kept of a next episode in a saved snapshot: the time, and whether it is an estimate or came from another
+// schedule (not how many sources agreed: that is worked out again each time).
+const keepNext = (n) => (n ? { episode: n.episode, airingAt: n.airingAt, ...(n.estimated ? { estimated: true } : {}), ...(n.source ? { source: n.source } : {}) } : null);
 // Call with fresh AniList data ({ id -> item }). Compares each followed
 // anime's next episode with the time saved last time: the same episode airing
 // more than an hour later = delayed. Also keeps the saved snapshots current.
@@ -750,8 +754,9 @@ export async function noteAiring(fresh) {
   Object.values(db.library).forEach((e) => {
     const f = e.item.segment === "anime" && fresh[e.item.id];
     if (!f) return;
-    const before = e.item.nextEpisode;
-    const now = f.nextEpisode || null;
+    const saved = e.item.nextEpisode || null;
+    const before = saved?.estimated ? null : saved; // a guess is not a time anyone announced, so a real one that differs is no "delay"
+    const now = keepNext(f.nextEpisode);
     if (before && now && before.episode === now.episode && now.airingAt - before.airingAt > HOUR) {
       // keep the ORIGINAL date if it slips twice
       const from = e.delay?.episode === now.episode ? e.delay.from : before.airingAt;
@@ -767,7 +772,7 @@ export async function noteAiring(fresh) {
     const caughtUp = e.item.knownAired != null && (counting || (airedFor({ ...f, segment: "anime", knownAired: undefined, manualNext: undefined }) ?? -1) >= e.item.knownAired);
     // AniList has a countdown now (whatever episode and day it says): it is the schedule again, your entry goes
     const manualDone = !!e.item.manualNext && counting;
-    if (manualDone || caughtUp || JSON.stringify(before) !== JSON.stringify(now) || e.item.finished !== f.finished || !!e.item.unreleased !== !!f.unreleased || (f.endDate ?? null) !== (e.item.endDate ?? null)) {
+    if (manualDone || caughtUp || JSON.stringify(saved) !== JSON.stringify(now) || e.item.finished !== f.finished || !!e.item.unreleased !== !!f.unreleased || (f.endDate ?? null) !== (e.item.endDate ?? null)) {
       const next = { ...e.item, nextEpisode: now, finished: f.finished, unreleased: f.unreleased, episodes: f.episodes ?? e.item.episodes, endDate: f.endDate ?? null };
       if (caughtUp) delete next.knownAired;
       if (manualDone) delete next.manualNext;

@@ -1,3 +1,4 @@
+// FILE: app/src/widget/index.js — home-screen widget glue (Android widgets). NOT app/index.js, the app entry point.
 // Home-screen widget glue. The widget library needs native code that Expo Go
 // doesn't have, so everything here is loaded only if that native part exists:
 // in Expo Go these calls quietly do nothing; in the real APK they work.

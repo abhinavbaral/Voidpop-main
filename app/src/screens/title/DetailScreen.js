@@ -25,6 +25,7 @@ import { addToCalendar } from "../../services/calendar";
 import { completeEarlierSeasons, undoEarlierSeasons } from "@voidpop/shared/features/earlierSeasons";
 import { getCachedItem, cacheItem, openDetail, goBackOrHome } from "../../utils/nav";
 import { releaseLabel, formatCountdown, dayLabel, airTime, parseLocalDateTime } from "@voidpop/shared/lib/format";
+import { projectStale } from "@voidpop/shared/features/nextEpisode";
 import { useNow } from "@voidpop/shared/lib/useNow";
 import { useSettings } from "@voidpop/shared/backend/SettingsContext";
 import { useIsWide } from "../../utils/layout";
@@ -114,6 +115,10 @@ function DetailBody({ item, navigation }) {
   const { clock24 } = useSettings().settings;
   const [status, setStatusState] = useState(null);
   const [nextEpisode, setNextEpisode] = useState(item.nextEpisode || null);
+  // A saved time that has passed is carried forward a week and marked as an estimate, so this page never says "Aired" for
+  // an episode whose successor is already due. It is worked out on every tick, so it also holds when the page stays open
+  // across air time or the refresh below can't reach anyone.
+  const shownNext = nextEpisode ? projectStale(nextEpisode, { episodes: item.episodes, now }) : null;
   const [myReview, setMyReview] = useState(null);
   useEffect(() => { let alive = true; loadFamiliarFaces({ segment: item.segment, id: item.id }).then((f) => alive && setFamiliar(f)).catch(() => {}); return () => { alive = false; }; }, [item.segment, item.id]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -166,7 +171,7 @@ function DetailBody({ item, navigation }) {
       .then((d) => { if (alive) { setTrailer(d.trailer); setRelated(d.related); setWatch(d.whereToWatch || []); setYoutube(d.whereToYouTube || []); setRead(d.whereToRead || null); setSource(d.source || null); setCast({ characters: d.characters || [], staff: d.staff || [], themes: d.themes || [] }); setEpisodes(d.episodes || []); } })
       .catch(() => {});
     if (item.segment === "anime") { // finished ones too: AniList may have a countdown now, and then what you entered goes
-      fetchNextEpisodes([item.id])
+      fetchNextEpisodes([item.id], { verify: true }) // this one title is also checked against the other schedules
         .then(async (fresh) => {
           if (!alive || !fresh[item.id]) return;
           setNextEpisode(fresh[item.id].nextEpisode);
@@ -342,24 +347,29 @@ function DetailBody({ item, navigation }) {
           {!wide && overview}
 
           {/* next episode countdown (airing anime) */}
-          {nextEpisode && (
+          {shownNext && (
             <View style={[styles.box, styles.nextBox]}>
               <View style={{ flex: 1 }}>
-                {/* a saved countdown that has passed is not "next" any more: AniList's newer one is still loading or couldn't be reached */}
-                <Text style={styles.nextLabel}>{nextEpisode.airingAt * 1000 < now ? "LATEST EPISODE" : "NEXT EPISODE"}</Text>
+                {/* inside its first hour an episode is "latest" (Airing now); after that shownNext has moved on to the next one */}
+                <Text style={styles.nextLabel}>{shownNext.airingAt * 1000 < now ? "LATEST EPISODE" : "NEXT EPISODE"}</Text>
                 <Text style={styles.nextTitle}>
-                  Episode {nextEpisode.episode}{item.episodes ? ` of ${item.episodes}` : ""}
+                  Episode {shownNext.episode}{item.episodes ? ` of ${item.episodes}` : ""}
                 </Text>
                 <Text style={styles.nextSub}>
-                  {dayLabel(nextEpisode.airingAt, now)}, {airTime(nextEpisode.airingAt, clock24)} (your time)
+                  {dayLabel(shownNext.airingAt, now)}, {airTime(shownNext.airingAt, clock24)} (your time)
                 </Text>
+                {shownNext.estimated ? (
+                  <Text style={styles.nextSub}>Estimated from the last episode's time</Text>
+                ) : shownNext.confirmedBy >= 2 ? (
+                  <Text style={styles.nextSub}>Time confirmed by {shownNext.confirmedBy} sources</Text>
+                ) : null}
                 {delay && (
                   <Text style={styles.delayed}>Delayed · was {dayLabel(delay.from, now)}, {airTime(delay.from, clock24)}</Text>
                 )}
               </View>
               <View style={{ alignItems: "flex-end", gap: 8 }}>
-                <Text style={styles.nextCountdown}>{formatCountdown(nextEpisode.airingAt, now)}</Text>
-                <TouchableOpacity onPress={() => addToCalendar({ ...item, nextEpisode })} hitSlop={6}>
+                <Text style={styles.nextCountdown}>{formatCountdown(shownNext.airingAt, now)}</Text>
+                <TouchableOpacity onPress={() => addToCalendar({ ...item, nextEpisode: shownNext })} hitSlop={6}>
                   <Text style={{ color: C.purple, fontSize: 12, fontWeight: "700" }}>+ Add to calendar</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => setCountdownOpen(true)} hitSlop={6}>
@@ -376,9 +386,9 @@ function DetailBody({ item, navigation }) {
             </View>
           )}
           {!unreleased && status !== "completed" && (status || progress > 0) && (
-            <ProgressBox item={{ ...item, nextEpisode, knownAired, manualNext }} progress={progress} onChange={changeProgress}
-              onSetOut={async (n) => { await setKnownAired({ ...item, nextEpisode }, n); await refresh(); }}
-              onSetNext={async (n) => { await setManualNext({ ...item, nextEpisode }, n); await refresh(); }} styles={styles} C={C} />
+            <ProgressBox item={{ ...item, nextEpisode: shownNext, knownAired, manualNext }} progress={progress} onChange={changeProgress}
+              onSetOut={async (n) => { await setKnownAired({ ...item, nextEpisode: shownNext }, n); await refresh(); }}
+              onSetNext={async (n) => { await setManualNext({ ...item, nextEpisode: shownNext }, n); await refresh(); }} styles={styles} C={C} />
           )}
           {item.segment === "anime" && <FillerGuide item={item} progress={progress} />}
 
@@ -440,7 +450,7 @@ function DetailBody({ item, navigation }) {
         />
       )}
       {countdownOpen && (
-        <CountdownShareModal visible item={item} next={nextEpisode} onClose={() => setCountdownOpen(false)} />
+        <CountdownShareModal visible item={item} next={shownNext} onClose={() => setCountdownOpen(false)} />
       )}
       <ShareCardModal
         visible={shareOpen}

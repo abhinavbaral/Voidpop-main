@@ -1,3 +1,4 @@
+// FILE: shared/api/anilist.js — the AniList client: every request to AniList (browse, search, details, countdowns) goes through here. NOT shared/sync/anilist.js, which is the two-way list sync.
 // AniList GraphQL — anime + manga. Free, NO KEY.
 // Supports: countryOfOrigin toggles, seasons, trending, airing schedule,
 // upcoming (unreleased) titles, and per-title details (trailer + related seasons).
@@ -6,6 +7,8 @@ import { CRUNCHYROLL_AOTY } from "../features/awards.js";
 import { officialYouTube } from "../features/officialYouTube.js";
 import { readingLinks } from "../features/readLinks.js";
 import { formatDateParts } from "../lib/format.js";
+import { airingPassedSince } from "../features/nextEpisode.js";
+import { settleNextEpisodes } from "./airingSources.js";
 import { cacheKey, cacheGet, cachePut, isDeviceOnline, noteSavedShown } from "./cache.js";
 export { onNetState, cacheClear, cacheSize, setDeviceOnline, isDeviceOnline } from "./cache.js";
 
@@ -90,7 +93,7 @@ const MEDIA_FIELDS = `
 // Creator line: animation studio for anime, mangaka for manga. Requested only
 // for the matching type to keep AniList's query-complexity score down.
 const CREATOR_FIELDS = {
-  anime: `studios(isMain: true) { nodes { name } } episodes nextAiringEpisode { episode airingAt }`,
+  anime: `studios(isMain: true) { nodes { name } } episodes idMal nextAiringEpisode { episode airingAt }`,
   manga: `staff(perPage: 6, sort: [RELEVANCE]) { edges { role node { name { full } } } } chapters`,
 };
 const fieldsFor = (segment) => `${MEDIA_FIELDS} ${CREATOR_FIELDS[segment] || ""}`;
@@ -150,6 +153,8 @@ function normalize(m, segment) {
     nextEpisode: m.nextAiringEpisode
       ? { episode: m.nextAiringEpisode.episode, airingAt: m.nextAiringEpisode.airingAt }
       : null,
+    // the MyAnimeList id: lets the countdown be checked against other schedules (see airingSources.js)
+    idMal: m.idMal ?? null,
   };
 }
 
@@ -174,9 +179,15 @@ async function gql(query, variables, { save = true, token = null } = {}) {
   const k = cacheKey(body);
   if (save) {
     const saved = await cacheGet(k);
-    if (saved && (Date.now() - saved.at < FRESH_MS || !isDeviceOnline())) {
-      noteSavedShown(saved.at);
-      return saved.data;
+    if (saved) {
+      // A countdown inside it that ran out AFTER it was saved is wrong now (the episode has aired and AniList has moved
+      // on), so it is never served as a fresh answer: ask again. Offline there is nothing better, and fetchNextEpisodes
+      // turns such a countdown into a weekly estimate instead of "Aired".
+      const outdated = airingPassedSince(saved.data, saved.at);
+      if (!outdated ? Date.now() - saved.at < FRESH_MS || !isDeviceOnline() : !isDeviceOnline()) {
+        noteSavedShown(saved.at);
+        return saved.data;
+      }
     }
   }
   if (!isDeviceOnline()) throw new Error("You're offline, and this hasn't been saved yet.");
@@ -837,7 +848,11 @@ export async function fetchAiringSchedule(days = 7, { from } = {}) {
 
 // Fresh "next episode" info for specific anime (the ones in your library).
 // Library entries are snapshots, so their countdowns go stale; this refreshes them.
-export async function fetchNextEpisodes(ids) {
+// The time comes from AniList; where it has run out (AniList was slow or rate limited and an old answer was used)
+// or is missing, other schedules are asked and the best one is used, else the last time is carried forward a week
+// and marked `estimated`. verify: also ask them when AniList is fine, to mark a time as confirmed (one title's page).
+// Never returns a "next episode" whose time has passed. See features/nextEpisode.js for the rules.
+export async function fetchNextEpisodes(ids, { verify = false } = {}) {
   if (!ids.length) return {};
   const query = `query ($ids: [Int]) {
     Page(page: 1, perPage: 25) {
@@ -849,7 +864,7 @@ export async function fetchNextEpisodes(ids) {
     const data = await gql(query, { ids: ids.slice(i, i + 25).map(Number) });
     data.Page.media.forEach((m) => { out[m.id] = normalize(m, "anime"); });
   }
-  return out;
+  return settleNextEpisodes(out, { verify });
 }
 
 // Who made each title, for Statistics → "Your people": main studio, the top

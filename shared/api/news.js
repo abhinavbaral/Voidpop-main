@@ -1,3 +1,4 @@
+// FILE: shared/api/news.js — fetches the news RSS feeds. NOT shared/features/news.js, which turns feeds into a clean list.
 // The only file that fetches news. A few public RSS feeds; each fails on its own, so one site being down
 // never empties the list. The result is kept on the device for 15 minutes (and used as-is when you're offline).
 

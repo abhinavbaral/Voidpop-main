@@ -1,3 +1,4 @@
+// FILE: shared/features/cinema.js — Movies & TV rules (collections, featured pick). NOT shared/demo/cinema.js, which is sample data.
 // Movies & TV: the rules (no drawing, no network). Ideas from the Talehouse concept:
 // curated collections, "More like this", and a featured pick for the hero.
 

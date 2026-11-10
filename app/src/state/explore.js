@@ -1,3 +1,4 @@
+// FILE: app/src/state/explore.js — the app's Explore store (what the grid and category pages read). NOT shared/features/explore.js, which is the section logic.
 // The Explore data, shared by the Explore grid and the category pages (a tiny
 // store: both read it with useExplore(), the actions below change it).
 // Loading is done here so a category page opens with what the grid already fetched.

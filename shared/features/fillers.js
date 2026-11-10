@@ -1,3 +1,4 @@
+// FILE: shared/features/fillers.js — filler guide logic (next filler block, skipped ranges). NOT shared/data/fillers.js, which is the filler database.
 // Filler guide logic: read the filler database (data/fillers.js), find the
 // next filler block, count what you could skip, and work with the skipped
 // episode ranges saved on a library entry (entry.skipped, e.g. [[54, 61]]).

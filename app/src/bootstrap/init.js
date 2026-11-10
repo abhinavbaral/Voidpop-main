@@ -1,3 +1,4 @@
+// FILE: app/src/bootstrap/init.js — phone app startup wiring (AsyncStorage, NetInfo, sync). NOT web/src/init.js, the website's.
 // App startup wiring (imported first in App.js): VoidPop keeps your library
 // on this phone with AsyncStorage. No accounts, no keys.
 import AsyncStorage from "@react-native-async-storage/async-storage";

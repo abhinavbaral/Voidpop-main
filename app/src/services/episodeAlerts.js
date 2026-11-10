@@ -94,7 +94,7 @@ export function rescheduleEpisodeAlerts() {
       };
       for (const item of Object.values(fresh)) {
         const next = item.nextEpisode;
-        if (!next || next.airingAt <= nowSec + 30) continue;
+        if (!next || next.estimated || next.airingAt <= nowSec + 30) continue; // never an alert at a guessed time
         await alert(item, next);
       }
       // episodes you entered yourself (AniList has nothing for those shows); weekly ones for the next few weeks

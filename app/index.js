@@ -1,3 +1,4 @@
+// FILE: app/index.js — the app entry point: registers the root component. NOT app/src/widget/index.js.
 // Entry point (SDK 52+ style): registers the root component.
 import { registerRootComponent } from "expo";
 import App from "./App";

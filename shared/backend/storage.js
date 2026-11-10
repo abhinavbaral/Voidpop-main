@@ -1,3 +1,4 @@
+// FILE: shared/backend/storage.js — the real key-value storage hook that each platform plugs into. NOT shared/demo/storage.js, the demo stand-in.
 // Where VoidPop keeps your data: on this device, nowhere else.
 //
 // Each platform plugs in its own key-value store at startup:

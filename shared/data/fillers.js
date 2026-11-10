@@ -1,3 +1,4 @@
+// FILE: shared/data/fillers.js — the filler database (which episodes are filler). NOT shared/features/fillers.js, which is the logic that reads it.
 // The filler database: which episodes of an anime are filler, anime canon or mixed.
 //
 //   AniList id → { name, afl, filler, animeCanon, mixed }

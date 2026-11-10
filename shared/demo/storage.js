@@ -1,3 +1,4 @@
+// FILE: shared/demo/storage.js — demo-mode stand-in for shared/backend/storage.js (sample library, memory only).
 // DEMO MODE stand-in for shared/backend/storage.js: starts with a sample
 // library and keeps changes in memory only, so a presentation always starts
 // from the same state. The REAL store.js runs on top of it.

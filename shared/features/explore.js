@@ -1,3 +1,4 @@
+// FILE: shared/features/explore.js — Explore (home) section logic, shared by app and website. NOT app/src/state/explore.js, which is the app's Explore store.
 // Explore (home) sections — the same picks on the app and the website.
 // Explore is anime only, except "Don't Miss This — Manga" and "Don't Miss
 // This — Novels". Nothing in your library or on your Excited list shows in

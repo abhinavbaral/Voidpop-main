@@ -1,3 +1,4 @@
+// FILE: shared/demo/cinema.js — sample movies and series used in demo mode / without a TMDB key. NOT shared/features/cinema.js, which is the rules.
 // Sample movies and series (from the Talehouse concept). Used when no TMDB key is
 // configured, so Movies & TV works offline and in demo builds. Ids are "demo-N"
 // strings so they can never be mistaken for real TMDB ids.

@@ -1,3 +1,4 @@
+// FILE: server/src/index.js — starts the Express backend server. NOT app/index.js or app/src/widget/index.js.
 // Start the server:  npm run server   (from the repo root)  or  npm start  (in server/)
 import { createServer } from "node:http";
 import { randomBytes } from "node:crypto";
