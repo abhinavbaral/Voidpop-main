@@ -23,7 +23,7 @@ import { fillerFor, canSkip, countIn, inRanges, addRange, removeRange, lastListe
 const DB_KEY = "voidation:db:v1";
 // notifyEpisodes only matters in the app (the website can't schedule alerts)
 // logo: which logo the app shows (see Brand.js): "classic", "voidmon" or "peeking"
-export const DEFAULT_SETTINGS = { clock24: false, posterBadges: true, notifyEpisodes: true, seasonLayout: "grid", logo: "classic", libraryLayout: "compact", name: "", nameAsked: false };
+export const DEFAULT_SETTINGS = { clock24: false, posterBadges: true, notifyEpisodes: true, autoUpdateCheck: true, seasonLayout: "grid", logo: "classic", libraryLayout: "compact", name: "", nameAsked: false };
 // the first Movies & TV version called a finished title "watched"; it is now "completed" like the rest of the Library
 function renameWatched(cinema) {
   for (const e of Object.values(cinema)) if (e.status === "watched") e.status = "completed";

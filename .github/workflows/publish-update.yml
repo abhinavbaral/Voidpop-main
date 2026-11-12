@@ -1,0 +1,48 @@
+# The "Publish update" button. Starts from the Publish card in the app (More > About, tap the version 7 times), from
+# GitHub (Actions > Publish update > Run workflow), or from a terminal: gh workflow run publish-update.yml -f notes="Fix countdowns".
+#
+# It checks the code first (lint, tests, a full Android bundle) and only then runs `eas update`, because one button makes
+# it easy to send a broken update to every phone. If a check fails nothing is published.
+#
+# One-time setup: add a repository secret EXPO_TOKEN (expo.dev > Account settings > Access tokens).
+name: Publish update
+
+on:
+  workflow_dispatch:
+    inputs:
+      notes:
+        description: "What's new (shown in the app's update sheet)"
+        required: true
+        type: string
+      channel:
+        description: "Which installed apps get it"
+        required: true
+        default: preview
+        type: choice
+        options: [preview, production]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Tests
+        run: npm test
+      - name: Bundle the Android app
+        run: npm run check:app
+      - name: Publish the update
+        working-directory: app
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          UPDATE_NOTES: ${{ inputs.notes }}
+          CHANNEL: ${{ inputs.channel }}
+        run: npx --yes eas-cli@latest update --channel "$CHANNEL" --platform android --message "$UPDATE_NOTES" --non-interactive

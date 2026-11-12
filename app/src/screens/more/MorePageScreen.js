@@ -38,7 +38,8 @@ const NATIVE = Platform.OS !== "web";
 const AUTO_BACKUP = Platform.OS === "android"; // Android's folder picker (SAF)
 
 import appConfig from "../../../app.json";
-import * as Updates from "expo-updates";
+import DevPublish from "../../components/update/DevPublish.js";
+import { useAppUpdate, checkNow, requestUpdateSheet, updatesOn } from "../../hooks/useAppUpdate.js";
 import Chips from "../../components/ui/Chips.js";
 import { computeAchievements } from "@voidpop/shared/features/achievements";
 import { loadPeopleStats, PEOPLE_KINDS } from "@voidpop/shared/features/peopleStats";
@@ -276,6 +277,7 @@ function Settings({ styles, C, navigation }) {
     <View style={styles.card}>
       {row("clock24", "24-hour clock", "Airing times as 16:30 instead of 4:30 PM")}
       {row("posterBadges", "Countdown badges", '"Ep 7 · 3h 30m" on posters')}
+      {Platform.OS === "android" && row("autoUpdateCheck", "Check for updates automatically", "Looks for a newer VoidPop when you open the app")}
       {NATIVE && (
         <Pressable style={styles.toggleRow} onPress={() => toggleAlerts(!settings.notifyEpisodes)}>
           <View style={{ flex: 1 }}>
@@ -715,19 +717,17 @@ function Help({ styles, navigation }) {
 // where your data lives.
 function About({ styles, C }) {
   const [checking, setChecking] = useState(null);
+  const [taps, setTaps] = useState(0); // tapping the version 7 times shows the developer's Publish card
+  const up = useAppUpdate();
+  // an update that is found or already downloaded opens the update sheet (UpdateGate, mounted in App.js)
   const check = async () => {
-    if (!Updates || Platform.OS === "web") return;
+    if (Platform.OS === "web") return;
+    if (!updatesOn) { setChecking("Updates work in the installed app, not while developing."); return; }
+    if (up.phase === "ready" || up.phase === "downloading") { requestUpdateSheet(); return; }
     setChecking("Checking…");
-    try {
-      const r = await Updates.checkForUpdateAsync();
-      if (!r.isAvailable) { setChecking("You're on the latest update."); return; }
-      setChecking("Downloading the update…");
-      await Updates.fetchUpdateAsync();
-      setChecking("Update downloaded. Restarting…");
-      await Updates.reloadAsync();
-    } catch {
-      setChecking("Couldn't check right now. Try again when you're online.");
-    }
+    const r = await checkNow();
+    if (r === "available") { setChecking("An update is available."); requestUpdateSheet(); return; }
+    setChecking(r === "error" ? "Couldn't check right now. Try again when you're online." : "You're on the latest version.");
   };
   const line = (title, body, onPress) => (
     <Pressable onPress={onPress} disabled={!onPress} style={[styles.trackerRow, { flexDirection: "column", alignItems: "flex-start", gap: 2 }]}>
@@ -740,7 +740,7 @@ function About({ styles, C }) {
       <View style={[styles.card, { alignItems: "center" }]}>
         <Voidmon pose="welcome" size={96} />
         <Text style={[styles.cardTitle, { fontSize: 18, marginTop: 6 }]}>VoidPop</Text>
-        <Text style={styles.note}>Version {VERSION}</Text>
+        <Pressable onPress={() => setTaps((t) => t + 1)}><Text style={styles.note}>Version {VERSION}</Text></Pressable>
         <Text style={[styles.note, { textAlign: "center", marginTop: 8 }]}>
           An anime and manga tracker with live countdowns to the next episode and Void Verdicts instead of scores.
         </Text>
@@ -748,8 +748,9 @@ function About({ styles, C }) {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>This copy</Text>
         {line("Version", `${VERSION} (Android app)`)}
-        {Platform.OS !== "web" && line("Check for updates", checking || "Downloads the newest update if there is one", check)}
+        {Platform.OS !== "web" && line("Check for updates", checking || (up.phase === "ready" ? "An update is ready to install" : "Looks for an update and installs it here"), check)}
       </View>
+      {taps >= 7 && <DevPublish />}
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Credits</Text>
         {line("Made by Abhinav Baral", "www.abhinavbaral.com.np · Jhapa, Nepal", () => Linking.openURL("https://www.abhinavbaral.com.np/").catch(() => {}))}

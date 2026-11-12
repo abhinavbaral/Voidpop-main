@@ -17,6 +17,7 @@ import useInitialRoute from "./src/hooks/useInitialRoute";
 import OfflineBanner from "./src/components/ui/OfflineBanner";
 import RankUp from "./src/components/library/RankUp";
 import SignInNudge from "./src/components/account/SignInNudge";
+import UpdateGate from "./src/components/update/UpdateGate";
 
 function ThemedApp() {
   const { C, dark } = useTheme();
@@ -38,6 +39,7 @@ function ThemedApp() {
       <OfflineBanner />
       <RankUp />
       <SignInNudge />
+      <UpdateGate />
     </NavigationContainer>
   );
 }
