@@ -9,6 +9,7 @@ import { fetchCinema } from "@voidpop/shared/api/tmdb";
 import { loadExplorePools, knownKeys, loadVerdictSources, loadRecsLike, loadNewSeasons, loadAnimeOfTheYear, loadJumpBackIn, loadInProgress } from "@voidpop/shared/features/explore";
 import { loadCinemaPools, loadComingBooks, loadAwards, loadNewSeasonsTv, loadMostLoved } from "@voidpop/shared/features/exploreCinema";
 import { loadCommunityRows } from "@voidpop/shared/features/exploreCommunity";
+import { loadShelfPools } from "@voidpop/shared/features/exploreShelf";
 import { likeMix } from "@voidpop/shared/features/exploreMix";
 import { TILES, EXTRA, PICK_COUNT, viewTile, dedupe, poolFor, chosenSource, nextSource } from "@voidpop/shared/features/exploreTiles";
 
@@ -132,6 +133,7 @@ export async function initExplore() {
     loadExplorePools({ extras: false }).then((pools) => mergePools(pools)).then(topUpPools).catch(() => mergePools({})),
     cinema.then(() => topUpPools()),
     loadComingBooks().then(mergePools).catch(() => {}),
+    loadShelfPools().then(mergePools).catch(() => {}), // games and comics (sample catalogue until the server exists)
     loadAwards().then((a) => set({ oscars: a.oscars, emmys: a.emmys })).catch(() => set({ oscars: state.oscars || [], emmys: state.emmys || [] })),
     loadAnimeOfTheYear().then((aoty) => set({ aoty })).catch(() => set({ aoty: state.aoty || [] })),
     // Best out there, Popular in town and Most loved from the community's verdicts (null with no server: they fall back or hide)

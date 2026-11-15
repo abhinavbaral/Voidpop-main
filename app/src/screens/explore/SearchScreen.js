@@ -8,6 +8,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { fetchAniList, fetchPeople } from "@voidpop/shared/api/anilist";
 import { fetchCinema } from "@voidpop/shared/api/tmdb";
+import { fetchShelf } from "@voidpop/shared/api/shelf";
 import Chips from "../../components/ui/Chips.js";
 import { useTheme } from "../../context/ThemeContext.js";
 import { openDetail, goBackOrHome } from "../../utils/nav";
@@ -61,16 +62,18 @@ export default function SearchScreen({ navigation, route }) {
     const t = setTimeout(async () => {
       const n = kind === "all" ? 5 : 20;
       const none = Promise.resolve(null);
-      const [anime, manga, novels, people, movies, tv] = await Promise.allSettled([
+      const [anime, manga, novels, people, movies, tv, games, comics] = await Promise.allSettled([
         kind === "all" || kind === "anime" ? fetchAniList("anime", { search: query, perPage: n }) : none,
         kind === "all" || kind === "manga" ? fetchAniList("manga", { search: query, perPage: n }) : none,
         kind === "all" || kind === "novel" ? fetchAniList("novel", { search: query, perPage: n }) : none,
         kind === "all" || kind === "people" ? fetchPeople(query, n) : none,
         kind === "all" || kind === "movie" ? fetchCinema("movie", { search: query }) : none,
         kind === "all" || kind === "tv" ? fetchCinema("tv", { search: query }) : none,
+        kind === "all" || kind === "game" ? fetchShelf("game", { query }) : none,
+        kind === "all" || kind === "comic" ? fetchShelf("comic", { query }) : none,
       ]);
       if (!alive) return; // you kept typing; a newer search owns the screen
-      const asked = [anime, manga, novels, people, movies, tv].filter((r) => r.status === "rejected" || r.value !== null);
+      const asked = [anime, manga, novels, people, movies, tv, games, comics].filter((r) => r.status === "rejected" || r.value !== null);
       if (asked.every((r) => r.status === "rejected")) {
         setSections([]);
         setStatus("failed");
@@ -85,6 +88,8 @@ export default function SearchScreen({ navigation, route }) {
           { title: "Novels", data: items(novels) },
           { title: "Movies", data: items(movies) },
           { title: "TV", data: items(tv) },
+          { title: "Games", data: items(games) },
+          { title: "Comics", data: items(comics) },
           { title: "People", data: folks },
         ].filter((s) => s.data.length > 0)
       );
@@ -110,7 +115,7 @@ export default function SearchScreen({ navigation, route }) {
       </View>
       <View style={{ paddingHorizontal: 14, paddingBottom: 6 }}>
         <Chips value={kind} onChange={setKind}
-          options={[{ key: "all", label: "All" }, { key: "anime", label: "Anime" }, { key: "manga", label: "Manga" }, { key: "novel", label: "Novels" }, { key: "movie", label: "Movies" }, { key: "tv", label: "TV" }, { key: "people", label: "People" }]} />
+          options={[{ key: "all", label: "All" }, { key: "anime", label: "Anime" }, { key: "manga", label: "Manga" }, { key: "novel", label: "Novels" }, { key: "movie", label: "Movies" }, { key: "tv", label: "TV" }, { key: "game", label: "Games" }, { key: "comic", label: "Comics" }, { key: "people", label: "People" }]} />
       </View>
 
       <SectionList

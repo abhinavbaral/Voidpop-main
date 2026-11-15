@@ -10,6 +10,7 @@ import { useTheme } from "../../context/ThemeContext.js";
 import { releaseLabel, formatCountdown } from "@voidpop/shared/lib/format";
 import { useSettings } from "@voidpop/shared/backend/SettingsContext";
 import { totalFor, unitFor, behindBy, maxProgress, doneLabel } from "@voidpop/shared/backend/store";
+import { isShelf, playTime } from "@voidpop/shared/features/shelfKinds";
 import Icon from "./Icon.js";
 
 // `columns`: when used in a grid, each cell gets an exact 1/columns width so an
@@ -64,8 +65,9 @@ function CardInner({ item, entry, onPlus, onPress, onLongPress, selecting, selec
           <Image source={{ uri: src }} style={styles.poster} resizeMethod="resize"
             onError={() => setFailed((n) => (n === 0 && item.imageSmall && item.imageSmall !== item.image ? 1 : 2))} />
         ) : (
-          <View style={[styles.poster, styles.noImg]}>
-            <Text style={{ color: C.faint, fontSize: 12 }}>No image</Text>
+          // no cover yet: a coloured title tile if the title has a colour (games and comics), else "No image"
+          <View style={[styles.poster, styles.noImg, item.color && { backgroundColor: item.color, padding: 10, alignItems: "flex-start", justifyContent: "flex-end" }]}>
+            {item.color ? <Text style={{ color: "#fff", fontSize: 15, fontWeight: "900", lineHeight: 18 }} numberOfLines={4}>{item.title}</Text> : <Text style={{ color: C.faint, fontSize: 12 }}>No image</Text>}
           </View>
         )}
         {!!item.awardYear && <View style={styles.award}><Icon name="trophy" size={11} color="#1a1205" strokeWidth={2.4} /><Text style={styles.awardText}>{item.awardYear}</Text></View>}
@@ -93,11 +95,13 @@ function CardInner({ item, entry, onPlus, onPress, onLongPress, selecting, selec
               <Text style={[styles.progress, { color: C.green }]} numberOfLines={1}>{doneLabel(item)}</Text>
             ) : (
               <Text style={styles.progress} numberOfLines={1}>
-                {unitFor(item.segment)} {entry.progress || 0}{totalFor(item) ? `/${totalFor(item)}` : ""}
+                {item.segment === "game"
+                  ? `${playTime(entry.progress)} played`
+                  : `${unitFor(item.segment)} ${entry.progress || 0}${totalFor(item) ? `/${totalFor(item)}` : ""}`}
                 {behindBy(entry) > 0 && <Text style={{ color: C.orange }}> · {behindBy(entry)} new</Text>}
               </Text>
             )}
-            {onPlus && !selecting && (maxProgress(item) == null || (entry.progress || 0) < maxProgress(item)) && (
+            {onPlus && !selecting && !isShelf(item.segment) && (maxProgress(item) == null || (entry.progress || 0) < maxProgress(item)) && (
               <Pressable onPress={onPlus} hitSlop={8} style={styles.plus}
                 accessibilityLabel={item.segment === "manga" ? "Mark next chapter read" : "Mark next episode watched"}>
                 <Text style={styles.plusText}>+1</Text>

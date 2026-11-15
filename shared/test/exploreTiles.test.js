@@ -14,9 +14,9 @@ const base = () => ({
   newSeasons: [], jump: { anime: [show(800), show(801)], manga: [] }, seeds: {}, saved: {}, extra: {}, busy: {},
 });
 
-test("20 tiles with unique keys, split into the grid and the poster rows; the fixed lists can't be rerolled", () => {
-  assert.equal(TILES.length, 20);
-  assert.equal(new Set(TILES.map((t) => t.key)).size, 20);
+test("22 tiles with unique keys, split into the grid and the poster rows; the fixed lists can't be rerolled", () => {
+  assert.equal(TILES.length, 22);
+  assert.equal(new Set(TILES.map((t) => t.key)).size, 22);
   assert.deepEqual(ROW_KEYS, ["talk", "best", "watch", "peak", "divein", "onetime", "loved"]);
   assert.deepEqual([...GRID_KEYS, ...ROW_KEYS].sort(), TILES.map((t) => t.key).sort()); // every tile is shown exactly once
   assert.ok(!TILES.some((t) => ["isekai", "shonen"].includes(t.key))); // Isekai Heaven and Shonen Feast are gone: those are genres in Browse now
@@ -262,12 +262,12 @@ test("Also watch this stays watchable when it runs short or falls back on what i
 const novel = (id) => show(id, { segment: "novel" });
 const kindStub = () => {
   const st = withCinema();
-  st.pools = { ...st.pools, popN: Array.from({ length: 20 }, (_, i) => novel(250 + i)), popM: comm(200, 20, "manga") };
+  st.pools = { ...st.pools, popN: Array.from({ length: 20 }, (_, i) => novel(250 + i)), popM: comm(200, 20, "manga"), popG: comm(6000, 20, "game"), popC: comm(7000, 20, "comic") };
   return st;
 };
 
-test("Popular in town has five chips and starts on anime", () => {
-  assert.deepEqual(TALK_KINDS.map((k) => k.key), ["anime", "manga", "novel", "movie", "tv"]);
+test("Popular in town has seven chips and starts on anime", () => {
+  assert.deepEqual(TALK_KINDS.map((k) => k.key), ["anime", "manga", "novel", "movie", "tv", "game", "comic"]);
   assert.equal(TALK_DEFAULT, "anime");
   const st = kindStub();
   const dflt = viewTile("talk", st);

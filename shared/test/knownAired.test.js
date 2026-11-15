@@ -8,6 +8,7 @@ const s = await import("../backend/store.js");
 
 const NOW = Date.parse("2026-11-11T12:00:00Z");
 const hrs = (h) => Math.floor(NOW / 1000) + h * 3600;
+Date.now = () => NOW; // the store asks the real clock too; these times are built from NOW, so the clock stands still at NOW
 const anime = (id, extra = {}) => ({ id, segment: "anime", title: `A${id}`, ...extra });
 const entry = (item, status, progress = 0) => ({ item, status, progress });
 
@@ -158,7 +159,8 @@ test("once AniList lists the episode you entered, your entry is dropped", async 
   const item = anime(31, { finished: true, episodes: 100, endDate: "2020-01-01" });
   await s.setProgress(null, item, 100, "typed");
   await s.setManualNext(item, { episode: 101, airingAt: hrs(24) });
-  await s.noteAiring({ 31: { ...item, finished: false, nextEpisode: { episode: 101, airingAt: hrs(24) } } });
+  const realNow = Date.now; Date.now = () => NOW; // noteAiring asks the real clock whether AniList's countdown is still running
+  try { await s.noteAiring({ 31: { ...item, finished: false, nextEpisode: { episode: 101, airingAt: hrs(24) } } }); } finally { Date.now = realNow; }
   const e = await s.getEntry("anime", 31);
   assert.equal(e.item.manualNext, undefined);
   assert.equal(e.item.nextEpisode.episode, 101);

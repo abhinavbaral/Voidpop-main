@@ -5,6 +5,7 @@
 // Plain functions: the History screen shows what buildHistory() returns.
 import { kindOf, totalFor } from "../backend/store.js";
 import { dayLabel } from "../lib/format.js";
+import { isShelf, progressRatio, playTime } from "./shelfKinds.js";
 
 export const HISTORY_FILTERS = [
   { key: "all", label: "All" },
@@ -13,10 +14,13 @@ export const HISTORY_FILTERS = [
   { key: "anime", label: "Anime" },
   { key: "manga", label: "Manga" },
   { key: "novel", label: "Novels" },
+  { key: "game", label: "Games" },
+  { key: "comic", label: "Comics" },
 ];
 
 const startOfDay = (ms) => new Date(new Date(ms).setHours(0, 0, 0, 0)).getTime();
 const fraction = (item, progress) => {
+  if (isShelf(item.segment)) return progressRatio(item, progress) ?? 0; // games: time played against the hours to beat; comics: issues
   const total = totalFor(item);
   return total ? Math.min(1, (progress || 0) / total) : 0;
 };
@@ -68,7 +72,7 @@ export function buildHistory({ log = [], library = {}, aired = [], labels = {}, 
   const q = query.trim().toLowerCase();
   const shown = items
     .filter((x) => !hidden.has(x.id))
-    .filter((x) => (filter === "towatch" ? x.type === "aired" : filter === "watched" ? x.type !== "aired" : ["anime", "manga", "novel"].includes(filter) ? kindOf(x.item) === filter : true))
+    .filter((x) => (filter === "towatch" ? x.type === "aired" : filter === "watched" ? x.type !== "aired" : ["anime", "manga", "novel", "game", "comic"].includes(filter) ? kindOf(x.item) === filter : true))
     .filter((x) => !q || x.item.title.toLowerCase().includes(q))
     .sort((a, b) => b.at - a.at);
 
@@ -85,6 +89,9 @@ export function buildHistory({ log = [], library = {}, aired = [], labels = {}, 
 // What a row says under the title
 export function historyText(x, now = Date.now()) {
   const unit = x.item.segment === "manga" ? "chapter" : "episode";
+  // games log minutes played, comics log issues read
+  if (x.type === "watched" && x.item.segment === "game") return { line1: `Played ${playTime(x.count)}`, line2: "" };
+  if (x.type === "watched" && x.item.segment === "comic") return { line1: `Read ${x.count} issue${x.count === 1 ? "" : "s"}`, line2: "" };
   if (x.type === "aired") return { line1: `Episode ${x.episode}`, line2: x.label || "" };
   if (x.type === "status") return { line1: x.status === "completed" ? "Completed" : "Dropped", line2: "" };
   return { line1: `${x.item.segment === "manga" ? "Read" : "Watched"} ${x.count} ${unit}${x.count === 1 ? "" : "s"}`, line2: "" };

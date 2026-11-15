@@ -23,7 +23,7 @@ import { fillerFor, canSkip, countIn, inRanges, addRange, removeRange, lastListe
 const DB_KEY = "voidation:db:v1";
 // notifyEpisodes only matters in the app (the website can't schedule alerts)
 // logo: which logo the app shows (see Brand.js): "classic", "voidmon" or "peeking"
-export const DEFAULT_SETTINGS = { clock24: false, posterBadges: true, notifyEpisodes: true, autoUpdateCheck: true, seasonLayout: "grid", logo: "classic", libraryLayout: "compact", name: "", nameAsked: false };
+export const DEFAULT_SETTINGS = { clock24: false, posterBadges: true, notifyEpisodes: true, seasonLayout: "grid", logo: "classic", libraryLayout: "compact", name: "", nameAsked: false };
 // the first Movies & TV version called a finished title "watched"; it is now "completed" like the rest of the Library
 function renameWatched(cinema) {
   for (const e of Object.values(cinema)) if (e.status === "watched") e.status = "completed";
@@ -103,7 +103,14 @@ export function statusesFor(segment) {
   if (segment === "movie") {
     return [{ key: "plan", label: "Plan to Watch" }, { key: "considering", label: "Considering" }, { key: "completed", label: "Watched" }];
   }
-  const reading = segment === "manga";
+  // Games: Backlog is "plan", Playing is "watching" (the keys are shared by every kind, only the words change)
+  if (segment === "game") {
+    return [
+      { key: "watching", label: "Playing" }, { key: "completed", label: "Completed" }, { key: "rewatching", label: "Replaying" },
+      { key: "plan", label: "Backlog" }, { key: "considering", label: "Considering" }, { key: "onhold", label: "On Hold" }, { key: "dropped", label: "Dropped" },
+    ];
+  }
+  const reading = segment === "manga" || segment === "comic";
   return [
     { key: "watching", label: reading ? "Reading" : "Watching" },
     { key: "completed", label: reading ? "Finished" : "Completed" },
@@ -133,7 +140,7 @@ export async function getLibrary() {
 // above). The Library screens read both through this: a movie or series looks like any other entry
 // (status, updatedAt), with no progress to count.
 const asEntry = (e) => ({
-  item: e.item, status: e.status, progress: 0,
+  item: e.item, status: e.status, progress: e.progress || 0, // games: minutes played; comics: issues read; movies and series: nothing to count
   addedAt: new Date(e.addedAt || 0).toISOString(), updatedAt: new Date(e.updatedAt || 0).toISOString(),
 });
 export async function getLibraryAll() {
@@ -196,9 +203,9 @@ export async function getEntry(segment, id) {
 
 /* ---------- progress: episodes watched / chapters read ---------- */
 
-export const unitFor = (segment) => (segment === "manga" ? "Ch" : "Ep");
+export const unitFor = (segment) => (segment === "manga" ? "Ch" : segment === "comic" ? "Issue" : segment === "game" ? "h" : "Ep");
 export const totalFor = (item) => {
-  if (item.segment === "manga") return item.chapters ?? null;
+  if (item.segment === "manga" || item.segment === "comic") return item.chapters ?? null; // a comic's issues
   // you set more episodes out than AniList lists: its count is wrong, so the real total is unknown
   if (aniListCounting(item)) return item.episodes ?? null;
   if (item.knownAired != null && item.episodes != null && item.knownAired > item.episodes) return null;
@@ -330,8 +337,9 @@ export function leftToWatch(entry) {
 
 // Completed means everything is watched / read: "✓ All 12 watched".
 export function doneLabel(item) {
+  if (item.segment === "game") return "✓ Completed";
   const total = totalFor(item);
-  const verb = item.segment === "manga" ? "read" : "watched";
+  const verb = item.segment === "manga" || item.segment === "comic" ? "read" : "watched";
   return total ? `✓ All ${total} ${verb}` : `✓ All ${verb}`;
 }
 
@@ -557,6 +565,10 @@ const slimCinemaItem = (item) => ({
   url: item.url || null, format: item.format || null, runtime: item.runtime || null,
   seasons: item.seasons ?? null, finished: item.finished ?? null,
   demo: !!item.demo, unreleased: !!item.unreleased,
+  // games and comics (see shared/features/shelfKinds.js)
+  color: item.color || null, platforms: item.platforms || null, developer: item.developer || null, publisher: item.publisher || null,
+  writer: item.writer || null, hoursToBeat: item.hoursToBeat ?? null, chapters: item.chapters ?? null,
+  releaseAt: item.releaseAt ?? null, nextIssue: item.nextIssue || null,
 });
 
 // every title on the shelf, newest change first
@@ -575,8 +587,8 @@ export async function setCinemaStatus(item, status) {
   db.cinema ||= {};
   const key = keyOf(item.segment, item.id);
 
-  // Only movies and live-action TV belong in cinema storage.
-  if (item.segment !== "movie" && item.segment !== "tv") {
+  // Movies, live-action TV, games and comics belong in this shelf storage.
+  if (!["movie", "tv", "game", "comic"].includes(item.segment)) {
     throw new Error(`Unsupported cinema segment: ${item.segment}`);
   }
 
@@ -602,8 +614,30 @@ export async function setCinemaStatus(item, status) {
   db.cinema[key] = {
     item: slimCinemaItem(freshest(before?.item, item)), status, review: before?.review ?? null,
     addedAt: before?.addedAt ?? now, updatedAt: now,
+    // comics: finishing one fills its issues, like finishing an anime fills its episodes; games keep the time played
+    ...(status === "completed" && item.segment === "comic" && item.chapters ? { progress: item.chapters } : before?.progress ? { progress: before.progress } : {}),
   };
   return save();
+}
+
+// Games and comics count something: minutes played, issues read. The change goes in the watch log like an episode does, so
+// History and its "this week" card see it. A title you haven't started (Backlog / Plan to Read) becomes Playing / Reading.
+// -> { ok, progress }; ok false when the title isn't in your library.
+export async function setShelfProgress(item, n) {
+  const db = await load();
+  db.cinema ||= {};
+  const key = keyOf(item.segment, item.id);
+  const e = db.cinema[key];
+  if (!e) return { ok: false, progress: 0 };
+  const before = e.progress || 0;
+  const next = Math.max(0, Math.round(Number(n) || 0));
+  if (next === before) return { ok: true, progress: before };
+  logChange(db, key, next - before, "plus");
+  e.progress = next;
+  e.updatedAt = Date.now();
+  if (next > 0 && (e.status === "plan" || e.status === "considering")) { logStatus(db, key, e.status, "watching"); e.status = "watching"; }
+  await save();
+  return { ok: true, progress: next };
 }
 
 // Saving a verdict marks it Completed (Watched for a movie). A changed verdict keeps the earlier one in `history`.
@@ -619,6 +653,7 @@ export async function saveCinemaReview(item, { verdict, moods, comment }) {
   logStatus(db, key, before?.status, "completed");
   db.cinema[key] = {
     item: slimCinemaItem(item), status: "completed", addedAt: before?.addedAt ?? now, updatedAt: now,
+    ...(before?.progress ? { progress: before.progress } : {}),
     review: {
       verdict, moods: moods || [], comment: comment || "", date: new Date(now).toISOString(),
       ...(history.length ? { history: history.slice(-10) } : {}),
@@ -923,15 +958,17 @@ export const LIBRARY_KINDS = [
   { key: "novel", label: "Novels", hint: "Light novels and web novels", segment: "manga" },
   { key: "movie", label: "Movies", hint: "Live-action films", segment: "movie" },
   { key: "tv", label: "TV", hint: "Live-action series", segment: "tv" },
+  { key: "game", label: "Games", hint: "Video games on any platform", segment: "game" },
+  { key: "comic", label: "Comics", hint: "Western comics and graphic novels", segment: "comic" },
 ];
 export function kindOf(item) {
-  if (item.segment === "movie" || item.segment === "tv") return item.segment;
+  if (["movie", "tv", "game", "comic"].includes(item.segment)) return item.segment;
   if (item.segment !== "manga") return "anime";
   return item.format === "NOVEL" ? "novel" : "manga";
 }
 export const kindLabel = (item) => LIBRARY_KINDS.find((k) => k.key === kindOf(item))?.label;
 // the three library headings: Manga covers manga, manhwa and manhua; Novel covers light and web novels
-const KIND_NAME = { anime: "Anime", manga: "Manga", novel: "Novel", movie: "Movie", tv: "TV" };
+const KIND_NAME = { anime: "Anime", manga: "Manga", novel: "Novel", movie: "Movie", tv: "TV", game: "Game", comic: "Comic" };
 
 // keys of library manga that don't know their format yet (so a novel
 // can't be told apart from a manga)

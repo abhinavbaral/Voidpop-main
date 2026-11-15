@@ -60,7 +60,7 @@ test("the progress bar is how far through the show you are", () => {
 });
 
 test("filters, search and removing", () => {
-  assert.deepEqual(HISTORY_FILTERS.map((f) => f.key), ["all", "towatch", "watched", "anime", "manga", "novel"]);
+  assert.deepEqual(HISTORY_FILTERS.map((f) => f.key), ["all", "towatch", "watched", "anime", "manga", "novel", "game", "comic"]);
   assert.deepEqual(buildHistory({ ...args, filter: "towatch" }).flatMap((s) => s.data).map((x) => x.type), ["aired"]);
   assert.ok(!buildHistory({ ...args, filter: "watched" }).flatMap((s) => s.data).some((x) => x.type === "aired"));
   assert.deepEqual(buildHistory({ ...args, filter: "manga" }).flatMap((s) => s.data).map((x) => x.item.title), ["Berserk"]);

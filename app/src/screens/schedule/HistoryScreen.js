@@ -14,8 +14,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import { fetchRecentEpisodes } from "@voidpop/shared/api/anilist";
 import { readKey, writeKey } from "@voidpop/shared/backend/storage";
-import { getLibrary, getExcited, getLog, setProgress, setStatus, addReview } from "@voidpop/shared/backend/store";
+import { getLibrary, getLibraryAll, getExcited, getLog, setProgress, setStatus, addReview } from "@voidpop/shared/backend/store";
 import { buildHistory, historyText, HISTORY_FILTERS } from "@voidpop/shared/features/history";
+import { weekSummary } from "@voidpop/shared/features/summaries";
+import { playTime } from "@voidpop/shared/features/shelfKinds";
 import { useAuth } from "@voidpop/shared/backend/AuthContext";
 import VerdictModal from "../../components/title/VerdictModal.js";
 import { airedAgo } from "@voidpop/shared/lib/format";
@@ -26,6 +28,7 @@ import { SkeletonList } from "../../components/ui/Skeleton.js";
 import Icon from "../../components/ui/Icon.js";
 import OptionsSheet from "../../components/ui/OptionsSheet.js";
 import HistoryRow from "../../components/history/HistoryRow.js";
+import WeekCard from "../../components/history/WeekCard.js";
 import { VoidmonEmpty } from "../../components/brand/Voidmon.js";
 
 const FOLLOWING = { watching: "Watching", plan: "Plan to Watch", onhold: "On Hold" };
@@ -52,8 +55,8 @@ export default function HistoryScreen({ navigation }) {
   const [finishing, setFinishing] = useState(null);
 
   const load = useCallback(async () => {
-    const [lib, excited, entries] = await Promise.all([getLibrary(), getExcited(), getLog()]);
-    setLibrary(lib);
+    const [lib, excited, entries, everyKind] = await Promise.all([getLibrary(), getExcited(), getLog(), getLibraryAll()]);
+    setLibrary(everyKind); // games and comics too; the anime-only logic below still reads `lib`
     setLog(entries);
     const prog = {};
     const next = {};
@@ -81,6 +84,7 @@ export default function HistoryScreen({ navigation }) {
     () => buildHistory({ log, library, aired, labels, progress, hidden, filter, query, now }),
     [log, library, aired, labels, progress, hidden, filter, query, Math.floor(now / 60000)] // eslint-disable-line react-hooks/exhaustive-deps
   );
+  const week = useMemo(() => weekSummary(log, now), [log, Math.floor(now / 60000)]); // eslint-disable-line react-hooks/exhaustive-deps
   const everything = useMemo( // for "Clear all history": every row, whatever the filter or search
     () => buildHistory({ log, library, aired, labels, progress, hidden, now }).flatMap((s) => s.data),
     [log, library, aired, labels, progress, hidden, Math.floor(now / 60000)] // eslint-disable-line react-hooks/exhaustive-deps
@@ -111,7 +115,7 @@ export default function HistoryScreen({ navigation }) {
     const when = x.type === "aired" ? airedAgo(Math.floor(x.at / 1000), now) : new Date(x.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
     return [`${t.line1} · ${when}`, t.line2];
   };
-  const badge = (x) => (x.type === "aired" ? `EP ${x.episode}` : x.type === "status" ? (x.status === "completed" ? "DONE" : "DROPPED") : `+${x.count}`);
+  const badge = (x) => (x.type === "aired" ? `EP ${x.episode}` : x.type === "status" ? (x.status === "completed" ? "DONE" : "DROPPED") : x.item.segment === "game" ? `+${playTime(x.count)}` : `+${x.count}`);
   const rowOptions = (x) => [
     ...(x.type === "aired" ? [{ key: "watch", label: "Mark watched" }] : []),
     { key: "open", label: "Open title" },
@@ -156,6 +160,7 @@ export default function HistoryScreen({ navigation }) {
           sections={sections}
           keyExtractor={(x) => x.id}
           stickySectionHeadersEnabled={false}
+          ListHeaderComponent={query || filter !== "all" ? null : <WeekCard week={week} />}
           contentContainerStyle={{ paddingBottom: 30 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={C.purple} colors={[C.purple]} />}
           renderSectionHeader={({ section }) => <Text style={styles.day}>{section.label}</Text>}

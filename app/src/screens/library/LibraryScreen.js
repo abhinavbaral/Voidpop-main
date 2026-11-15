@@ -14,6 +14,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useAuth } from "@voidpop/shared/backend/AuthContext";
 import { getLibrary, getLibraryAll, statusesFor, LIBRARY_KINDS as KINDS, kindOf, kindsMissing, fillKinds, noteAiring } from "@voidpop/shared/backend/store";
 import { buildPlaylists, searchEntries, PLAYLIST_SORTS } from "@voidpop/shared/features/playlists";
+import { libraryStats } from "@voidpop/shared/features/summaries";
 import { fetchNextEpisodes, fetchKinds } from "@voidpop/shared/api/anilist";
 import { useSettings } from "@voidpop/shared/backend/SettingsContext";
 import { useTheme } from "../../context/ThemeContext.js";
@@ -24,6 +25,7 @@ import Icon from "../../components/ui/Icon.js";
 import OptionsSheet from "../../components/ui/OptionsSheet.js";
 import LibraryCard from "../../components/library/LibraryCard.js";
 import PlaylistItem from "../../components/library/PlaylistItem.js";
+import StatStrip from "../../components/library/StatStrip.js";
 import { VoidmonEmpty } from "../../components/brand/Voidmon.js";
 
 export default function LibraryScreen({ navigation }) {
@@ -71,6 +73,7 @@ export default function LibraryScreen({ navigation }) {
   const kindEntries = useMemo(() => entries.filter((e) => kindOf(e.item) === kind), [entries, kind]);
   const playlists = useMemo(() => buildPlaylists(kindEntries, statusesFor(current.segment), sort), [kindEntries, current.segment, sort]);
   const results = useMemo(() => searchEntries(kindEntries, query), [kindEntries, query]);
+  const stats = useMemo(() => libraryStats(kindEntries), [kindEntries]);
   const q = query.trim();
 
   const open = (p) => navigation.navigate("Playlist", { kind, ref: p.ref, title: p.name });
@@ -108,6 +111,7 @@ export default function LibraryScreen({ navigation }) {
         />
       ) : (
         <>
+          <StatStrip stats={stats} />
           <View style={styles.sortRow}>
             <TouchableOpacity onPress={() => setSheet("sort")} style={styles.sortBtn} accessibilityRole="button" accessibilityLabel={`Sort playlists: ${sortLabel}`}>
               <Icon name="sort" size={20} color={C.text} />

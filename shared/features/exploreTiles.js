@@ -39,24 +39,28 @@ export const TILES = [
   { key: "dmNovels", title: "Don't Miss This — Novels", color: "#0d73ec", reroll: true },
   { key: "dmMovies", title: "Don't Miss This — Movies", color: "#c0392b", reroll: true },
   { key: "dmTv", title: "Don't Miss This — TV", color: "#0e7490", reroll: true },
+  { key: "dmGames", title: "Don't Miss This — Games", color: "#2a6df4", reroll: true },
+  { key: "dmComics", title: "Don't Miss This — Comics", color: "#b8860b", reroll: true },
   { key: "angles", title: "VoidPop Angles", color: "#509bf5", reroll: true },
 ];
 
 // What Explore shows, in order. The grid is the colourful tiles; the rows are posters in lines, each mixing
 // anime, manga, novels, movies and TV.
-export const GRID_KEYS = ["coming", "aoty", "oscars", "emmys", "jump", "seasons", "dmAnime", "dmManga", "dmMovies", "dmNovels", "dmTv", "angles", "trending"];
+export const GRID_KEYS = ["coming", "aoty", "oscars", "emmys", "jump", "seasons", "dmAnime", "dmManga", "dmMovies", "dmNovels", "dmTv", "dmGames", "dmComics", "angles", "trending"];
 // The kinds you can switch Coming soon between (the chips on its page); "all" is every kind together
 export const COMING_KINDS = [
   { key: "all", label: "All" }, { key: "anime", label: "Anime" }, { key: "manga", label: "Manga" },
   { key: "novel", label: "Novels" }, { key: "movie", label: "Movies" }, { key: "tv", label: "TV" },
+  { key: "game", label: "Games" }, { key: "comic", label: "Comics" },
 ];
-const COMING_NAME = { anime: "anime", manga: "manga", novel: "novels", movie: "movies", tv: "TV shows" };
+const COMING_NAME = { anime: "anime", manga: "manga", novel: "novels", movie: "movies", tv: "TV shows", game: "games", comic: "comics" };
 
 // The kinds you can switch Popular in town between (the chips on its row and its page). One kind at a time, no "all";
 // it always starts on anime.
 export const TALK_KINDS = [
   { key: "anime", label: "Anime" }, { key: "manga", label: "Manga" }, { key: "novel", label: "Novels" },
   { key: "movie", label: "Movies" }, { key: "tv", label: "TV" },
+  { key: "game", label: "Games" }, { key: "comic", label: "Comics" },
 ];
 export const TALK_DEFAULT = "anime";
 const talkKindOf = (st) => (TALK_KINDS.some((k) => k.key === st?.talkKind) ? st.talkKind : TALK_DEFAULT);
@@ -105,16 +109,17 @@ const COUNTRY_LABEL = { JP: "Japan", KR: "Korea", CN: "China" };
 const MIN_SHOWN = 6; // a tile with fewer shows than this gets topped up
 
 // the unmarked shows a Reroll tile draws from (its AniList pages plus anything Reroll fetched)
-const POOL_OF = { dmAnime: "popA", dmManga: "popM", dmNovels: "popN", dmMovies: "popMv", dmTv: "popTv" };
+const POOL_OF = { dmAnime: "popA", dmManga: "popM", dmNovels: "popN", dmMovies: "popMv", dmTv: "popTv", dmGames: "popG", dmComics: "popC" };
 // Also watch this mixes anime, movies and TV; VoidPop Angles mixes all five kinds, taken in turns
 const MIXED = {
   watch: (p) => [p.popMv, p.popTv, p.popA],
-  angles: (p) => [p.popA, p.popM, p.popN, p.popMv, p.popTv],
+  angles: (p) => [p.popA, p.popM, p.popN, p.popMv, p.popTv, p.popG, p.popC],
 };
 // Popular in town, one kind at a time: what is trending now first, then what is popular
 const TALK_POOLS = {
   anime: (p) => [p.trA, p.popA], manga: (p) => [p.popM], novel: (p) => [p.popN],
   movie: (p) => [p.trMv, p.popMv], tv: (p) => [p.trTv, p.popTv],
+  game: (p) => [p.popG], comic: (p) => [p.popC],
 };
 export function poolFor(key, st) {
   const base = MIXED[key] && st.pools ? interleave(MIXED[key](st.pools), 200) : st.pools?.[POOL_OF[key]];
@@ -188,7 +193,9 @@ function compute(key, st) {
     if (EXTRA[key] && kept.length >= MIN_SHOWN) return kept.slice(0, count);
     return mix(list, seed).slice(0, count);
   };
-  const byDate = (a, b) => (a.date ? 0 : 1) - (b.date ? 0 : 1) || (a.date || "").localeCompare(b.date || "");
+  // soonest first; a game sorts by its release time and a comic by its next issue (its own date is when it began)
+  const when = (it) => (it.releaseAt ? new Date(it.releaseAt * 1000).toISOString().slice(0, 10) : it.nextIssue ? new Date(it.nextIssue.airingAt * 1000).toISOString().slice(0, 10) : it.date);
+  const byDate = (a, b) => (when(a) ? 0 : 1) - (when(b) ? 0 : 1) || (when(a) || "").localeCompare(when(b) || "");
 
   if (def.verdict) {
     const v = st.verdicts?.[key];
@@ -228,9 +235,9 @@ function compute(key, st) {
       const yours = new Set((st.newSeasons || []).map((it) => it.id)); // sequels of shows you watched live in "New seasons"
       // everything that hasn't come out yet (anime, manga, novels, movies, TV), or just the kind it's switched to
       const p = st.pools;
-      const byKind = { anime: p.coming, manga: p.comingM, novel: p.comingN, movie: p.comingMv, tv: p.comingTv };
+      const byKind = { anime: p.coming, manga: p.comingM, novel: p.comingN, movie: p.comingMv, tv: p.comingTv, game: p.comingG, comic: p.comingC };
       const kind = byKind[st.comingKind] ? st.comingKind : null;
-      const pool = kind ? byKind[kind] : [...(p.coming || []), ...(p.comingMv || []), ...(p.comingTv || []), ...(p.comingM || []), ...(p.comingN || [])];
+      const pool = kind ? byKind[kind] : [...(p.coming || []), ...(p.comingMv || []), ...(p.comingTv || []), ...(p.comingM || []), ...(p.comingN || []), ...(p.comingG || []), ...(p.comingC || [])];
       const list = dedupe(fresh(pool)).filter((it) => !(it.segment === "anime" && yours.has(it.id)));
       const items = [...list].sort(byDate).slice(0, 24); // soonest first
       const label = st.pools.comingChip?.label || null;
@@ -289,24 +296,24 @@ function compute(key, st) {
       if (c.length >= MIN_SHOWN) return out(mix(c, seed).slice(0, PICK_COUNT), { subtitle: "Most talked about in VoidPop", noLast });
       if (!st.pools) return wait({ noLast });
       const p = st.pools;
-      if ((kind === "movie" && !p.trMv && !p.popMv) || (kind === "tv" && !p.trTv && !p.popTv)) return wait({ noLast }); // movies and TV load a moment after anime
+      if ((kind === "movie" && !p.trMv && !p.popMv) || (kind === "tv" && !p.trTv && !p.popTv) || (kind === "game" && !p.popG) || (kind === "comic" && !p.popC)) return wait({ noLast }); // movies and TV load a moment after anime
       const list = dedupe(fresh(TALK_POOLS[kind](p).flatMap((l) => l || [])));
       return out(draw(list), { noLast });
     }
-    case "dmAnime": case "dmManga": case "dmNovels": case "dmMovies": case "dmTv": {
+    case "dmAnime": case "dmManga": case "dmNovels": case "dmMovies": case "dmTv": case "dmGames": case "dmComics": {
       if (!st.pools) return wait();
-      if ((key === "dmMovies" && !st.pools.popMv) || (key === "dmTv" && !st.pools.popTv)) return wait(); // movies and TV load a moment after anime
-      const backups = { dmManga: st.pools.popM, dmNovels: st.pools.popN, dmMovies: st.pools.popMv, dmTv: st.pools.popTv }[key] || popular();
+      if ((key === "dmMovies" && !st.pools.popMv) || (key === "dmTv" && !st.pools.popTv) || (key === "dmGames" && !st.pools.popG) || (key === "dmComics" && !st.pools.popC)) return wait(); // movies and TV load a moment after anime
+      const backups = { dmManga: st.pools.popM, dmNovels: st.pools.popN, dmMovies: st.pools.popMv, dmTv: st.pools.popTv, dmGames: st.pools.popG, dmComics: st.pools.popC }[key] || popular();
       const t = topUp(draw(poolFor(key, st)), backups);
       return out(t.items);
     }
     case "angles": {
       if (!st.pools) return wait();
       // never repeats what the Don't Miss This tiles show right now; still takes all five kinds in turns
-      const shown = new Set(["dmAnime", "dmManga", "dmNovels", "dmMovies", "dmTv"].flatMap((k) => (viewTile(k, { ...st, last: null }).items || []).map(keyOf)));
+      const shown = new Set(["dmAnime", "dmManga", "dmNovels", "dmMovies", "dmTv", "dmGames", "dmComics"].flatMap((k) => (viewTile(k, { ...st, last: null }).items || []).map(keyOf)));
       const kindLists = MIXED.angles(st.pools).map((l) => (l || []).filter((it) => !known.has(keyOf(it)) && !shown.has(keyOf(it))));
       const rest = interleave(kindLists, 200);
-      const t = topUp(draw(rest.length ? rest : poolFor(key, st)), interleave([st.pools.popA, st.pools.popM, st.pools.popN, st.pools.popMv, st.pools.popTv], 30));
+      const t = topUp(draw(rest.length ? rest : poolFor(key, st)), interleave([st.pools.popA, st.pools.popM, st.pools.popN, st.pools.popMv, st.pools.popTv, st.pools.popG, st.pools.popC], 30));
       return out(t.items);
     }
     default: return out([]);
