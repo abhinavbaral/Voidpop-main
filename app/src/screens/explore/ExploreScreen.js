@@ -13,7 +13,8 @@ import { useTheme } from "../../context/ThemeContext.js";
 import { openDetail } from "../../utils/nav";
 import { useIsWide } from "../../utils/layout";
 import Icon from "../../components/ui/Icon.js";
-import AnimatedBanner from "../../components/brand/AnimatedBanner.js";
+import ContinueStrip from "../../components/explore/ContinueStrip.js";
+import WeekBanner from "../../components/explore/WeekBanner.js";
 import { NewEpisodeCards, Countdowns, LatestAnnouncement } from "../../components/explore/ExploreCards.js";
 import Billboard from "../../components/explore/Billboard.js";
 import TileGrid from "../../components/explore/TileGrid.js";
@@ -21,7 +22,7 @@ import { useExplore, initExplore, refreshPersonal, rerollAll } from "../../state
 import PosterRow from "../../components/ui/PosterRow.js";
 
 export default function ExploreScreen({ navigation }) {
-  const { C, dark } = useTheme();
+  const { C } = useTheme();
   const styles = makeStyles(C);
   const wide = useIsWide();
   const { settings } = useSettings();
@@ -65,11 +66,12 @@ export default function ExploreScreen({ navigation }) {
   const row = (key, render) => ({ key, render });
   const sections = [
     featured && row("billboard", () => <Billboard item={featured} onOpen={open} />),
+    row("continue", () => <ContinueStrip onOpen={open} />),
     row("new-eps", () => <NewEpisodeCards onOpen={open} />),
     row("coming-up", () => <Countdowns onOpen={open} />),
+    row("week", () => <WeekBanner onOpen={open} />),
     // only the newest announcement; View more opens More → Other → New announcements
     row("announced", () => <LatestAnnouncement onOpen={open} onMore={() => navigation.navigate("More", { openOther: "announced" })} />),
-    !wide && row("search", () => searchRow),
     row("tiles", () => <TileGrid state={ex} keys={GRID_KEYS} onOpen={openCategory} />),
     // poster rows below the tiles: most mix all five kinds; Popular in town shows one kind at a time (chips),
     // and Also watch this has only what you can watch
@@ -86,11 +88,10 @@ export default function ExploreScreen({ navigation }) {
 
   const header = !wide && (
     <>
-    <View style={styles.hero}>
-      {/* the same animated sky as More (sun by day, moon and stars by night) */}
-      <View style={StyleSheet.absoluteFill}><AnimatedBanner accent={C.purple} dark={dark} height={170} /></View>
-      <View style={styles.heroTop}><Brand size={20} /></View>
+    <View style={styles.top}>
+      <View style={styles.topRow}><Brand size={22} /></View>
       <Text style={styles.hello} accessibilityRole="header">{greetingFor(new Date().getHours(), settings.name)}</Text>
+      {searchRow}
     </View>
     </>
     ) || null;
@@ -120,9 +121,9 @@ export default function ExploreScreen({ navigation }) {
 const makeStyles = (C) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
   header: { paddingHorizontal: 14, paddingTop: 10 },
-  hero: { height: 170, overflow: "hidden", justifyContent: "space-between", padding: 14, paddingBottom: 18 },
-  heroTop: { flexDirection: "row", alignItems: "center" },
-  hello: { color: "#fff", fontSize: 30, fontWeight: "900", textShadowColor: "rgba(0,0,0,0.35)", textShadowRadius: 8, textShadowOffset: { width: 0, height: 2 } },
+  top: { paddingTop: 6 },
+  topRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 14 },
+  hello: { color: C.text, fontSize: 24, fontWeight: "900", paddingHorizontal: 14, marginTop: 8 },
   brand: { color: C.text, fontSize: 22, fontWeight: "800" },
   searchBtn: {
     marginTop: 10, height: 40, borderRadius: 12, borderWidth: 1,

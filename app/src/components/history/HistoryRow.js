@@ -3,6 +3,8 @@
 import { useRef } from "react";
 import { View, Text, Image, Pressable, Animated, PanResponder, StyleSheet, useWindowDimensions } from "react-native";
 import Svg, { Path, Polyline } from "react-native-svg";
+import { kindOf } from "@voidpop/shared/backend/store";
+import { KIND_LABEL } from "@voidpop/shared/features/entryLine";
 import { useTheme } from "../../context/ThemeContext.js";
 
 const PANEL = 96; // width of the trash panel
@@ -47,12 +49,13 @@ export default function HistoryRow({ x, lines, badge, onOpen, onMenu, onRemove }
       <Animated.View style={[styles.row, { backgroundColor: C.bg, transform: [{ translateX: shift }] }]} {...pan.panHandlers}>
         <Pressable onPress={() => (open.current ? slide(0) : onOpen())} style={styles.main} accessibilityRole="button"
           accessibilityLabel={`${x.item.title}. ${lines.join(". ")}`} accessibilityHint="Swipe left or use the menu to remove from history">
-          <View style={{ width: thumbW, height: thumbH, borderRadius: 10, overflow: "hidden", backgroundColor: C.border }}>
+          <View style={{ width: thumbW, height: thumbH, borderRadius: 10, overflow: "hidden", backgroundColor: x.item.color || C.border }}>
             {src ? <Image source={{ uri: src }} style={{ width: thumbW, height: thumbH }} resizeMode="cover" resizeMethod="resize" /> : null}
             <View style={styles.badge}><Text style={styles.badgeText}>{badge}</Text></View>
             <View style={styles.track}><View style={[styles.fill, { width: `${Math.round((x.fraction || 0) * 100)}%` }]} /></View>
           </View>
           <View style={{ flex: 1 }}>
+            <Text style={styles.kind}>{(KIND_LABEL[kindOf(x.item)] || "").toUpperCase()}</Text>
             <Text style={styles.title} numberOfLines={3}>{x.item.title}</Text>
             {lines.filter(Boolean).map((l, i) => <Text key={i} style={styles.sub} numberOfLines={1}>{l}</Text>)}
           </View>
@@ -74,6 +77,7 @@ const makeStyles = (C) => StyleSheet.create({
   badgeText: { color: "#fff", fontSize: 12, fontWeight: "800" },
   track: { position: "absolute", left: 0, right: 0, bottom: 0, height: 3, backgroundColor: "rgba(255,255,255,0.3)" },
   fill: { height: 3, backgroundColor: C.purple },
+  kind: { color: C.purple, fontSize: 10, fontWeight: "800", letterSpacing: 1.1 },
   title: { color: C.text, fontSize: 15, fontWeight: "800", lineHeight: 20 },
   sub: { color: C.faint, fontSize: 13, lineHeight: 19, marginTop: 1 },
   dots: { paddingHorizontal: 6, paddingVertical: 4, gap: 3, alignItems: "center" },

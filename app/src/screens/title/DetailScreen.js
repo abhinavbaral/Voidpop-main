@@ -26,6 +26,7 @@ import { completeEarlierSeasons, undoEarlierSeasons } from "@voidpop/shared/feat
 import { getCachedItem, cacheItem, openDetail, goBackOrHome } from "../../utils/nav";
 import { releaseLabel, formatCountdown, dayLabel, airTime, parseLocalDateTime } from "@voidpop/shared/lib/format";
 import { projectStale } from "@voidpop/shared/features/nextEpisode";
+import { KIND_LABEL } from "@voidpop/shared/features/entryLine";
 import { useNow } from "@voidpop/shared/lib/useNow";
 import { useSettings } from "@voidpop/shared/backend/SettingsContext";
 import { useIsWide } from "../../utils/layout";
@@ -35,6 +36,7 @@ import {
   getExcited, toggleExcited, getEntry, setProgress, setKnownAired, setManualNext, aniListCounting, noteAiring, totalFor, unitFor, airedFor, maxProgress, checkProgress,
   doneLabel, fillCompleted,
 } from "@voidpop/shared/backend/store";
+import { kindOf } from "@voidpop/shared/backend/store";
 import { fetchAniListDetail, fetchAniListItem, fetchNextEpisodes } from "@voidpop/shared/api/anilist";
 import { readableAccent, withAlpha } from "@voidpop/shared/lib/color";
 import ReviewCard from "../../components/title/ReviewCard.js";
@@ -321,6 +323,7 @@ function DetailBody({ item, navigation }) {
               )}
             </TouchableOpacity>
             <View style={{ flex: 1 }}>
+              <Text style={styles.eyebrow}>{(KIND_LABEL[kindOf(item)] || "").toUpperCase()}</Text>
               <Text style={[styles.title, wide && styles.titleWide]}>{item.title}</Text>
               {!!creator && (
                 <Text style={styles.creator}>
@@ -653,7 +656,8 @@ const makeStyles = (C) => StyleSheet.create({
   poster: { width: 120, aspectRatio: 2 / 3, borderRadius: 12, backgroundColor: C.card },
   noImg: { alignItems: "center", justifyContent: "center" },
   posterWide: { width: 220, borderRadius: 14 },
-  title: { color: C.text, fontSize: 19, fontWeight: "800" },
+  eyebrow: { color: C.purple, fontSize: 11, fontWeight: "800", letterSpacing: 1.2 },
+  title: { color: C.text, fontSize: 26, fontWeight: "900", lineHeight: 28, letterSpacing: 0.4, textTransform: "uppercase" },
   titleWide: { fontSize: 30, lineHeight: 36 },
   creator: { color: C.orange, fontSize: 13, fontWeight: "700", marginTop: 6 },
   creatorLabel: { color: C.faint, fontSize: 10, fontWeight: "800", letterSpacing: 1, textTransform: "uppercase" },

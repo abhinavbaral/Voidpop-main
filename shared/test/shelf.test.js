@@ -115,3 +115,19 @@ test("a comic's total is its issue count, and finished wording fits each kind", 
   assert.equal(s.doneLabel(comic), `✓ All ${comic.chapters} read`);
   assert.equal(s.doneLabel(game), "✓ Completed");
 });
+
+test("entry line: where you are, for every kind", async () => {
+  const { entryLine } = await import("../features/entryLine.js");
+  const now = 1_000_000_000_000;
+  const [game] = (await fetchShelf("game")).items, [comic] = (await fetchShelf("comic")).items;
+  assert.equal(entryLine({ item: game, status: "watching", progress: 90 }, now).line, "1 h 30 m played");
+  assert.equal(entryLine({ item: game, status: "plan", progress: 0 }, now).line, "Not started");
+  const c = entryLine({ item: comic, status: "watching", progress: 12 }, now);
+  assert.equal(c.line, `Issue 12/${comic.chapters}`);
+  assert.ok(Math.abs(c.ratio - 12 / comic.chapters) < 1e-9);
+  const anime = { segment: "anime", id: 1, title: "A", episodes: 12, nextEpisode: { episode: 8, airingAt: now / 1000 + 90000 } };
+  const a = entryLine({ item: anime, status: "watching", progress: 7 }, now);
+  assert.match(a.line, /^Ep 7\/12 · in 1d/);
+  assert.equal(entryLine({ item: { segment: "manga", id: 2, title: "M", chapters: 100 }, status: "completed", progress: 100 }, now).ratio, 1);
+  assert.equal(entryLine({ item: { segment: "movie", id: 3, title: "F", dateLabel: "2025" }, status: "plan" }, now).line, "2025");
+});

@@ -206,7 +206,7 @@ export default function HistoryScreen({ navigation }) {
 const makeStyles = (C) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
   top: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 14, paddingTop: 6 },
-  title: { color: C.text, fontSize: 32, fontWeight: "900" },
+  title: { color: C.text, fontSize: 32, fontWeight: "900", letterSpacing: 0.6, textTransform: "uppercase" },
   dot: { width: 4, height: 4, borderRadius: 2, backgroundColor: C.text },
   search: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 12, marginHorizontal: 14, paddingHorizontal: 12, height: 44, borderRadius: 10, backgroundColor: C.card },
   input: { flex: 1, color: C.text, fontSize: 15, paddingVertical: 0 },
@@ -214,5 +214,5 @@ const makeStyles = (C) => StyleSheet.create({
   chip: { height: 34, paddingHorizontal: 14, borderRadius: 8, backgroundColor: C.card, alignItems: "center", justifyContent: "center" },
   chipText: { color: C.text, fontWeight: "700", fontSize: 14 },
   note: { color: C.faint, fontSize: 12, paddingHorizontal: 14, marginBottom: 4 },
-  day: { color: C.text, fontSize: 20, fontWeight: "900", paddingHorizontal: 14, paddingTop: 14, paddingBottom: 6 },
+  day: { color: C.purple, fontSize: 18, fontWeight: "900", letterSpacing: 0.6, textTransform: "uppercase", paddingHorizontal: 14, paddingTop: 18, paddingBottom: 6 },
 });

@@ -42,7 +42,7 @@ export default function PosterRow({ title, items, loading, onOpen, dot, chip, on
     <View style={{ marginTop: wide ? 26 : 18 }}>
       <View style={styles.head}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 1 }}>
-          <Text style={[styles.title, wide && { fontSize: 19 }]} numberOfLines={1}>{dot ? <Text style={{ color: dot }}>● </Text> : null}{title}</Text>
+          <Text style={[styles.title, wide && { fontSize: 24 }]} accessibilityRole="header" numberOfLines={1}>{dot ? <Text style={{ color: dot }}>● </Text> : null}{title}</Text>
           {chip && (
             <Pressable disabled={!chip.onPress} onPress={chip.onPress} style={[styles.chip, chip.onPress && { borderColor: C.purple }]}
               accessibilityRole={chip.onPress ? "button" : undefined} accessibilityLabel={chip.a11y}>
@@ -53,8 +53,8 @@ export default function PosterRow({ title, items, loading, onOpen, dot, chip, on
           )}
         </View>
         {onMore && !wide && (
-          <Pressable onPress={onMore} hitSlop={10} accessibilityRole="button" accessibilityLabel={`See all: ${title}`}>
-            <Text style={{ color: C.purple, fontWeight: "800", fontSize: 13 }}>See all ›</Text>
+          <Pressable onPress={onMore} hitSlop={10} accessibilityRole="button" accessibilityLabel={`See all: ${title}`} style={styles.more}>
+            <Text style={{ color: C.purple, fontWeight: "800", fontSize: 12 }}>See more</Text>
           </Pressable>
         )}
         {wide && !loading && (
@@ -118,9 +118,10 @@ const makeStyles = (C) => StyleSheet.create({
   chipText: { color: C.sub, fontSize: 12, fontWeight: "700" },
   head: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    paddingHorizontal: 14, marginBottom: 4,
+    paddingHorizontal: 14, marginBottom: 8,
   },
-  title: { color: C.text, fontWeight: "800", fontSize: 16 },
+  title: { color: C.text, fontWeight: "900", fontSize: 22, letterSpacing: 0.6, textTransform: "uppercase" },
+  more: { borderWidth: 1, borderColor: C.purple, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 4 },
   arrow: {
     width: 32, height: 32, borderRadius: 16, borderWidth: 1, borderColor: C.border,
     backgroundColor: C.card, alignItems: "center", justifyContent: "center",
