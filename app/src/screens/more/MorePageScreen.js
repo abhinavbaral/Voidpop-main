@@ -18,7 +18,7 @@ import { useTheme } from "../../context/ThemeContext.js";
 import { goBackOrHome } from "../../utils/nav";
 import { durationLabel } from "@voidpop/shared/lib/format";
 import {
-  FREQUENCIES, getBackupConfig, setFrequency, chooseFolder, backupNow, restoreFromFile, listBackups, restoreFromUri, markBackedUp,
+  FREQUENCIES, getBackupConfig, saveBackupAs, setFrequency, chooseFolder, backupNow, restoreFromFile, listBackups, restoreFromUri, markBackedUp,
 } from "../../services/backup";
 import { ensurePermission, rescheduleEpisodeAlerts } from "../../services/episodeAlerts";
 import AniListSync from "../../components/library/AniListSync.js";
@@ -327,7 +327,8 @@ function DataStorage({ styles, C }) {
   const [restoreFiles, setRestoreFiles] = useState(null); // the files in the Voidpop folder, while choosing one
   // Sent here by the login screen: make a backup first, then it takes you straight back to signing in
   const navigation = useNavigation();
-  const forSignIn = !!useRoute().params?.forSignIn;
+  const params = useRoute().params;
+  const forSignIn = !!params?.forSignIn;
   const backedUp = async () => {
     if (!forSignIn) return;
     await markBackedUp().catch(() => {});
@@ -367,6 +368,14 @@ function DataStorage({ styles, C }) {
   const create = () => run(async () => {
     try {
       if (AUTO_BACKUP) {
+        // Android's Save screen opens in your Voidpop folder with the name popv<next> filled in; Save writes it
+        try {
+          const r = await saveBackupAs();
+          if (r.cancelled) { setMessage("Backup not saved."); return; }
+          setMessage(`Backup saved as ${r.name}.`);
+          await backedUp();
+          return;
+        } catch { /* the Save screen couldn't open: fall back to choosing the folder */ }
         let dir = cfg?.dirUri ? cfg : await chooseFolder();
         if (!dir) { setMessage("No folder chosen, so no backup was made."); return; }
         const saved = await backupNow();
@@ -376,6 +385,12 @@ function DataStorage({ styles, C }) {
       await backedUp(); // from the login screen: now on to signing in
     } catch { setMessage("Couldn't create the backup. Choose the backup folder again."); }
   });
+  // More > Login (a guest, no server yet) sends you here: the Save screen opens straight away
+  useEffect(() => {
+    if (!params?.startBackup) return;
+    navigation.setParams({ startBackup: undefined });
+    create();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const afterRestore = (err) => {
     if (err === "cancelled") return;
     setMessage(err || "Library restored from backup.");

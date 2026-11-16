@@ -27,7 +27,7 @@ export const FREQUENCIES = [
 ];
 export const KEEP = 5; // newest numbered backups kept in the folder
 
-const DEFAULT = { dirUri: null, dirName: null, freq: "daily", last: null, lastFile: null, lastError: null };
+const DEFAULT = { dirUri: null, dirName: null, freq: "daily", last: null, lastFile: null, lastError: null, counter: 0 };
 
 export async function getBackupConfig() {
   try {
@@ -81,6 +81,28 @@ export async function chooseFolder() {
     dirName = `${dirName}/${BACKUP_FOLDER}`;
   }
   return saveConfig({ dirUri, dirName, lastError: null });
+}
+
+// Create backup: Android's own "Save" screen opens, in your Voidpop folder when you have one, with the file already named
+// popv<next number>. You can move to another folder or change the name; tapping Save writes the backup there.
+// -> { name, uri } or { cancelled: true }. Throws if the save screen can't open (the caller then falls back to the folder way).
+export async function saveBackupAs() {
+  const cfg = await getBackupConfig();
+  let names = [];
+  try { if (cfg.dirUri) names = (await SAF.readDirectoryAsync(cfg.dirUri)).map(leafName); } catch { /* the folder is gone: the counter below still gives a number */ }
+  const number = Math.max(nextBackupNumber(names), (cfg.counter || 0) + 1);
+  const name = `popv${number}`;
+  // loaded only now: a build made before this package was added then fails here (and the caller falls back), not at startup
+  const IntentLauncher = await import("expo-intent-launcher");
+  const res = await IntentLauncher.startActivityAsync("android.intent.action.CREATE_DOCUMENT", {
+    category: "android.intent.category.OPENABLE",
+    type: "application/json",
+    extra: { "android.intent.extra.TITLE": `${name}.json`, ...(cfg.dirUri ? { "android.provider.extra.INITIAL_URI": cfg.dirUri } : {}) },
+  });
+  if (res.resultCode !== -1 || !res.data) return { cancelled: true }; // -1 is Android's RESULT_OK
+  await writeAsStringAsync(res.data, await exportData());
+  await saveConfig({ counter: number, last: new Date().toISOString(), lastFile: name, lastError: null });
+  return { name, uri: res.data };
 }
 
 // Writes the next numbered backup (popv1, popv2 …) into the Voidpop folder, then

@@ -5,7 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Brand from "../../components/brand/Brand.js";
 import { buildExplore } from "@voidpop/shared/features/explore";
 import { billboardPick } from "@voidpop/shared/features/exploreMix";
-import { GRID_KEYS, ROW_KEYS, TALK_KINDS, TALK_DEFAULT, viewTile } from "@voidpop/shared/features/exploreTiles";
+import { ROW_KEYS, TALK_KINDS, TALK_DEFAULT, COMING_KINDS, viewTile } from "@voidpop/shared/features/exploreTiles";
 import { greetingFor } from "@voidpop/shared/lib/greeting";
 import { useSettings } from "@voidpop/shared/backend/SettingsContext";
 import NamePrompt from "../../components/welcome/NamePrompt.js";
@@ -13,13 +13,15 @@ import { useTheme } from "../../context/ThemeContext.js";
 import { openDetail } from "../../utils/nav";
 import { useIsWide } from "../../utils/layout";
 import Icon from "../../components/ui/Icon.js";
-import ContinueStrip from "../../components/explore/ContinueStrip.js";
-import WeekBanner from "../../components/explore/WeekBanner.js";
 import { NewEpisodeCards, Countdowns, LatestAnnouncement } from "../../components/explore/ExploreCards.js";
 import Billboard from "../../components/explore/Billboard.js";
-import TileGrid from "../../components/explore/TileGrid.js";
 import { useExplore, initExplore, refreshPersonal, rerollAll } from "../../state/explore";
 import PosterRow from "../../components/ui/PosterRow.js";
+
+// Don't miss this: one tile per kind behind the chips
+const DM_KEY = { anime: "dmAnime", manga: "dmManga", novel: "dmNovels", movie: "dmMovies", tv: "dmTv", game: "dmGames", comic: "dmComics" };
+const DM_KINDS = TALK_KINDS; // the same seven kinds the Popular in town chips use
+const AWARDS = [{ key: "aoty", label: "Anime of the Year" }, { key: "oscars", label: "Oscars" }, { key: "emmys", label: "Emmys" }];
 
 export default function ExploreScreen({ navigation }) {
   const { C } = useTheme();
@@ -29,6 +31,9 @@ export default function ExploreScreen({ navigation }) {
   const ex = useExplore();
   const [refreshing, setRefreshing] = useState(false);
   const [talkKind, setTalkKind] = useState(TALK_DEFAULT); // Popular in town: one kind at a time, anime to start
+  const [dmKind, setDmKind] = useState("anime");           // Don't miss this: one kind at a time
+  const [awardKey, setAwardKey] = useState("aoty");        // Awards: Anime of the Year, Oscars or Emmys
+  const [soonKind, setSoonKind] = useState("all");         // Out soon: every kind, or one
 
   useEffect(() => { initExplore(); }, []);
   // what's in your library and your verdicts change as you use the app, so these refresh on every visit
@@ -64,15 +69,31 @@ export default function ExploreScreen({ navigation }) {
   );
 
   const row = (key, render) => ({ key, render });
+  // one poster row from a tile's content. title: shown instead of the tile's own; kinds: switch chips; kindArg: passed on
+  // to the row's own page; extra: more state for the tile
+  const chipRow = (key, title, kinds, kindArg, extra) => {
+    const v = viewTile(key, extra ? { ...ex, ...extra } : ex);
+    if (v.hidden) return null;
+    return (
+      <PosterRow title={title || v.title} items={v.items || undefined} loading={v.loading} onOpen={open} kinds={kinds}
+        onMore={() => openCategory(key, kindArg || undefined)} />
+    );
+  };
   const sections = [
     featured && row("billboard", () => <Billboard item={featured} onOpen={open} />),
-    row("continue", () => <ContinueStrip onOpen={open} />),
     row("new-eps", () => <NewEpisodeCards onOpen={open} />),
-    row("coming-up", () => <Countdowns onOpen={open} />),
-    row("week", () => <WeekBanner onOpen={open} />),
+    // what you're watching, then what you're waiting for (Excited marks and sequels of shows you watched), then where to jump back in
+    row("coming-up", () => <Countdowns mode="up" onOpen={open} />),
+    row("coming-soon", () => <Countdowns mode="soon" extra={ex.newSeasons} onOpen={open} />),
+    row("jump", () => chipRow("jump", "Jump back in")),
     // only the newest announcement; View more opens More → Other → New announcements
     row("announced", () => <LatestAnnouncement onOpen={open} onMore={() => navigation.navigate("More", { openOther: "announced" })} />),
-    row("tiles", () => <TileGrid state={ex} keys={GRID_KEYS} onOpen={openCategory} />),
+    // the colourful tile grid is gone: what was in it is now poster rows, switched with chips where it covers several things
+    row("dm", () => chipRow(DM_KEY[dmKind], "Don't miss this", { options: DM_KINDS, value: dmKind, onChange: setDmKind }, dmKind)),
+    row("soon", () => chipRow("coming", "Out soon", { options: COMING_KINDS, value: soonKind, onChange: setSoonKind }, soonKind === "all" ? null : soonKind, { comingKind: soonKind === "all" ? null : soonKind })),
+    row("awards", () => chipRow(awardKey, "Awards", { options: AWARDS, value: awardKey, onChange: setAwardKey })),
+    row("angles", () => chipRow("angles", "VoidPop Angles")),
+    row("trending", () => chipRow("trending")),
     // poster rows below the tiles: most mix all five kinds; Popular in town shows one kind at a time (chips),
     // and Also watch this has only what you can watch
     ...ROW_KEYS.filter((key) => !viewTile(key, ex).hidden).map((key) => row(`row-${key}`, () => {

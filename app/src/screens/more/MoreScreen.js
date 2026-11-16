@@ -1,36 +1,40 @@
-// MORE — laid out like the "More" tab in reader apps: Voidmon on top with your rank
-// badge right beside him (just the badge: tap it for Ranks and badges), then menu rows
-// that open Statistics, Data and storage,
-// Appearance (theme, colour, name) and Settings (24-hour clock, countdown badges,
-// episode alerts, welcome tour),
-// Help and About (MorePageScreen).
-// When a VoidPop server is set up, the account rows sit next to Sync: someone who is not signed in (a guest, or
-// anyone who skipped the login screen) sees "Sign in"; someone signed in sees "Account" (their username) and "Log out".
+// MORE — your profile on top (name, rank, and Login or Log out), a row of numbers (titles, finished, this week), then the menus
+// as rounded cards: Statistics, Compare, Data and storage; Void AI, Other; Sync (and Account when signed in); Appearance,
+// Settings, Help and About (MorePageScreen).
+//   - Signed in (needs a VoidPop server): your username and a Log out button (two taps, since Alert doesn't exist on web).
+//   - A guest (everyone, until the server exists): a Login button. With a server it opens the sign-in page, which backs up the
+//     library first; without one it opens Create backup, the way to keep your library safe.
 
 import { ScrollView, View, Text, Pressable, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
-import { getUserTier } from "@voidpop/shared/backend/store";
+import { getUserTier, getRanksCollected, getLibraryAll, getLog } from "@voidpop/shared/backend/store";
+import { libraryStats, weekSummary } from "@voidpop/shared/features/summaries";
 import { logout } from "@voidpop/shared/api/community";
 import { useAccount } from "@voidpop/shared/backend/useCommunity";
+import { useSettings } from "@voidpop/shared/backend/SettingsContext";
 import { useTheme } from "../../context/ThemeContext.js";
 import Voidmon from "../../components/brand/Voidmon.js";
-import AnimatedBanner from "../../components/brand/AnimatedBanner.js";
 import Icon from "../../components/ui/Icon.js";
 import OtherPopup from "../../components/more/OtherPopup.js";
 
 const GROUPS = [
   [["statistics", "stats", "Statistics"], ["compare", "list", "Compare"], ["data", "storage", "Data and storage"]],
-  [["voidai", "explore", "Void AI"], ["other", "menu", "Other"]], // opens a popup with You're watching and New announcements
-  [["anilist", "sync", "Sync"], ["account", "profile", "Account"]], // the account rows are worked out below (Sign in / Account + Log out)
+  [["voidai", "explore", "Void AI"], ["other", "menu", "Other"]], // Other opens a popup with You're watching and New announcements
+  [["anilist", "sync", "Sync"], ["account", "profile", "Account"]], // Account only when signed in
   [["appearance", "palette", "Appearance"], ["settings", "settings", "Settings"], ["help", "help", "Help"], ["about", "info", "About"]],
 ];
+const RANKS_TOTAL = 15;
 
 export default function MoreScreen({ navigation, route }) {
-  const { C, dark } = useTheme();
+  const { C } = useTheme();
   const styles = makeStyles(C);
+  const { settings } = useSettings();
   const [rank, setRank] = useState(null);
+  const [collected, setCollected] = useState(0);
+  const [entries, setEntries] = useState([]);
+  const [log, setLog] = useState([]);
   const [otherOpen, setOtherOpen] = useState(false);
   const [otherSection, setOtherSection] = useState(null); // which section Other opens on (Explore's "View more" sends "announced")
   const wanted = route?.params?.openOther;
@@ -40,73 +44,90 @@ export default function MoreScreen({ navigation, route }) {
     setOtherOpen(true);
     navigation.setParams({ openOther: undefined }); // used up: coming back to More later shouldn't reopen it
   }, [wanted, navigation]);
-  const { user, ready, enabled } = useAccount();
-  const [confirmLogout, setConfirmLogout] = useState(false); // logging out takes two taps, since Alert doesn't exist on web
+  const { user, enabled } = useAccount();
+  const [confirmLogout, setConfirmLogout] = useState(false);
   useEffect(() => {
     if (!confirmLogout) return undefined;
     const t = setTimeout(() => setConfirmLogout(false), 4000);
     return () => clearTimeout(t);
   }, [confirmLogout]);
 
-  // the rows of a group: the Account row turns into "Sign in", or "Account" and "Log out"
-  const rowsOf = (group) => group.flatMap(([page, icon, label]) => {
-    if (page !== "account") return [{ page, icon, label }];
-    if (!enabled || !ready) return [];
-    if (!user) return [{ page: "signin", icon: "login", label: "Sign in", sub: "Comments, shared Void Verdicts and cloud backup" }];
-    return [
-      { page: "account", icon: "profile", label: "Account", sub: user.username },
-      { page: "logout", icon: "logout", label: confirmLogout ? "Tap again to log out" : "Log out", danger: confirmLogout },
-    ];
-  });
+  useFocusEffect(useCallback(() => {
+    getUserTier().then(setRank).catch(() => {});
+    getRanksCollected().then(setCollected).catch(() => {});
+    getLibraryAll().then((l) => setEntries(Object.values(l))).catch(() => {});
+    getLog().then(setLog).catch(() => {});
+  }, []));
+  const stats = useMemo(() => libraryStats(entries), [entries]);
+  const week = useMemo(() => weekSummary(log), [log]);
+
+  const login = () => {
+    if (enabled) navigation.navigate("SignIn", { inApp: true }); // backs up a guest's library first, then returns here
+    else navigation.navigate("MorePage", { page: "data", startBackup: true }); // no server yet: Create backup opens
+  };
+  const doLogout = () => {
+    if (!confirmLogout) { setConfirmLogout(true); return; }
+    setConfirmLogout(false);
+    logout().catch(() => {}); // signed out; the app carries on as a guest with everything still on this phone
+  };
   const open = (page) => {
     if (page === "voidai") navigation.navigate("VoidAI");
     else if (page === "other") setOtherOpen(true);
-    else if (page === "signin") navigation.navigate("SignIn", { inApp: true }); // the same login page; backs up a guest's library first, then returns here
     else if (page === "account") navigation.navigate("Account");
-    else if (page === "logout") {
-      if (!confirmLogout) { setConfirmLogout(true); return; }
-      setConfirmLogout(false);
-      logout().catch(() => {}); // signed out; the app carries on in guest mode with everything still on this phone
-    } else navigation.navigate("MorePage", { page });
+    else navigation.navigate("MorePage", { page });
   };
-  useFocusEffect(useCallback(() => {
-    getUserTier().then(setRank).catch(() => {});
-  }, []));
+  const rowsOf = (group) => group.filter(([page]) => page !== "account" || !!user);
 
+  const name = (settings.name || "").trim() || "You";
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <ScrollView contentContainerStyle={{ paddingBottom: 30 }}>
-        <View style={styles.logoWrap}>
-          <View style={StyleSheet.absoluteFill}><AnimatedBanner accent={C.purple} dark={dark} height={190} /></View>
-          {/* Voidmon peeks over the bottom edge of the banner */}
-          <Voidmon pose="peeking" size={220} />
-          {/* the rank badge sits on Voidmon's right, level with his bottom edge */}
-          {rank && (
-            <Pressable
-              onPress={() => navigation.navigate("MorePage", { page: "badge" })}
-              hitSlop={10}
-              accessibilityRole="button"
-              accessibilityLabel={`Your rank: ${rank.tier.label}. Opens ranks and achievements.`}
-              style={({ pressed }) => [styles.badge, { borderColor: rank.tier.color }, pressed && { opacity: 0.8 }]}
-            >
-              <Icon name={rank.tier.key === "addicted" ? "coffee" : "star"} size={24} color={rank.tier.color} fill={rank.tier.key !== "addicted"} />
-            </Pressable>
-          )}
+        <Text style={styles.screenTitle} accessibilityRole="header">More</Text>
+
+        <View style={styles.card}>
+          <View style={styles.profileRow}>
+            <View style={styles.avatar}><Voidmon pose="peeking" size={74} /></View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.name} numberOfLines={1}>{name}</Text>
+              <Text style={styles.sub} numberOfLines={1}>{user ? `@${user.username}` : "Guest · saved on this phone"}</Text>
+              {rank && <Text style={[styles.rank, { color: rank.tier.color }]} numberOfLines={1}>{rank.tier.label}</Text>}
+            </View>
+            {user ? (
+              <Pressable onPress={doLogout} accessibilityRole="button" style={[styles.pill, confirmLogout && { borderColor: C.rose }]}>
+                <Text style={[styles.pillText, confirmLogout && { color: C.rose }]}>{confirmLogout ? "Tap again" : "Log out"}</Text>
+              </Pressable>
+            ) : (
+              <Pressable onPress={login} accessibilityRole="button" accessibilityLabel="Login. Opens Create backup" style={[styles.pill, { backgroundColor: C.purple, borderColor: C.purple }]}>
+                <Text style={[styles.pillText, { color: "#fff" }]}>Login</Text>
+              </Pressable>
+            )}
+          </View>
+          <Pressable onPress={() => navigation.navigate("MorePage", { page: "badge" })} accessibilityRole="button" accessibilityLabel={`Rank collector: ${collected} of ${RANKS_TOTAL} ranks. Opens ranks and achievements.`} style={{ marginTop: 14 }}>
+            <View style={styles.rankHead}>
+              <Text style={styles.label}>RANK COLLECTOR</Text>
+              <Text style={styles.small}>{collected} of {RANKS_TOTAL} ranks</Text>
+            </View>
+            <View style={styles.track}><View style={[styles.fill, { width: `${Math.max(3, (collected / RANKS_TOTAL) * 100)}%` }]} /></View>
+          </Pressable>
         </View>
+
+        <View style={styles.tiles}>
+          {[["TITLES", stats.titles], ["FINISHED", stats.done], ["THIS WEEK", week.total]].map(([label, value]) => (
+            <View key={label} style={styles.tile}>
+              <Text style={styles.label}>{label}</Text>
+              <Text style={styles.tileValue}>{value}</Text>
+            </View>
+          ))}
+        </View>
+
         {GROUPS.map((group, i) => (
           <View key={i} style={styles.group}>
-            {rowsOf(group).map(({ page, icon, label, sub, danger }) => (
-              <Pressable
-                key={page}
-                style={({ pressed }) => [styles.row, pressed && { backgroundColor: C.card }]}
-                onPress={() => open(page)}
-                accessibilityRole="button"
-              >
-                <View style={styles.icon}><Icon name={icon} size={21} color={danger ? C.rose : C.purple} /></View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.label, danger && { color: C.rose }]}>{label}</Text>
-                  {!!sub && <Text style={styles.sub} numberOfLines={1}>{sub}</Text>}
-                </View>
+            {rowsOf(group).map(([page, icon, label], k, rows) => (
+              <Pressable key={page} onPress={() => open(page)} accessibilityRole="button"
+                style={({ pressed }) => [styles.row, k < rows.length - 1 && styles.rowLine, pressed && { backgroundColor: C.bg }]}>
+                <View style={styles.icon}><Icon name={icon} size={20} color={C.purple} /></View>
+                <Text style={styles.rowText}>{page === "account" && user ? `Account · @${user.username}` : label}</Text>
+                <Text style={styles.chev}>›</Text>
               </Pressable>
             ))}
           </View>
@@ -118,13 +139,28 @@ export default function MoreScreen({ navigation, route }) {
 }
 
 const makeStyles = (C) => StyleSheet.create({
-  // Voidmon's drawing fills the middle 56% of his 220-wide picture (±62), so the badge starts just past that
-  badge: { position: "absolute", bottom: 8, left: "50%", marginLeft: 74, width: 52, height: 52, borderRadius: 26, borderWidth: 4, alignItems: "center", justifyContent: "center", backgroundColor: "#171226" },
   safe: { flex: 1, backgroundColor: C.bg },
-  logoWrap: { height: 190, alignItems: "center", justifyContent: "flex-end", marginBottom: 8, overflow: "hidden" },
-  group: { borderTopWidth: 1, borderTopColor: C.border, paddingVertical: 6 },
-  row: { flexDirection: "row", alignItems: "center", gap: 22, paddingHorizontal: 22, paddingVertical: 16 },
+  screenTitle: { color: C.text, fontSize: 32, fontWeight: "900", letterSpacing: 0.6, textTransform: "uppercase", paddingHorizontal: 14, paddingTop: 8, paddingBottom: 10 },
+  card: { backgroundColor: C.card, borderColor: C.border, borderWidth: 1, borderRadius: 18, padding: 16, marginHorizontal: 14 },
+  profileRow: { flexDirection: "row", alignItems: "center", gap: 14 },
+  avatar: { width: 64, height: 64, borderRadius: 32, overflow: "hidden", backgroundColor: C.bg, borderWidth: 2, borderColor: C.purple, alignItems: "center", justifyContent: "flex-end" },
+  name: { color: C.text, fontSize: 24, fontWeight: "900", letterSpacing: 0.3 },
+  sub: { color: C.faint, fontSize: 12, marginTop: 2 },
+  rank: { fontSize: 13, fontWeight: "800", marginTop: 3 },
+  pill: { borderWidth: 1, borderColor: C.border, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 9 },
+  pillText: { color: C.text, fontWeight: "800", fontSize: 13 },
+  label: { color: C.purple, fontSize: 11, fontWeight: "800", letterSpacing: 1.2 },
+  small: { color: C.faint, fontSize: 12 },
+  rankHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  track: { height: 6, borderRadius: 3, backgroundColor: C.border, marginTop: 8, overflow: "hidden" },
+  fill: { height: 6, borderRadius: 3, backgroundColor: C.purple },
+  tiles: { flexDirection: "row", gap: 10, paddingHorizontal: 14, marginTop: 12 },
+  tile: { flex: 1, backgroundColor: C.card, borderColor: C.border, borderWidth: 1, borderRadius: 16, padding: 14 },
+  tileValue: { color: C.text, fontSize: 28, fontWeight: "900", marginTop: 2 },
+  group: { backgroundColor: C.card, borderColor: C.border, borderWidth: 1, borderRadius: 18, marginHorizontal: 14, marginTop: 12, overflow: "hidden" },
+  row: { flexDirection: "row", alignItems: "center", gap: 14, paddingHorizontal: 16, paddingVertical: 15 },
+  rowLine: { borderBottomWidth: 1, borderBottomColor: C.border },
   icon: { width: 24, alignItems: "center" },
-  label: { color: C.text, fontSize: 16, fontWeight: "600" },
-  sub: { color: C.sub, fontSize: 12, marginTop: 2 },
+  rowText: { flex: 1, color: C.text, fontSize: 16, fontWeight: "700" },
+  chev: { color: C.faint, fontSize: 22 },
 });

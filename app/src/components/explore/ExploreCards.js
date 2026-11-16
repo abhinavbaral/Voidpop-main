@@ -1,10 +1,11 @@
 // Explore's big cards (ideas from the "It's Fun Time!" concept):
 //   NewEpisodeCards   one colourful card per show with episodes you haven't
 //                     watched yet: "New episode · Ep 22", swipe sideways
-//   Countdowns        "Coming up" (replaced Up next): a days : hours : minutes
-//                     banner card for every anime you're Watching or Excited
-//                     about, soonest first, with "3 pending" / "All caught up"
-//                     in the heading and +1 on cards you're behind on
+//   Countdowns        a days : hours : minutes banner card per anime, soonest first, swipe sideways. Two uses:
+//                     mode "up"   "Coming up": the anime you're Watching, with "3 pending" / "All caught up" in the
+//                                 heading and +1 on cards you're behind on
+//                     mode "soon" "Coming soon": anime you marked Excited, plus the sequels of shows you watched
+//                                 (passed in as `extra`); nothing to catch up on, hidden when there are none
 import { useCallback, useEffect, useRef, useState } from "react";
 import { View, Text, Image, ScrollView, Pressable, StyleSheet, useWindowDimensions } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
@@ -18,6 +19,7 @@ import { loadAnnounced, daysLeft } from "@voidpop/shared/features/announced";
 import { releaseLabel } from "@voidpop/shared/lib/format";
 import { useTheme } from "../../context/ThemeContext.js";
 import Icon from "../ui/Icon.js";
+import SectionHead from "../ui/SectionHead.js";
 import VerdictModal from "../title/VerdictModal.js";
 import { VoidmonCheer } from "../brand/Voidmon.js";
 
@@ -97,7 +99,7 @@ function Fade({ id }) {
 
 // Every anime you're Watching or Excited about that has something coming,
 // soonest first, one banner card each (swipe sideways).
-export function Countdowns({ onOpen }) {
+export function Countdowns({ onOpen, mode = "up", extra }) {
   const { C } = useTheme();
   const { user } = useAuth();
   const { width } = useWindowDimensions();
@@ -108,15 +110,18 @@ export function Countdowns({ onOpen }) {
   const [finishing, setFinishing] = useState(null);
   const read = useCallback(async () => {
     const [lib, ex] = await Promise.all([getLibrary(), getExcited()]);
-    const watch = Object.values(lib).filter((e) => e.status === "watching" && e.item.segment === "anime");
-    const picked = [...watch, ...Object.values(ex)].map((e) => e.item).filter((i) => i.segment === "anime");
+    const allWatching = Object.values(lib).filter((e) => e.status === "watching" && e.item.segment === "anime");
+    const watch = mode === "up" ? allWatching : [];
+    const beingWatched = new Set(allWatching.map((e) => e.item.id)); // those belong to Coming up, not here
+    const picked = (mode === "up" ? allWatching.map((e) => e.item) : [...Object.values(ex).map((e) => e.item), ...(extra || [])].filter((i) => !beingWatched.has(i.id)))
+      .filter((i) => i.segment === "anime");
     const ids = [...new Set(picked.map((i) => i.id))];
     // fresh data: the saved copy may be old or missing its banner
     const fresh = await fetchNextEpisodes(ids).catch(() => ({}));
     await noteAiring(fresh).catch(() => {}); // keeps the saved copies (and delay tags) current
     setMine(ids.map((id) => fresh[id] || picked.find((i) => i.id === id)));
     setWatching(Object.fromEntries(watch.map((e) => [e.item.id, { ...e, item: { ...e.item, ...(fresh[e.item.id] || {}) } }])));
-  }, []);
+  }, [mode, extra]);
   useFocusEffect(useCallback(() => { read().catch(() => {}); }, [read]));
   useEffect(() => onDataChange(() => { read().catch(() => {}); }), [read]);
   if (!mine || !mine.length) return null;
@@ -133,15 +138,12 @@ export function Countdowns({ onOpen }) {
     await addReview(user, finishing.segment, finishing.id, { verdict, vibes, moods, comment });
     setFinishing(null);
   };
+  if (mode === "soon" && !list.length) return null; // nothing marked or announced: no empty box
   return (
-    <View style={{ marginTop: 22 }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, marginBottom: 10 }}>
-        <Icon name="clock" size={17} color={C.orange} />
-        <Text style={{ color: C.text, fontWeight: "800", fontSize: 16, flex: 1 }}>Coming up</Text>
-        {Object.keys(watching).length > 0 && (
-          <Text style={{ color: pending ? C.orange : C.green, fontWeight: "800", fontSize: 12 }}>{pending ? `${pending} pending` : "All caught up"}</Text>
-        )}
-      </View>
+    <View>
+      <SectionHead title={mode === "up" ? "Coming up" : "Coming soon"} right={Object.keys(watching).length > 0 ? (
+        <Text style={{ color: pending ? C.orange : C.green, fontWeight: "800", fontSize: 12, flex: 1, textAlign: "right" }}>{pending ? `${pending} pending` : "All caught up"}</Text>
+      ) : null} />
       {!list.length && (
         pending ? (
           <Text style={{ color: C.faint, fontSize: 13, paddingHorizontal: 14 }}>Nothing airing soon. Catch up on your new episodes above.</Text>
